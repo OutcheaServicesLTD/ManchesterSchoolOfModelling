@@ -20,7 +20,7 @@ specification section 51.
 | ----- | ----- | ----- |
 | 1 | Project, configuration, Identity, roles, authorization policies, domain entities, database abstraction | Done |
 | 2 | Client onboarding, GHL contact ID capture, profile, measurements, guardian workflow | Done |
-| 3 | Media storage abstraction, upload pipeline, 60-image pool, 30-image portfolio, featured image, self-tape | Not started |
+| 3 | Media storage abstraction, upload pipeline, 60-image pool, 30-image portfolio, featured image, self-tape | Done |
 | 4 | Retoucher queue, assignments, upload workspace, submit for review | Not started |
 | 5 | Admin dashboard, client management, portfolio preview, status management, publish/unpublish | Not started |
 | 6 | Public portfolio, responsive gallery, contact MSM, Model Board, slugs | Not started |
@@ -140,6 +140,57 @@ thing the specification prohibits. The hard stop is the one section 11 states �
 and publication — enforced by `ClientProfile.IsBlockedPendingGuardianConsent`. If MSM
 would rather block preparation too, that is a one-line change.
 
+## Media
+
+Each client has one private pool of up to 60 images, of which at most 30 appear on
+their portfolio. That gap is the point: staff work from more photographs than the model
+ever shows publicly.
+
+**Media is never served from `wwwroot`.** Files live outside the web root and every
+request goes through `/media/{assetId}/{variant}`, which decides access:
+
+| Requester | Sees |
+| --------- | ---- |
+| Staff (Super Admin, Admin, Retoucher) | Any asset |
+| The owning client | Their own library |
+| Anonymous, including agencies | Only images selected for a **published** portfolio |
+
+Both conditions matter for the public case. A selected image on an unpublished
+portfolio stays private, and an unselected image on a published portfolio stays private.
+A denied request returns 404 rather than 403, because a 403 would confirm the asset id
+exists.
+
+### Image processing
+
+Uploads are decoded rather than trusted by extension or content type, so a renamed
+non-image is rejected. Each accepted image is archived exactly as uploaded, and three
+web renditions are generated (large 2000px, medium 1200px, thumbnail 400px on the
+longest edge). Nothing is cropped and nothing is scaled up: renditions preserve the
+original aspect ratio, so portrait and landscape are equally well supported, and a
+small original is left at its own size rather than enlarged.
+
+Grids use thumbnails and lazy loading; the archived original is never sent to a browser.
+
+Batch uploads report each file individually, so one rejected photograph does not force
+a retoucher to restart the batch.
+
+### Featured image
+
+Exactly one portfolio image is the featured image, used as the portfolio hero and the
+Model Board card. The specification stores this in two places — a flag on the asset and
+a foreign key on the portfolio — so both are maintained in one place in `MediaService`
+and can never disagree. Selecting the first image promotes it automatically; removing or
+deselecting the featured image promotes another, and emptying the portfolio clears it.
+
+Removal is a soft delete. The row is flagged and the file stays in storage, so a
+mistaken removal is recoverable; permanent destruction is a Super Admin action.
+
+### Image library choice
+
+SkiaSharp (MIT). ImageSharp is the more common choice but requires a paid commercial
+licence above a revenue threshold, which would be a licensing liability for a commercial
+product.
+
 ## Database
 
 The provider is deliberately configurable, because the production database is still an
@@ -163,6 +214,11 @@ Notes for when the provider is chosen:
 - SQLite stores `decimal` as text, so money columns do not sort or compare correctly in
   raw SQL. This affects development only; PostgreSQL and SQL Server both map `decimal`
   natively.
+- SQLite has no native `DateTimeOffset` and refuses to sort one, so on that provider
+  only, timestamps are stored as UTC ticks via a value converter. Without it, queries
+  such as "the most recent self-tape" throw rather than return rows. Nothing is lost,
+  because every timestamp in this application is written as UTC. PostgreSQL and SQL
+  Server handle the type natively and are untouched.
 - `MigrateOnStartup` is convenient in development. Production deployments normally
   migrate as a separate, deliberate step — set it to `false` there.
 
@@ -190,8 +246,13 @@ Carried from specification section 52. These are configuration decisions, not mi
 requirements.
 
 - **Database provider** — abstracted; see the Database section above.
-- **Media/object storage provider** — `Media:StorageProvider` is `LocalDisk` for now.
-  Azure Blob, S3 or R2 slot in behind the same interface in Phase 3.
+- **Media/object storage provider** — `LocalDiskMediaStorageService` is registered for
+  now. Azure Blob, S3 or R2 slot in behind `IMediaStorageService` by changing that one
+  registration. Local disk does not survive a multi-server deployment or a container
+  rebuild, so this needs deciding before go-live.
+- **Malware scanning** — specification section 38 asks for it where the hosting
+  infrastructure supports it. Uploads are currently validated by decoding rather than
+  scanned; wire a scanner in once hosting is chosen.
 - **Final maintenance price** — `Commerce:MaintenancePrice`, placeholder £19.99.
   Existing subscriptions keep the price agreed when they started.
 - **Maintenance start date** — `Commerce:MaintenanceStartsAfterDays`, currently 0.

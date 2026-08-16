@@ -1,0 +1,65 @@
+@model Msm.Portfolio.Web.ViewModels.SelfTapeViewModel
+@{
+    ViewData["Title"] = "My self-tape";
+    var error = TempData["Error"] as string;
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <h1>My self-tape</h1>
+
+        <p class="lead">
+            A short video introducing yourself. This appears on your portfolio only if
+            you upload one.
+        </p>
+
+        @if (error is not null)
+        {
+            <div class="alert alert-danger" role="alert">@error</div>
+        }
+
+        @if (Model.HasSelfTape)
+        {
+            <div class="card mb-4">
+                <div class="card-body">
+                    <h2 class="h5 card-title">Your current self-tape</h2>
+
+                    <video controls preload="metadata" class="w-100 mb-3" style="max-height: 480px; background:#000;">
+                        <source src="/media/@Model.AssetId" />
+                        Your browser cannot play this video.
+                    </video>
+
+                    <p class="text-muted">@Model.Filename</p>
+
+                    <form method="post" asp-action="RemoveSelfTape"
+                          onsubmit="return confirm('Remove your self-tape?');">
+                        <button type="submit" class="btn btn-outline-danger">Remove self-tape</button>
+                    </form>
+                </div>
+            </div>
+        }
+
+        <div class="card">
+            <div class="card-body">
+                <h2 class="h5 card-title">
+                    @(Model.HasSelfTape ? "Replace your self-tape" : "Upload a self-tape")
+                </h2>
+
+                @if (Model.HasSelfTape)
+                {
+                    <p class="text-muted">Uploading a new video replaces the one above.</p>
+                }
+
+                <form method="post" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="file" class="form-label">Choose a video</label>
+                        <input id="file" name="file" type="file" class="form-control"
+                               accept="@Model.AcceptAttribute" />
+                        <div class="form-text">Up to @Model.MaxMegabytes MB.</div>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Upload</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,134 @@
+@model Msm.Portfolio.Web.ViewModels.MediaLibraryViewModel
+@{
+    ViewData["Title"] = "My photographs";
+    var error = TempData["Error"] as string;
+    var summary = TempData["UploadSummary"] as string;
+    var failures = TempData["UploadFailures"] as string;
+}
+
+<h1>My photographs</h1>
+
+<p class="lead">
+    Choose which photographs appear on your portfolio. You can show up to
+    @Model.PortfolioLimit of them.
+</p>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+@if (summary is not null)
+{
+    <div class="alert alert-success" role="alert">
+        @summary
+        @if (failures is not null)
+        {
+            <div class="mt-2"><strong>Not uploaded:</strong> @failures</div>
+        }
+    </div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 class="h6 card-title">On your portfolio</h2>
+                <p class="h4 mb-0">@Model.SelectedCount <small class="text-muted">of @Model.PortfolioLimit</small></p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 class="h6 card-title">In your library</h2>
+                <p class="h4 mb-0">@Model.Assets.Count <small class="text-muted">of @Model.PoolLimit</small></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h2 class="h5 card-title">Add photographs</h2>
+
+        @if (Model.PoolIsFull)
+        {
+            <p class="text-muted mb-0">
+                Your library is full. Remove a photograph before adding another.
+            </p>
+        }
+        else
+        {
+            <form method="post" asp-action="Upload" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label for="files" class="form-label">Choose images</label>
+                    <input id="files" name="files" type="file" class="form-control"
+                           multiple accept="@Model.AcceptAttribute" />
+                    <div class="form-text">
+                        Up to @Model.MaxImageMegabytes MB each. Portrait and landscape are both fine.
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Upload</button>
+            </form>
+        }
+    </div>
+</div>
+
+@if (Model.Assets.Count == 0)
+{
+    <p class="text-muted">You have no photographs yet.</p>
+}
+else
+{
+    <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">
+        @foreach (var asset in Model.Assets)
+        {
+            <div class="col">
+                <div class="card h-100 @(asset.IsSelected ? "border-primary" : "")">
+                    @* Thumbnails in the grid, never originals (specification section 42). *@
+                    <img src="/media/@asset.Id/thumbnail"
+                         class="card-img-top"
+                         loading="lazy"
+                         style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background:#f6f6f6;"
+                         alt="@asset.Filename" />
+
+                    <div class="card-body p-2">
+                        @if (asset.IsFeatured)
+                        {
+                            <span class="badge text-bg-primary mb-2">Main image</span>
+                        }
+                        else if (asset.IsSelected)
+                        {
+                            <span class="badge text-bg-secondary mb-2">On portfolio</span>
+                        }
+
+                        <div class="d-grid gap-1">
+                            <form method="post" asp-action="Select" asp-route-assetId="@asset.Id">
+                                <input type="hidden" name="selected" value="@((!asset.IsSelected).ToString().ToLowerInvariant())" />
+                                <button type="submit"
+                                        class="btn btn-sm w-100 @(asset.IsSelected ? "btn-outline-secondary" : "btn-outline-primary")"
+                                        @(Model.PortfolioIsFull && !asset.IsSelected ? "disabled" : "")>
+                                    @(asset.IsSelected ? "Remove from portfolio" : "Add to portfolio")
+                                </button>
+                            </form>
+
+                            @if (asset.IsSelected && !asset.IsFeatured)
+                            {
+                                <form method="post" asp-action="Featured" asp-route-assetId="@asset.Id">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary w-100">
+                                        Make main image
+                                    </button>
+                                </form>
+                            }
+
+                            <form method="post" asp-action="Remove" asp-route-assetId="@asset.Id"
+                                  onsubmit="return confirm('Remove this photograph from your library?');">
+                                <button type="submit" class="btn btn-sm btn-outline-danger w-100">Remove</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}

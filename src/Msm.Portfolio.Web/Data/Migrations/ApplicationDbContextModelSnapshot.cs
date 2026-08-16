@@ -160,8 +160,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                         .IsConcurrencyToken()
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Email")
                         .HasMaxLength(256)
@@ -177,8 +177,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     b.Property<bool>("IsActive")
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset?>("LastLoginAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("LastLoginAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("LastName")
                         .HasMaxLength(100)
@@ -187,8 +187,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     b.Property<bool>("LockoutEnabled")
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset?>("LockoutEnd")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("LockoutEnd")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("NormalizedEmail")
                         .HasMaxLength(256)
@@ -256,8 +256,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     b.Property<string>("OldValue")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("Timestamp")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("Timestamp")
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid?>("UserId")
                         .HasColumnType("TEXT");
@@ -288,8 +288,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     b.Property<string>("Biography")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<DateOnly?>("DateOfBirth")
                         .HasColumnType("TEXT");
@@ -335,8 +335,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -355,8 +355,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset?>("ApprovedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("ApprovedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("ClientId")
                         .HasColumnType("TEXT");
@@ -365,8 +365,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                         .HasMaxLength(50)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Email")
                         .IsRequired()
@@ -390,8 +390,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset?>("TokenExpiresAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("TokenExpiresAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("VerificationToken")
                         .IsRequired()
@@ -418,19 +418,19 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     b.Property<Guid>("ClientId")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Currency")
                         .IsRequired()
                         .HasMaxLength(3)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset?>("GracePeriodEndsAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("GracePeriodEndsAt")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset?>("NextPaymentDate")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("NextPaymentDate")
+                        .HasColumnType("INTEGER");
 
                     b.Property<decimal>("PriceAtCreation")
                         .HasPrecision(18, 2)
@@ -443,14 +443,14 @@ namespace Msm.Portfolio.Web.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset?>("StartDate")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("StartDate")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -474,8 +474,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     b.Property<Guid>("ClientId")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset?>("DeletedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("DeletedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("DisplayOrder")
                         .HasColumnType("INTEGER");
@@ -516,8 +516,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("UploadedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("UploadedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid?>("UploadedByUserId")
                         .HasColumnType("TEXT");
@@ -560,8 +560,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     b.Property<int>("Unit")
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Value")
                         .IsRequired()
@@ -582,8 +582,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<bool>("IsRead")
                         .HasColumnType("INTEGER");
@@ -622,17 +622,17 @@ namespace Msm.Portfolio.Web.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset?>("CheckoutStartedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("CheckoutStartedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("ClientId")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset?>("ConfirmedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("ConfirmedAt")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Currency")
                         .IsRequired()
@@ -643,8 +643,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset?>("NoSaleAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("NoSaleAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("ProductId")
                         .HasColumnType("TEXT");
@@ -673,8 +673,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Currency")
                         .IsRequired()
@@ -700,8 +700,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -726,8 +726,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     b.Property<string>("Payload")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset?>("ProcessedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("ProcessedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("ProcessingError")
                         .HasMaxLength(2000)
@@ -746,8 +746,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("ReceivedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("ReceivedAt")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -766,8 +766,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     b.Property<Guid>("ClientId")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("CrmSyncError")
                         .HasMaxLength(1000)
@@ -776,8 +776,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     b.Property<int>("CrmSyncStatus")
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset?>("CrmSyncedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("CrmSyncedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid?>("FeaturedMediaId")
                         .HasColumnType("TEXT");
@@ -788,8 +788,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     b.Property<bool>("IsVisibleOnModelBoard")
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset?>("PublishedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("PublishedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Slug")
                         .HasMaxLength(160)
@@ -798,11 +798,11 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset?>("UnpublishedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("UnpublishedAt")
+                        .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -836,8 +836,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("CreatedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<string>("Currency")
                         .IsRequired()
@@ -860,8 +860,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                         .HasPrecision(18, 2)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -877,26 +877,26 @@ namespace Msm.Portfolio.Web.Data.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("AssignedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("AssignedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("ClientId")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset?>("CompletedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("CompletedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid>("RetoucherUserId")
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset?>("StartedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("StartedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<int>("Status")
                         .HasColumnType("INTEGER");
 
-                    b.Property<DateTimeOffset?>("SubmittedForReviewAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long?>("SubmittedForReviewAt")
+                        .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
 
@@ -922,8 +922,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("TEXT");
 
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("TEXT");
+                    b.Property<long>("UpdatedAt")
+                        .HasColumnType("INTEGER");
 
                     b.Property<Guid?>("UpdatedByUserId")
                         .HasColumnType("TEXT");

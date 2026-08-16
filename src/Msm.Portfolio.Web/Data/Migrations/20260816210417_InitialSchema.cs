@@ -34,8 +34,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     FirstName = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
                     LastName = table.Column<string>(type: "TEXT", maxLength: 100, nullable: true),
                     IsActive = table.Column<bool>(type: "INTEGER", nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    LastLoginAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
+                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: false),
+                    LastLoginAt = table.Column<long>(type: "INTEGER", nullable: true),
                     UserName = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
                     NormalizedUserName = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
                     Email = table.Column<string>(type: "TEXT", maxLength: 256, nullable: true),
@@ -47,7 +47,7 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     PhoneNumber = table.Column<string>(type: "TEXT", nullable: true),
                     PhoneNumberConfirmed = table.Column<bool>(type: "INTEGER", nullable: false),
                     TwoFactorEnabled = table.Column<bool>(type: "INTEGER", nullable: false),
-                    LockoutEnd = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
+                    LockoutEnd = table.Column<long>(type: "INTEGER", nullable: true),
                     LockoutEnabled = table.Column<bool>(type: "INTEGER", nullable: false),
                     AccessFailedCount = table.Column<int>(type: "INTEGER", nullable: false)
                 },
@@ -65,8 +65,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     ProviderEventId = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
                     EventType = table.Column<string>(type: "TEXT", maxLength: 200, nullable: false),
                     Payload = table.Column<string>(type: "TEXT", nullable: true),
-                    ReceivedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    ProcessedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
+                    ReceivedAt = table.Column<long>(type: "INTEGER", nullable: false),
+                    ProcessedAt = table.Column<long>(type: "INTEGER", nullable: true),
                     ProcessingStatus = table.Column<int>(type: "INTEGER", nullable: false),
                     ProcessingError = table.Column<string>(type: "TEXT", maxLength: 2000, nullable: true)
                 },
@@ -88,8 +88,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     BillingType = table.Column<int>(type: "INTEGER", nullable: false),
                     BillingInterval = table.Column<int>(type: "INTEGER", nullable: false),
                     IsActive = table.Column<bool>(type: "INTEGER", nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false)
+                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: false),
+                    UpdatedAt = table.Column<long>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -104,7 +104,7 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     Key = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
                     Value = table.Column<string>(type: "TEXT", maxLength: 2000, nullable: true),
                     Description = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
+                    UpdatedAt = table.Column<long>(type: "INTEGER", nullable: false),
                     UpdatedByUserId = table.Column<Guid>(type: "TEXT", nullable: true)
                 },
                 constraints: table =>
@@ -229,7 +229,7 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     Action = table.Column<string>(type: "TEXT", maxLength: 100, nullable: false),
                     OldValue = table.Column<string>(type: "TEXT", nullable: true),
                     NewValue = table.Column<string>(type: "TEXT", nullable: true),
-                    Timestamp = table.Column<DateTimeOffset>(type: "TEXT", nullable: false)
+                    Timestamp = table.Column<long>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -261,8 +261,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     InstagramUrl = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
                     TikTokUrl = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
                     AccountStatus = table.Column<int>(type: "INTEGER", nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false)
+                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: false),
+                    UpdatedAt = table.Column<long>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -285,7 +285,7 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     Message = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: false),
                     Url = table.Column<string>(type: "TEXT", maxLength: 500, nullable: true),
                     IsRead = table.Column<bool>(type: "INTEGER", nullable: false),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false)
+                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -311,9 +311,9 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     Status = table.Column<int>(type: "INTEGER", nullable: false),
                     ConsentVersion = table.Column<string>(type: "TEXT", maxLength: 50, nullable: true),
                     VerificationToken = table.Column<string>(type: "TEXT", maxLength: 128, nullable: false),
-                    TokenExpiresAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
-                    ApprovedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false)
+                    TokenExpiresAt = table.Column<long>(type: "INTEGER", nullable: true),
+                    ApprovedAt = table.Column<long>(type: "INTEGER", nullable: true),
+                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -337,11 +337,11 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     PriceAtCreation = table.Column<decimal>(type: "TEXT", precision: 18, scale: 2, nullable: false),
                     Currency = table.Column<string>(type: "TEXT", maxLength: 3, nullable: false),
                     Status = table.Column<int>(type: "INTEGER", nullable: false),
-                    StartDate = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
-                    NextPaymentDate = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
-                    GracePeriodEndsAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false)
+                    StartDate = table.Column<long>(type: "INTEGER", nullable: true),
+                    NextPaymentDate = table.Column<long>(type: "INTEGER", nullable: true),
+                    GracePeriodEndsAt = table.Column<long>(type: "INTEGER", nullable: true),
+                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: false),
+                    UpdatedAt = table.Column<long>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -375,12 +375,12 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     Orientation = table.Column<int>(type: "INTEGER", nullable: false),
                     MediaType = table.Column<int>(type: "INTEGER", nullable: false),
                     UploadedByUserId = table.Column<Guid>(type: "TEXT", nullable: true),
-                    UploadedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
+                    UploadedAt = table.Column<long>(type: "INTEGER", nullable: false),
                     IsSelectedForPortfolio = table.Column<bool>(type: "INTEGER", nullable: false),
                     IsFeatured = table.Column<bool>(type: "INTEGER", nullable: false),
                     DisplayOrder = table.Column<int>(type: "INTEGER", nullable: false),
                     IsDeleted = table.Column<bool>(type: "INTEGER", nullable: false),
-                    DeletedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true)
+                    DeletedAt = table.Column<long>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -410,7 +410,7 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     CanonicalValue = table.Column<decimal>(type: "TEXT", precision: 10, scale: 2, nullable: true),
                     Unit = table.Column<int>(type: "INTEGER", nullable: false),
                     DisplayOrder = table.Column<int>(type: "INTEGER", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false)
+                    UpdatedAt = table.Column<long>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -434,10 +434,10 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     Currency = table.Column<string>(type: "TEXT", maxLength: 3, nullable: false),
                     Status = table.Column<int>(type: "INTEGER", nullable: false),
                     GoCardlessReference = table.Column<string>(type: "TEXT", maxLength: 200, nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    CheckoutStartedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
-                    ConfirmedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
-                    NoSaleAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true)
+                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: false),
+                    CheckoutStartedAt = table.Column<long>(type: "INTEGER", nullable: true),
+                    ConfirmedAt = table.Column<long>(type: "INTEGER", nullable: true),
+                    NoSaleAt = table.Column<long>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -464,10 +464,10 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     ClientId = table.Column<Guid>(type: "TEXT", nullable: false),
                     RetoucherUserId = table.Column<Guid>(type: "TEXT", nullable: false),
                     Status = table.Column<int>(type: "INTEGER", nullable: false),
-                    AssignedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    StartedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
-                    SubmittedForReviewAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
-                    CompletedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true)
+                    AssignedAt = table.Column<long>(type: "INTEGER", nullable: false),
+                    StartedAt = table.Column<long>(type: "INTEGER", nullable: true),
+                    SubmittedForReviewAt = table.Column<long>(type: "INTEGER", nullable: true),
+                    CompletedAt = table.Column<long>(type: "INTEGER", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -497,13 +497,13 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     FeaturedMediaId = table.Column<Guid>(type: "TEXT", nullable: true),
                     IsPublished = table.Column<bool>(type: "INTEGER", nullable: false),
                     IsVisibleOnModelBoard = table.Column<bool>(type: "INTEGER", nullable: false),
-                    PublishedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
-                    UnpublishedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
+                    PublishedAt = table.Column<long>(type: "INTEGER", nullable: true),
+                    UnpublishedAt = table.Column<long>(type: "INTEGER", nullable: true),
                     CrmSyncStatus = table.Column<int>(type: "INTEGER", nullable: false),
-                    CrmSyncedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: true),
+                    CrmSyncedAt = table.Column<long>(type: "INTEGER", nullable: true),
                     CrmSyncError = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false)
+                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: false),
+                    UpdatedAt = table.Column<long>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -534,8 +534,8 @@ namespace Msm.Portfolio.Web.Data.Migrations
                     Currency = table.Column<string>(type: "TEXT", maxLength: 3, nullable: false),
                     Status = table.Column<int>(type: "INTEGER", nullable: false),
                     FailureReason = table.Column<string>(type: "TEXT", maxLength: 1000, nullable: true),
-                    CreatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false),
-                    UpdatedAt = table.Column<DateTimeOffset>(type: "TEXT", nullable: false)
+                    CreatedAt = table.Column<long>(type: "INTEGER", nullable: false),
+                    UpdatedAt = table.Column<long>(type: "INTEGER", nullable: false)
                 },
                 constraints: table =>
                 {

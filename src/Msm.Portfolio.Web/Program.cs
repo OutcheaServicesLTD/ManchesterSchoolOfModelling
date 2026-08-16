@@ -6,6 +6,7 @@ using Msm.Portfolio.Web.Configuration;
 using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.Services;
+using Msm.Portfolio.Web.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -59,6 +60,12 @@ builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IClientProfileAccessor, ClientProfileAccessor>();
 builder.Services.AddScoped<IGuardianConsentService, GuardianConsentService>();
 builder.Services.AddScoped<IClientOnboardingService, ClientOnboardingService>();
+builder.Services.AddScoped<IMediaService, MediaService>();
+builder.Services.AddSingleton<IImageProcessor, ImageProcessor>();
+
+// Local disk for now. Object storage replaces this registration once MSM's hosting is
+// decided; nothing above the interface changes (specification section 33).
+builder.Services.AddSingleton<IMediaStorageService, LocalDiskMediaStorageService>();
 
 // Logs messages rather than delivering them. Client-facing messaging is intended to run
 // through GoHighLevel automation in Phase 9; this keeps the guardian workflow complete

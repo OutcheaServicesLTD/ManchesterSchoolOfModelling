@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Msm.Portfolio.Web.Domain.Entities;
 
 namespace Msm.Portfolio.Web.Data;
@@ -288,5 +289,48 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
             entity.HasIndex(s => s.Key).IsUnique();
         });
+
+        ApplySqliteDateTimeOffsetWorkaround(builder);
+    }
+
+    /// <summary>
+    /// Stores <see cref="DateTimeOffset"/> as UTC ticks when running on SQLite.
+    /// </summary>
+    /// <remarks>
+    /// SQLite has no native type for it and refuses to sort one, so "the most recent
+    /// self-tape" or "the newest audit entry" would throw rather than return rows.
+    /// Ticks sort correctly and lose nothing here, because every timestamp in this
+    /// application is written as UTC. PostgreSQL and SQL Server both handle the type
+    /// natively and are left alone.
+    /// </remarks>
+    private void ApplySqliteDateTimeOffsetWorkaround(ModelBuilder builder)
+    {
+        if (!Database.IsSqlite())
+        {
+            return;
+        }
+
+        var converter = new ValueConverter<DateTimeOffset, long>(
+            value => value.UtcTicks,
+            ticks => new DateTimeOffset(ticks, TimeSpan.Zero));
+
+        var nullableConverter = new ValueConverter<DateTimeOffset?, long?>(
+            value => value == null ? null : value.Value.UtcTicks,
+            ticks => ticks == null ? null : new DateTimeOffset(ticks.Value, TimeSpan.Zero));
+
+        foreach (var entityType in builder.Model.GetEntityTypes())
+        {
+            foreach (var property in entityType.GetProperties())
+            {
+                if (property.ClrType == typeof(DateTimeOffset))
+                {
+                    property.SetValueConverter(converter);
+                }
+                else if (property.ClrType == typeof(DateTimeOffset?))
+                {
+                    property.SetValueConverter(nullableConverter);
+                }
+            }
+        }
     }
 }

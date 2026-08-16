@@ -1,0 +1,116 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Msm.Portfolio.Web.Authorization;
+using Msm.Portfolio.Web.Data;
+using Msm.Portfolio.Web.Domain.Entities;
+using Msm.Portfolio.Web.Domain.Enums;
+using Msm.Portfolio.Web.Storage;
+
+namespace Msm.Portfolio.Web.Controllers;
+
+/// <summary>
+/// Streams media out of storage.
+/// </summary>
+/// <remarks>
+/// Media never sits under wwwroot. A client's pool holds up to 60 images of which at
+/// most 30 are ever public, so serving files straight off disk would expose the
+/// unpublished remainder to anyone who guessed a path. Every request is authorised
+/// here instead.
+/// </remarks>
+[Route("media")]
+[AllowAnonymous]
+public class MediaController(
+    ApplicationDbContext db,
+    IMediaStorageService storage,
+    UserManager<ApplicationUser> userManager) : Controller
+{
+    [HttpGet("{assetId:guid}/{variant?}")]
+    public async Task<IActionResult> Get(
+        Guid assetId,
+        string? variant = null,
+        CancellationToken cancellationToken = default)
+    {
+        var asset = await db.MediaAssets
+            .Include(m => m.Client)
+            .ThenInclude(c => c.Portfolio)
+            .FirstOrDefaultAsync(m => m.Id == assetId && !m.IsDeleted, cancellationToken);
+
+        if (asset is null)
+        {
+            return NotFound();
+        }
+
+        if (!await IsAllowedAsync(asset))
+        {
+            // Deliberately NotFound rather than Forbid: a 403 would confirm that this
+            // asset id exists, which is itself information about a private library.
+            return NotFound();
+        }
+
+        var requested = ParseVariant(variant);
+
+        // Originals are archived at full quality and are not for browsers to fetch.
+        // Requests for one are served the large rendition instead.
+        var served = requested == MediaVariant.Original && asset.MediaType == MediaType.Image
+            ? MediaVariant.Large
+            : requested;
+
+        var key = asset.MediaType == MediaType.SelfTape
+            ? asset.StorageKey
+            : MediaStorageKeys.ForVariant(asset.StorageKey, served);
+
+        var stream = await storage.GetAsync(key, cancellationToken);
+
+        if (stream is null)
+        {
+            return NotFound();
+        }
+
+        var contentType = asset.MediaType == MediaType.SelfTape || served == MediaVariant.Original
+            ? asset.MimeType
+            : "image/jpeg";
+
+        // Immutable: an asset id always refers to the same photograph, and replacing an
+        // image creates a new asset rather than overwriting one.
+        Response.Headers.CacheControl = asset.IsSelectedForPortfolio
+            ? "public, max-age=31536000, immutable"
+            : "private, max-age=3600";
+
+        // Range support lets a self-tape be scrubbed rather than only played from the start.
+        return File(stream, contentType, enableRangeProcessing: true);
+    }
+
+    /// <summary>
+    /// Who may see this file. Staff see everything, a client sees their own library,
+    /// and the public sees only images the client has put on a published portfolio.
+    /// </summary>
+    private async Task<bool> IsAllowedAsync(MediaAsset asset)
+    {
+        if (User.Identity?.IsAuthenticated == true)
+        {
+            if (User.IsInRole(Roles.SuperAdmin) || User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Retoucher))
+            {
+                return true;
+            }
+
+            var userId = userManager.GetUserId(User);
+            if (Guid.TryParse(userId, out var id) && asset.Client.ApplicationUserId == id)
+            {
+                return true;
+            }
+        }
+
+        // Both conditions matter: an image selected for a portfolio that has not been
+        // published is still private, and an unselected image on a published portfolio
+        // is part of the private pool.
+        return asset.IsSelectedForPortfolio
+               && asset.Client.Portfolio is { IsPublished: true };
+    }
+
+    private static MediaVariant ParseVariant(string? variant) =>
+        Enum.TryParse<MediaVariant>(variant, ignoreCase: true, out var parsed)
+            ? parsed
+            : MediaVariant.Medium;
+}
