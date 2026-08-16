@@ -19,7 +19,7 @@ specification section 51.
 | Phase | Scope | State |
 | ----- | ----- | ----- |
 | 1 | Project, configuration, Identity, roles, authorization policies, domain entities, database abstraction | Done |
-| 2 | Client onboarding, GHL contact ID capture, profile, measurements, guardian workflow | Not started |
+| 2 | Client onboarding, GHL contact ID capture, profile, measurements, guardian workflow | Done |
 | 3 | Media storage abstraction, upload pipeline, 60-image pool, 30-image portfolio, featured image, self-tape | Not started |
 | 4 | Retoucher queue, assignments, upload workspace, submit for review | Not started |
 | 5 | Admin dashboard, client management, portfolio preview, status management, publish/unpublish | Not started |
@@ -96,6 +96,50 @@ owner's reach. The capabilities reserved to Super Admin in specification section
 listed in `Permissions.SuperAdminOnly`, and a test asserts no other role is granted
 them.
 
+## Onboarding and guardian consent
+
+The client arrives from a GoHighLevel link carrying their contact id:
+
+```
+/onboarding?ghlContactId=abc123
+```
+
+The contact id is stored against the client and is the permanent CRM link; email and
+telephone are never used as the CRM identifier, because either can change without the
+contact changing.
+
+Submitting the form creates the account, profile, measurements and a portfolio, and
+places that portfolio in the retoucher queue — all in one transaction, so a client can
+never exist without a portfolio or vice versa. The account is created **without a
+password**: the client receives sign-in access after purchase (specification section 50).
+
+Two behaviours here are worth knowing about:
+
+- **Nothing already stored is read back to an anonymous visitor.** The contact id
+  travels in a URL and is not a credential, so anyone holding a link could otherwise
+  read the client's date of birth, location and telephone number. Reopening a completed
+  link shows a neutral "we already have your details" page instead of the profile.
+- **Guardian requirement is derived from the date of birth**, not from the flag the
+  browser posts back, so clearing that flag in the page does not bypass the check.
+
+For an under-18 client, guardian details are mandatory and the guardian receives a
+tokenised approval link at `/guardian/approve/{token}`. The token is 32 bytes of
+cryptographic randomness, time limited, and rotated on use so a forwarded or logged
+link cannot be replayed.
+
+Until Phase 9 connects GoHighLevel messaging, `IEmailSender` is a logging
+implementation: in development the approval link appears in the application log, and
+outside development it logs an error rather than silently dropping a real guardian's
+email.
+
+### Where the under-18 block applies
+
+A minor's portfolio still enters the retoucher queue while guardian approval is
+outstanding, because the studio workflow is meant to be fast and preparation is not the
+thing the specification prohibits. The hard stop is the one section 11 states — purchase
+and publication — enforced by `ClientProfile.IsBlockedPendingGuardianConsent`. If MSM
+would rather block preparation too, that is a one-line change.
+
 ## Database
 
 The provider is deliberately configurable, because the production database is still an
@@ -131,6 +175,8 @@ will maintain them in a later phase.
 | Section | Covers |
 | ------- | ------ |
 | `Media` | 60-image pool limit, 30-image portfolio limit, file size and type restrictions, storage provider |
+| `MeasurementTemplates` | Which measurements are collected per profile type. Overrides the section 9 defaults without a schema change |
+| `GuardianConsent` | Consent wording version, approval link lifetime, consent text |
 | `Commerce` | Programme price (£3,499), maintenance price (£19.99), 7-day grace period, maintenance start offset |
 | `Msm` | Business name, public domain, contact email/phone/WhatsApp, social links |
 | `Integrations` | GoCardless and GoHighLevel credentials |
@@ -152,9 +198,13 @@ requirements.
 - **Production domain** — `Msm:PublicDomain`.
 - **MSM contact details** — `Msm:ContactEmail`, `ContactPhone`, `WhatsApp`, to be
   supplied by MSM.
-- **Guardian consent wording** — to be supplied or approved by MSM. `GuardianConsent`
-  records the version agreed, so changing the wording later cannot retrospectively
-  alter what was consented to.
+- **Guardian consent wording** — `GuardianConsent:ConsentText`, to be supplied or
+  approved by MSM. A clearly-labelled placeholder is shown until then. Each approval
+  records the version agreed (`GuardianConsent:CurrentVersion`), so changing the wording
+  later cannot retrospectively alter what was consented to.
+- **Email delivery** — no provider is configured. Guardian approval emails are only
+  logged. Either connect GoHighLevel in Phase 9 or register a real `IEmailSender`
+  before go-live.
 - **Image and video size limits** — `Media:MaxImageBytes`, `Media:MaxVideoBytes`.
 
 ### One judgement call worth confirming

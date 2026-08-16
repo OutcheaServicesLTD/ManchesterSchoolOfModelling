@@ -1,0 +1,140 @@
+@model Msm.Portfolio.Web.ViewModels.ClientProfileViewModel
+@using Msm.Portfolio.Web.Domain.Enums
+@{
+    ViewData["Title"] = "My profile";
+    var saved = TempData["Saved"] as bool? ?? false;
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <h1>My profile</h1>
+
+        @if (saved)
+        {
+            <div class="alert alert-success" role="alert">Your profile has been updated.</div>
+        }
+
+        <p class="lead">
+            Changes you make here appear on your public portfolio straight away.
+        </p>
+
+        <form method="post" novalidate>
+            <div asp-validation-summary="All" class="alert alert-danger" role="alert"
+                 style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
+
+            <fieldset class="mb-4">
+                <legend class="h5">About you</legend>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="FirstName" class="form-label"></label>
+                        <input asp-for="FirstName" class="form-control" />
+                        <span asp-validation-for="FirstName" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="LastName" class="form-label"></label>
+                        <input asp-for="LastName" class="form-control" />
+                        <span asp-validation-for="LastName" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="DisplayName" class="form-label"></label>
+                    <input asp-for="DisplayName" class="form-control" />
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="DateOfBirth" class="form-label"></label>
+                        <input asp-for="DateOfBirth" type="date" class="form-control" />
+                        <span asp-validation-for="DateOfBirth" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="Location" class="form-label"></label>
+                        <input asp-for="Location" class="form-control" />
+                    </div>
+                </div>
+            </fieldset>
+
+            @if (Model.Template.Count > 0)
+            {
+                <fieldset class="mb-4">
+                    <legend class="h5">Measurements</legend>
+
+                    @for (var i = 0; i < Model.Measurements.Count; i++)
+                    {
+                        var field = Model.Template.FirstOrDefault(f => f.Key == Model.Measurements[i].Key);
+                        if (field is null) { continue; }
+
+                        <div class="row align-items-end mb-3">
+                            <input type="hidden" asp-for="Measurements[i].Key" />
+
+                            <div class="col-md-6">
+                                <label asp-for="Measurements[i].Value" class="form-label">
+                                    @field.Label @(field.Required ? "" : "(optional)")
+                                </label>
+                                <input asp-for="Measurements[i].Value" class="form-control" inputmode="decimal" />
+                            </div>
+
+                            <div class="col-md-4">
+                                @if (field.AllowsUnitChoice)
+                                {
+                                    <label asp-for="Measurements[i].Unit" class="form-label">Unit</label>
+                                    <select asp-for="Measurements[i].Unit" class="form-select">
+                                        <option value="@((int)MeasurementUnit.Centimetres)">Centimetres</option>
+                                        <option value="@((int)MeasurementUnit.Inches)">Inches</option>
+                                    </select>
+                                }
+                                else
+                                {
+                                    <input type="hidden" asp-for="Measurements[i].Unit" />
+                                    <span class="form-text">UK sizing</span>
+                                }
+                            </div>
+                        </div>
+                    }
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="HairColour" class="form-label"></label>
+                            <input asp-for="HairColour" class="form-control" />
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label asp-for="EyeColour" class="form-label"></label>
+                            <input asp-for="EyeColour" class="form-control" />
+                        </div>
+                    </div>
+                </fieldset>
+            }
+
+            <fieldset class="mb-4">
+                <legend class="h5">About me</legend>
+
+                <div class="mb-3">
+                    <label asp-for="Biography" class="form-label"></label>
+                    <textarea asp-for="Biography" class="form-control" rows="5"></textarea>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="InstagramUrl" class="form-label"></label>
+                        <input asp-for="InstagramUrl" class="form-control" />
+                        <span asp-validation-for="InstagramUrl" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="TikTokUrl" class="form-label"></label>
+                        <input asp-for="TikTokUrl" class="form-control" />
+                        <span asp-validation-for="TikTokUrl" class="text-danger"></span>
+                    </div>
+                </div>
+            </fieldset>
+
+            <button type="submit" class="btn btn-primary">Save changes</button>
+            <a class="btn btn-link" asp-area="Client" asp-controller="Home" asp-action="Index">Cancel</a>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

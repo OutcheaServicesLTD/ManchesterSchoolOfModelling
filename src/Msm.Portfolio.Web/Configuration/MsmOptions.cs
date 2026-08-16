@@ -121,6 +121,30 @@ public class MsmBrandOptions
 }
 
 /// <summary>
+/// Guardian consent settings for under-18 clients (specification section 11).
+/// </summary>
+public class GuardianConsentOptions
+{
+    public const string SectionName = "GuardianConsent";
+
+    /// <summary>
+    /// Version of the consent wording currently in force. Recorded against each
+    /// approval, so revising the wording cannot retrospectively change what a guardian
+    /// agreed to. The wording itself is supplied or approved by MSM.
+    /// </summary>
+    public string CurrentVersion { get; set; } = "v1-draft";
+
+    /// <summary>How long an approval link stays valid.</summary>
+    public int TokenLifetimeDays { get; set; } = 14;
+
+    /// <summary>
+    /// Consent text shown to the guardian. Placeholder wording until MSM supplies the
+    /// approved version.
+    /// </summary>
+    public string? ConsentText { get; set; }
+}
+
+/// <summary>
 /// Credentials and endpoints for the external systems. Left empty in source control;
 /// supplied through user secrets or environment variables (specification section 43).
 /// </summary>

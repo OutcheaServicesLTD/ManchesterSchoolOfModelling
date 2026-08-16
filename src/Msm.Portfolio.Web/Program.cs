@@ -5,6 +5,7 @@ using Msm.Portfolio.Web.Authorization;
 using Msm.Portfolio.Web.Configuration;
 using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Entities;
+using Msm.Portfolio.Web.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +13,8 @@ builder.Services.Configure<MediaOptions>(builder.Configuration.GetSection(MediaO
 builder.Services.Configure<CommerceOptions>(builder.Configuration.GetSection(CommerceOptions.SectionName));
 builder.Services.Configure<MsmBrandOptions>(builder.Configuration.GetSection(MsmBrandOptions.SectionName));
 builder.Services.Configure<IntegrationOptions>(builder.Configuration.GetSection(IntegrationOptions.SectionName));
+builder.Services.Configure<GuardianConsentOptions>(builder.Configuration.GetSection(GuardianConsentOptions.SectionName));
+builder.Services.Configure<MeasurementTemplateOptions>(builder.Configuration.GetSection(MeasurementTemplateOptions.SectionName));
 
 builder.Services.AddApplicationData(builder.Configuration);
 
@@ -49,6 +52,18 @@ builder.Services.ConfigureApplicationCookie(options =>
 
 builder.Services.AddMsmAuthorization();
 builder.Services.AddScoped<DbSeeder>();
+
+builder.Services.AddSingleton<IMeasurementTemplateProvider, MeasurementTemplateProvider>();
+builder.Services.AddScoped<IAuditService, AuditService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IClientProfileAccessor, ClientProfileAccessor>();
+builder.Services.AddScoped<IGuardianConsentService, GuardianConsentService>();
+builder.Services.AddScoped<IClientOnboardingService, ClientOnboardingService>();
+
+// Logs messages rather than delivering them. Client-facing messaging is intended to run
+// through GoHighLevel automation in Phase 9; this keeps the guardian workflow complete
+// until then.
+builder.Services.AddScoped<IEmailSender, LoggingEmailSender>();
 
 builder.Services.AddControllersWithViews(options =>
 {

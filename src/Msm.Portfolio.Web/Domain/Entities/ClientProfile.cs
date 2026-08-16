@@ -115,4 +115,16 @@ public class ClientProfile
     /// birth is treated as requiring consent, so an incomplete profile cannot bypass the check.
     /// </summary>
     public bool RequiresGuardianConsent(DateOnly today) => AgeOn(today) is not { } age || age < 18;
+
+    /// <summary>
+    /// Whether the client is barred from purchase and publication because guardian
+    /// approval is required and has not been recorded (specification section 11).
+    /// </summary>
+    /// <remarks>
+    /// Retouching is deliberately not gated on this. The studio workflow is meant to be
+    /// fast, so preparation begins while the guardian's approval is outstanding; the
+    /// hard stop is the one the specification states, at purchase and publication.
+    /// </remarks>
+    public bool IsBlockedPendingGuardianConsent(DateOnly today) =>
+        RequiresGuardianConsent(today) && GuardianConsent?.IsApproved != true;
 }

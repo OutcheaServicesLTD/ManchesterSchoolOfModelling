@@ -1,0 +1,129 @@
+using System.ComponentModel.DataAnnotations;
+using Msm.Portfolio.Web.Configuration;
+using Msm.Portfolio.Web.Domain.Enums;
+
+namespace Msm.Portfolio.Web.ViewModels;
+
+/// <summary>The client's dashboard summary (specification section 17).</summary>
+public class ClientDashboardViewModel
+{
+    public string Name { get; set; } = string.Empty;
+
+    public PortfolioStatus PortfolioStatus { get; set; }
+
+    public bool IsPublished { get; set; }
+
+    /// <summary>Full public URL, shown with a copy button once the portfolio is live.</summary>
+    public string? PublicUrl { get; set; }
+
+    public int PortfolioImageCount { get; set; }
+
+    public int PortfolioImageLimit { get; set; }
+
+    public int MediaPoolCount { get; set; }
+
+    public int MediaPoolLimit { get; set; }
+
+    /// <summary>Rough completeness of the profile, used to prompt the client to finish it.</summary>
+    public int ProfileCompletionPercent { get; set; }
+
+    public bool GuardianApprovalPending { get; set; }
+
+    public string StatusDescription => PortfolioStatus switch
+    {
+        PortfolioStatus.AwaitingClientInformation => "We are waiting for your details.",
+        PortfolioStatus.ReadyForRetoucher => "Your photographs are queued with our team.",
+        PortfolioStatus.Retouching => "Our team is preparing your portfolio.",
+        PortfolioStatus.ReadyForReview => "Your portfolio is with our team for review.",
+        PortfolioStatus.InViewing => "Your portfolio is ready to view.",
+        PortfolioStatus.AwaitingPurchase => "Your portfolio is ready to view.",
+        PortfolioStatus.Purchased => "Thank you. We are publishing your portfolio.",
+        PortfolioStatus.Published => "Your portfolio is live.",
+        PortfolioStatus.PaymentWarning => "Your portfolio is live, but there is a problem with your payment.",
+        PortfolioStatus.Unpublished => "Your portfolio is not currently public.",
+        PortfolioStatus.NoSale => "Your portfolio is not currently public.",
+        PortfolioStatus.Archived => "Your portfolio has been archived.",
+        _ => string.Empty
+    };
+}
+
+/// <summary>
+/// The client editing their own profile (specification section 17). Once the portfolio
+/// is live these changes reach the public page immediately, with no approval step.
+/// </summary>
+public class ClientProfileViewModel : IValidatableObject
+{
+    [Required(ErrorMessage = "Please enter your first name.")]
+    [StringLength(100)]
+    [Display(Name = "First name")]
+    public string FirstName { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "Please enter your last name.")]
+    [StringLength(100)]
+    [Display(Name = "Last name")]
+    public string LastName { get; set; } = string.Empty;
+
+    [StringLength(150)]
+    [Display(Name = "Model name (if different)")]
+    public string? DisplayName { get; set; }
+
+    [Required(ErrorMessage = "Please enter your date of birth.")]
+    [DataType(DataType.Date)]
+    [Display(Name = "Date of birth")]
+    public DateOnly? DateOfBirth { get; set; }
+
+    [StringLength(200)]
+    [Display(Name = "Location")]
+    public string? Location { get; set; }
+
+    [Display(Name = "Profile type")]
+    public ModelProfileType ModelProfileType { get; set; }
+
+    [StringLength(50)]
+    [Display(Name = "Hair colour")]
+    public string? HairColour { get; set; }
+
+    [StringLength(50)]
+    [Display(Name = "Eye colour")]
+    public string? EyeColour { get; set; }
+
+    [StringLength(4000)]
+    [Display(Name = "About me")]
+    public string? Biography { get; set; }
+
+    [Url(ErrorMessage = "Please enter a valid link.")]
+    [StringLength(500)]
+    [Display(Name = "Instagram")]
+    public string? InstagramUrl { get; set; }
+
+    [Url(ErrorMessage = "Please enter a valid link.")]
+    [StringLength(500)]
+    [Display(Name = "TikTok")]
+    public string? TikTokUrl { get; set; }
+
+    public List<MeasurementInputModel> Measurements { get; set; } = [];
+
+    public IReadOnlyList<MeasurementFieldDefinition> Template { get; set; } = [];
+
+    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        if (DateOfBirth is { } dob && dob > today)
+        {
+            yield return new ValidationResult(
+                "Date of birth cannot be in the future.", [nameof(DateOfBirth)]);
+        }
+
+        foreach (var field in Template.Where(f => f.Required))
+        {
+            var entered = Measurements.FirstOrDefault(m => m.Key == field.Key);
+
+            if (entered is null || string.IsNullOrWhiteSpace(entered.Value))
+            {
+                yield return new ValidationResult(
+                    $"Please enter your {field.Label.ToLowerInvariant()}.", [nameof(Measurements)]);
+            }
+        }
+    }
+}

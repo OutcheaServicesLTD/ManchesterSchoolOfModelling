@@ -1,0 +1,16 @@
+@model Msm.Portfolio.Web.ViewModels.GuardianApprovalViewModel
+@{
+    ViewData["Title"] = "Already approved";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <h1>Already approved</h1>
+        <p class="lead">
+            Approval for @Model.ClientName was already recorded@(Model.ApprovedAt is null
+                ? ""
+                : $" on {Model.ApprovedAt:d MMMM yyyy}").
+        </p>
+        <p>There is nothing further you need to do.</p>
+    </div>
+</div>

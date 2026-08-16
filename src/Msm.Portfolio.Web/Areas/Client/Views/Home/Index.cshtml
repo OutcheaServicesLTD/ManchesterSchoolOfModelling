@@ -1,11 +1,77 @@
+@model Msm.Portfolio.Web.ViewModels.ClientDashboardViewModel
 @{
     ViewData["Title"] = "My account";
 }
 
-<h1>My account</h1>
-<p class="lead">Signed in as @User.Identity?.Name</p>
+<h1>Hello, @Model.Name</h1>
 
-<p>
-    Foundation only. The dashboard, profile and portfolio management described in
-    specification section 17 are built in Phases 2 and 3.
-</p>
+@if (Model.GuardianApprovalPending)
+{
+    @* Shown to the client and to staff, but never on the public portfolio (spec 23/11). *@
+    <div class="alert alert-warning" role="alert">
+        We are still waiting for your parent or guardian to approve. Your portfolio
+        cannot be completed until they do.
+    </div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 class="h5 card-title">Portfolio status</h2>
+                <p class="card-text">@Model.StatusDescription</p>
+
+                @if (Model.PublicUrl is not null)
+                {
+                    <label for="publicUrl" class="form-label">Your portfolio link</label>
+                    <div class="input-group">
+                        <input id="publicUrl" class="form-control" readonly value="@Model.PublicUrl" />
+                        <button class="btn btn-outline-secondary" type="button"
+                                onclick="navigator.clipboard.writeText(document.getElementById('publicUrl').value)">
+                            Copy
+                        </button>
+                    </div>
+                    <a class="btn btn-primary mt-3" href="@Model.PublicUrl">View my portfolio</a>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 class="h5 card-title">Your photographs</h2>
+
+                <p class="card-text mb-1">
+                    On your portfolio: @Model.PortfolioImageCount of @Model.PortfolioImageLimit
+                </p>
+                <div class="progress mb-3" role="progressbar"
+                     aria-label="Portfolio images used"
+                     aria-valuenow="@Model.PortfolioImageCount"
+                     aria-valuemin="0" aria-valuemax="@Model.PortfolioImageLimit">
+                    <div class="progress-bar"
+                         style="width:@(Model.PortfolioImageLimit == 0 ? 0 : Model.PortfolioImageCount * 100 / Model.PortfolioImageLimit)%"></div>
+                </div>
+
+                <p class="card-text">
+                    In your library: @Model.MediaPoolCount of @Model.MediaPoolLimit
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h2 class="h5 card-title">Your profile</h2>
+        <p class="card-text">Profile completeness: @Model.ProfileCompletionPercent%</p>
+        <div class="progress mb-3" role="progressbar"
+             aria-label="Profile completeness"
+             aria-valuenow="@Model.ProfileCompletionPercent" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress-bar" style="width:@Model.ProfileCompletionPercent%"></div>
+        </div>
+        <a class="btn btn-outline-primary" asp-area="Client" asp-controller="Profile" asp-action="Index">
+            Edit my profile
+        </a>
+    </div>
+</div>
