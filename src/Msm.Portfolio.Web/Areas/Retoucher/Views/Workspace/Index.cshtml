@@ -1,0 +1,217 @@
+@model Msm.Portfolio.Web.ViewModels.RetoucherWorkspaceViewModel
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    ViewData["Title"] = Model.ClientName;
+    var error = TempData["Error"] as string;
+    var token = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+    <div>
+        <h1 class="mb-1">@Model.ClientName</h1>
+        <p class="text-muted mb-0">Status: @Model.Status</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="/retoucher">Back to queue</a>
+</div>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+
+@if (Model.GuardianApprovalPending)
+{
+    @* Preparation is allowed; the block is at purchase and publication (spec 11). *@
+    <div class="alert alert-warning" role="alert">
+        This client is under 18 and guardian approval is still outstanding. You can
+        prepare the portfolio, but it cannot be sold or published until approval arrives.
+    </div>
+}
+
+@if (Model.AlreadySubmitted)
+{
+    <div class="alert alert-info" role="alert">
+        This portfolio has been sent for review. Any further changes will be seen by the
+        reviewing administrator.
+    </div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-sm-6">
+        <div class="card h-100"><div class="card-body">
+            <h2 class="h6 card-title">On the portfolio</h2>
+            <p class="h4 mb-0">@Model.Selected.Count <small class="text-muted">of @Model.PortfolioLimit</small></p>
+        </div></div>
+    </div>
+    <div class="col-sm-6">
+        <div class="card h-100"><div class="card-body">
+            <h2 class="h6 card-title">In the library</h2>
+            <p class="h4 mb-0">@Model.Assets.Count <small class="text-muted">of @Model.PoolLimit</small></p>
+        </div></div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h2 class="h5 card-title">Upload photographs</h2>
+
+        @if (Model.PoolIsFull)
+        {
+            <p class="text-muted mb-0">The library is full at @Model.PoolLimit images.</p>
+        }
+        else
+        {
+            <div id="uploader"
+                 data-upload-url="/retoucher/client/@Model.ClientId/upload"
+                 data-token="@token"
+                 data-max-bytes="@Model.MaxImageBytes"
+                 data-accept="@Model.AcceptAttribute"
+                 data-remaining="@(Model.PoolLimit - Model.Assets.Count)">
+
+                <div id="drop-zone" class="border border-2 border-dashed rounded p-4 text-center mb-3">
+                    <p class="mb-2">Drag photographs here</p>
+                    <label for="file-input" class="btn btn-primary mb-0">Choose files</label>
+                    @* Also a plain file input, so the workspace still works without drag and drop. *@
+                    <input id="file-input" type="file" class="visually-hidden"
+                           multiple accept="@Model.AcceptAttribute" />
+                    <p class="form-text mb-0">
+                        Up to @Model.MaxImageMegabytes MB each. Portrait and landscape both supported.
+                    </p>
+                </div>
+
+                <p id="upload-summary" class="visually-hidden" aria-live="polite"></p>
+                <ul id="upload-list" class="list-group"></ul>
+
+                <div id="refresh-after-upload" class="mt-3 d-none">
+                    <a class="btn btn-outline-primary" href="/retoucher/client/@Model.ClientId">
+                        Refresh to see the uploaded photographs
+                    </a>
+                </div>
+            </div>
+        }
+    </div>
+</div>
+
+<h2 class="h5">Portfolio (@Model.Selected.Count)</h2>
+@if (Model.Selected.Count == 0)
+{
+    <p class="text-muted">No photographs chosen yet.</p>
+}
+else
+{
+    <ol class="row row-cols-2 row-cols-md-4 g-3 list-unstyled mb-4">
+        @for (var i = 0; i < Model.Selected.Count; i++)
+        {
+            var asset = Model.Selected[i];
+            <li class="col">
+                <div class="card h-100 @(asset.IsFeatured ? "border-primary" : "")">
+                    <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
+                         style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background:#f6f6f6;"
+                         alt="@asset.Filename" />
+                    <div class="card-body p-2">
+                        <p class="small text-muted mb-1">
+                            @(i + 1). @asset.Orientation
+                            @if (asset.IsFeatured)
+                            {
+                                <span class="badge text-bg-primary">Main</span>
+                            }
+                        </p>
+
+                        <div class="btn-group btn-group-sm w-100 mb-1" role="group" aria-label="Reorder">
+                            <form method="post" asp-action="Move" asp-route-clientId="@Model.ClientId"
+                                  asp-route-assetId="@asset.Id" class="d-grid">
+                                <input type="hidden" name="direction" value="-1" />
+                                <button type="submit" class="btn btn-outline-secondary"
+                                        aria-label="Move @asset.Filename earlier" @(i == 0 ? "disabled" : "")>&larr;</button>
+                            </form>
+                            <form method="post" asp-action="Move" asp-route-clientId="@Model.ClientId"
+                                  asp-route-assetId="@asset.Id" class="d-grid">
+                                <input type="hidden" name="direction" value="1" />
+                                <button type="submit" class="btn btn-outline-secondary"
+                                        aria-label="Move @asset.Filename later"
+                                        @(i == Model.Selected.Count - 1 ? "disabled" : "")>&rarr;</button>
+                            </form>
+                        </div>
+
+                        @if (!asset.IsFeatured)
+                        {
+                            <form method="post" asp-action="Featured" asp-route-clientId="@Model.ClientId"
+                                  asp-route-assetId="@asset.Id" class="d-grid mb-1">
+                                <button type="submit" class="btn btn-sm btn-outline-primary">Make main</button>
+                            </form>
+                        }
+
+                        <form method="post" asp-action="Select" asp-route-clientId="@Model.ClientId"
+                              asp-route-assetId="@asset.Id" class="d-grid">
+                            <input type="hidden" name="selected" value="false" />
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">Remove from portfolio</button>
+                        </form>
+                    </div>
+                </div>
+            </li>
+        }
+    </ol>
+}
+
+<h2 class="h5">Library (@Model.Unselected.Count not on the portfolio)</h2>
+@if (Model.Unselected.Count == 0)
+{
+    <p class="text-muted">Every photograph is on the portfolio.</p>
+}
+else
+{
+    <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
+        @foreach (var asset in Model.Unselected)
+        {
+            <div class="col">
+                <div class="card h-100">
+                    <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
+                         style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background:#f6f6f6;"
+                         alt="@asset.Filename" />
+                    <div class="card-body p-2">
+                        <p class="small text-muted mb-1">@asset.Orientation</p>
+
+                        <form method="post" asp-action="Select" asp-route-clientId="@Model.ClientId"
+                              asp-route-assetId="@asset.Id" class="d-grid mb-1">
+                            <input type="hidden" name="selected" value="true" />
+                            <button type="submit" class="btn btn-sm btn-outline-primary"
+                                    @(Model.PortfolioIsFull ? "disabled" : "")>Add to portfolio</button>
+                        </form>
+
+                        <form method="post" asp-action="Remove" asp-route-clientId="@Model.ClientId"
+                              asp-route-assetId="@asset.Id" class="d-grid"
+                              onsubmit="return confirm('Remove this photograph?');">
+                            <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+<div class="border-top pt-3 d-flex gap-2 flex-wrap">
+    <form method="post" asp-action="Submit" asp-route-clientId="@Model.ClientId">
+        <button type="submit" class="btn btn-primary btn-lg" @(Model.CanSubmit ? "" : "disabled")>
+            Send for review
+        </button>
+    </form>
+    <a class="btn btn-outline-secondary btn-lg" href="/retoucher">Save and close</a>
+</div>
+
+@if (!Model.CanSubmit)
+{
+    <p class="form-text">
+        @(Model.Selected.Count == 0
+            ? "Choose at least one photograph before sending for review."
+            : "Choose a main image before sending for review.")
+    </p>
+}
+else
+{
+    <p class="form-text">Your changes are saved as you make them.</p>
+}
+
+@section Scripts {
+    <script src="~/js/retoucher-upload.js" asp-append-version="true"></script>
+}

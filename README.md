@@ -21,7 +21,7 @@ specification section 51.
 | 1 | Project, configuration, Identity, roles, authorization policies, domain entities, database abstraction | Done |
 | 2 | Client onboarding, GHL contact ID capture, profile, measurements, guardian workflow | Done |
 | 3 | Media storage abstraction, upload pipeline, 60-image pool, 30-image portfolio, featured image, self-tape | Done |
-| 4 | Retoucher queue, assignments, upload workspace, submit for review | Not started |
+| 4 | Retoucher queue, assignments, upload workspace, submit for review | Done |
 | 5 | Admin dashboard, client management, portfolio preview, status management, publish/unpublish | Not started |
 | 6 | Public portfolio, responsive gallery, contact MSM, Model Board, slugs | Not started |
 | 7 | Orders, checkout, GoCardless integration, webhooks | Not started |
@@ -190,6 +190,45 @@ mistaken removal is recoverable; permanent destruction is a Super Admin action.
 SkiaSharp (MIT). ImageSharp is the more common choice but requires a paid commercial
 licence above a revenue threshold, which would be a licensing liability for a commercial
 product.
+
+## Retoucher workflow
+
+The queue at `/retoucher` has the four tabs from specification section 6 — Waiting,
+In progress, Ready for review, Completed — derived from portfolio status rather than
+stored separately.
+
+**Work is claimed, not just opened.** Starting work on a waiting client creates a
+`RetoucherAssignment` and moves the portfolio to Retouching. After that, only the
+assigned retoucher can open that workspace; another retoucher is refused, so two people
+cannot unknowingly prepare the same portfolio. Unclaimed work in the Waiting tab is open
+to anyone to pick up, and Admins can open any workspace. Every workspace action
+re-checks the assignment, so the check cannot be skipped by posting directly.
+
+### Uploading
+
+The workspace sends **one file per request**. That is what makes specification section
+42's requirements achievable: a progress bar per file, a failure reported against the
+file that caused it, and a retry that re-sends only that file rather than restarting the
+batch. Drag-and-drop is progressive enhancement over a plain file input, and the
+endpoint answers in JSON — including for authorisation failures, so an expired session
+reports itself rather than surfacing as a parse error.
+
+Browser-side size and type checks exist to avoid pointless uploads; the server repeats
+every one of them.
+
+### Reordering
+
+Reordering uses move-earlier/move-later buttons rather than drag-only handles.
+Specification section 41 requires keyboard navigation, and a drag-only control is
+unusable without a mouse.
+
+### Sending for review
+
+Submitting requires at least one selected photograph and a chosen main image, otherwise
+the portfolio would reach Admin with nothing to review. It moves the assignment and
+portfolio to Ready for review, notifies staff and writes an audit entry, all in one
+transaction. Changes save as they are made, so there is no separate "save draft" step —
+the draft is simply the portfolio before it is submitted.
 
 ## Database
 

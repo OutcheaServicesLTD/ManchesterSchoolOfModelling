@@ -61,6 +61,7 @@ builder.Services.AddScoped<IClientProfileAccessor, ClientProfileAccessor>();
 builder.Services.AddScoped<IGuardianConsentService, GuardianConsentService>();
 builder.Services.AddScoped<IClientOnboardingService, ClientOnboardingService>();
 builder.Services.AddScoped<IMediaService, MediaService>();
+builder.Services.AddScoped<IRetoucherService, RetoucherService>();
 builder.Services.AddSingleton<IImageProcessor, ImageProcessor>();
 
 // Local disk for now. Object storage replaces this registration once MSM's hosting is
@@ -77,6 +78,10 @@ builder.Services.AddControllersWithViews(options =>
     // Anti-forgery on every state-changing request by default (specification section 43).
     options.Filters.Add(new Microsoft.AspNetCore.Mvc.AutoValidateAntiforgeryTokenAttribute());
 });
+
+// The retoucher's uploader posts each file with fetch/XHR rather than a form, so the
+// token has to be accepted from a header as well as a form field.
+builder.Services.AddAntiforgery(options => options.HeaderName = "RequestVerificationToken");
 
 var app = builder.Build();
 

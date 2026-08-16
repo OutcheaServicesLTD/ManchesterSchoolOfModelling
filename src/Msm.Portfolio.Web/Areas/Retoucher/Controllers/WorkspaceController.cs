@@ -1,0 +1,261 @@
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Msm.Portfolio.Web.Authorization;
+using Msm.Portfolio.Web.Configuration;
+using Msm.Portfolio.Web.Data;
+using Msm.Portfolio.Web.Domain.Entities;
+using Msm.Portfolio.Web.Services;
+using Msm.Portfolio.Web.ViewModels;
+
+namespace Msm.Portfolio.Web.Areas.Retoucher.Controllers;
+
+/// <summary>
+/// Where a retoucher prepares one client's portfolio (specification sections 6 and 34).
+/// </summary>
+/// <remarks>
+/// This area does take a client id in the route, because a retoucher legitimately works
+/// on other people's records. Every action therefore checks the id against the
+/// retoucher's own assignment first; an id belonging to someone else's work is refused.
+/// </remarks>
+[Area("Retoucher")]
+[Route("retoucher/client/{clientId:guid}")]
+[Authorize(Policy = Policies.RetoucherArea)]
+public class WorkspaceController(
+    ApplicationDbContext db,
+    IRetoucherService retouchers,
+    IMediaService media,
+    UserManager<ApplicationUser> userManager,
+    IOptions<MediaOptions> mediaOptions) : Controller
+{
+    [HttpGet("")]
+    public async Task<IActionResult> Index(Guid clientId, CancellationToken cancellationToken = default)
+    {
+        if (!await IsAllowedAsync(clientId, cancellationToken))
+        {
+            return Forbid();
+        }
+
+        var model = await BuildAsync(clientId, cancellationToken);
+
+        return model is null ? NotFound() : View(model);
+    }
+
+    /// <summary>
+    /// Receives one file per request so the browser can report progress for each and
+    /// retry just the ones that failed, rather than restarting the batch
+    /// (specification section 42).
+    /// </summary>
+    [HttpPost("upload")]
+    [RequestSizeLimit(1_073_741_824)]
+    public async Task<IActionResult> Upload(
+        Guid clientId,
+        List<IFormFile> files,
+        CancellationToken cancellationToken = default)
+    {
+        // JSON rather than Forbid(), which would redirect this XHR to an HTML denial
+        // page. The uploader could only report that as an unexpected response, hiding
+        // the real reason from the retoucher.
+        if (!await IsAllowedAsync(clientId, cancellationToken))
+        {
+            return StatusCode(StatusCodes.Status403Forbidden,
+                new { error = "You are not assigned to this client." });
+        }
+
+        if (files.Count == 0)
+        {
+            return BadRequest(new { error = "No file was received." });
+        }
+
+        var outcomes = await media.UploadImagesAsync(clientId, files, CurrentUserId(), cancellationToken);
+
+        return Json(new
+        {
+            results = outcomes.Select(o => new
+            {
+                filename = o.Filename,
+                succeeded = o.Succeeded,
+                assetId = o.AssetId,
+                error = o.Error
+            })
+        });
+    }
+
+    [HttpPost("select/{assetId:guid}")]
+    public async Task<IActionResult> Select(
+        Guid clientId, Guid assetId, bool selected, CancellationToken cancellationToken = default)
+    {
+        if (!await IsAllowedAsync(clientId, cancellationToken))
+        {
+            return Forbid();
+        }
+
+        var (succeeded, error) = await media.SetSelectedAsync(
+            clientId, assetId, selected, CurrentUserId(), cancellationToken);
+
+        if (!succeeded)
+        {
+            TempData["Error"] = error;
+        }
+
+        return RedirectToAction(nameof(Index), new { clientId });
+    }
+
+    [HttpPost("featured/{assetId:guid}")]
+    public async Task<IActionResult> Featured(
+        Guid clientId, Guid assetId, CancellationToken cancellationToken = default)
+    {
+        if (!await IsAllowedAsync(clientId, cancellationToken))
+        {
+            return Forbid();
+        }
+
+        var (succeeded, error) = await media.SetFeaturedAsync(
+            clientId, assetId, CurrentUserId(), cancellationToken);
+
+        if (!succeeded)
+        {
+            TempData["Error"] = error;
+        }
+
+        return RedirectToAction(nameof(Index), new { clientId });
+    }
+
+    [HttpPost("remove/{assetId:guid}")]
+    public async Task<IActionResult> Remove(
+        Guid clientId, Guid assetId, CancellationToken cancellationToken = default)
+    {
+        if (!await IsAllowedAsync(clientId, cancellationToken))
+        {
+            return Forbid();
+        }
+
+        await media.SoftDeleteAsync(clientId, assetId, CurrentUserId(), cancellationToken);
+
+        return RedirectToAction(nameof(Index), new { clientId });
+    }
+
+    /// <summary>
+    /// Moves an image one place earlier or later in the portfolio order.
+    /// </summary>
+    /// <remarks>
+    /// Buttons rather than drag-only reordering, because specification section 41
+    /// requires keyboard navigation; a drag-only control would be unusable without a
+    /// mouse.
+    /// </remarks>
+    [HttpPost("move/{assetId:guid}")]
+    public async Task<IActionResult> Move(
+        Guid clientId, Guid assetId, int direction, CancellationToken cancellationToken = default)
+    {
+        if (!await IsAllowedAsync(clientId, cancellationToken))
+        {
+            return Forbid();
+        }
+
+        var ordered = (await media.GetPoolAsync(clientId, cancellationToken))
+            .Where(a => a.IsSelectedForPortfolio)
+            .Select(a => a.Id)
+            .ToList();
+
+        var index = ordered.IndexOf(assetId);
+        var target = index + Math.Sign(direction);
+
+        if (index >= 0 && target >= 0 && target < ordered.Count)
+        {
+            (ordered[index], ordered[target]) = (ordered[target], ordered[index]);
+
+            // Unselected images keep their relative order behind the portfolio ones.
+            var rest = (await media.GetPoolAsync(clientId, cancellationToken))
+                .Where(a => !a.IsSelectedForPortfolio)
+                .Select(a => a.Id);
+
+            await media.ReorderAsync(clientId, [.. ordered, .. rest], CurrentUserId(), cancellationToken);
+        }
+
+        return RedirectToAction(nameof(Index), new { clientId });
+    }
+
+    [HttpPost("submit")]
+    public async Task<IActionResult> Submit(Guid clientId, CancellationToken cancellationToken = default)
+    {
+        if (!await IsAllowedAsync(clientId, cancellationToken))
+        {
+            return Forbid();
+        }
+
+        var (succeeded, error) = await retouchers.SubmitForReviewAsync(
+            clientId, CurrentUserId(), cancellationToken);
+
+        if (!succeeded)
+        {
+            TempData["Error"] = error;
+            return RedirectToAction(nameof(Index), new { clientId });
+        }
+
+        TempData["Submitted"] = true;
+        return Redirect("/retoucher?tab=ReadyForReview");
+    }
+
+    /// <summary>
+    /// Admins may open any client's workspace; a retoucher is limited to their own
+    /// assignment or unclaimed work.
+    /// </summary>
+    private async Task<bool> IsAllowedAsync(Guid clientId, CancellationToken cancellationToken)
+    {
+        if (User.IsInRole(Roles.SuperAdmin) || User.IsInRole(Roles.Admin))
+        {
+            return true;
+        }
+
+        return await retouchers.CanOpenAsync(clientId, CurrentUserId(), cancellationToken);
+    }
+
+    private Guid CurrentUserId() =>
+        Guid.TryParse(userManager.GetUserId(User), out var id) ? id : Guid.Empty;
+
+    private async Task<RetoucherWorkspaceViewModel?> BuildAsync(Guid clientId, CancellationToken cancellationToken)
+    {
+        var client = await db.ClientProfiles
+            .Include(c => c.Portfolio)
+            .Include(c => c.GuardianConsent)
+            .FirstOrDefaultAsync(c => c.Id == clientId, cancellationToken);
+
+        if (client is null)
+        {
+            return null;
+        }
+
+        var options = mediaOptions.Value;
+        var pool = await media.GetPoolAsync(clientId, cancellationToken);
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var assignment = await retouchers.GetAssignmentAsync(clientId, cancellationToken);
+
+        return new RetoucherWorkspaceViewModel
+        {
+            ClientId = clientId,
+            ClientName = client.PublicName,
+            Status = client.Portfolio?.Status ?? Domain.Enums.PortfolioStatus.AwaitingClientInformation,
+            AssignmentStatus = assignment?.Status,
+            Assets =
+            [
+                .. pool.Select(a => new MediaAssetViewModel
+                {
+                    Id = a.Id,
+                    Filename = a.OriginalFilename,
+                    Orientation = a.Orientation,
+                    IsSelected = a.IsSelectedForPortfolio,
+                    IsFeatured = a.IsFeatured,
+                    Width = a.Width,
+                    Height = a.Height
+                })
+            ],
+            PoolLimit = options.MediaPoolImageLimit,
+            PortfolioLimit = options.PortfolioImageLimit,
+            MaxImageBytes = options.MaxImageBytes,
+            AllowedContentTypes = options.AllowedImageContentTypes,
+            GuardianApprovalPending = client.IsBlockedPendingGuardianConsent(today)
+        };
+    }
+}

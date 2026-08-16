@@ -1,11 +1,102 @@
+@model Msm.Portfolio.Web.ViewModels.RetoucherQueueViewModel
+@using Msm.Portfolio.Web.Services
+@using Msm.Portfolio.Web.ViewModels
 @{
-    ViewData["Title"] = "Retoucher";
+    ViewData["Title"] = "Retoucher queue";
+    var error = TempData["Error"] as string;
+    var submitted = TempData["Submitted"] as bool? ?? false;
 }
 
-<h1>Retoucher</h1>
-<p class="lead">Signed in as @User.Identity?.Name</p>
+<h1>Queue</h1>
 
-<p>
-    Foundation only. The queue and batch upload workspace described in specification
-    section 6 are built in Phase 4.
-</p>
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+@if (submitted)
+{
+    <div class="alert alert-success" role="alert">Portfolio sent for review.</div>
+}
+
+<ul class="nav nav-tabs mb-3">
+    @foreach (var tab in Enum.GetValues<RetoucherQueueTab>())
+    {
+        <li class="nav-item">
+            <a class="nav-link @(Model.Tab == tab ? "active" : "")"
+               asp-action="Index" asp-route-tab="@tab"
+               aria-current="@(Model.Tab == tab ? "page" : null)">
+                @RetoucherQueueViewModel.Label(tab)
+                <span class="badge text-bg-secondary">@Model.CountFor(tab)</span>
+            </a>
+        </li>
+    }
+</ul>
+
+@if (Model.Items.Count == 0)
+{
+    <p class="text-muted">Nothing in this queue.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <caption class="visually-hidden">Clients in the @RetoucherQueueViewModel.Label(Model.Tab) queue</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Client</th>
+                    <th scope="col">Received</th>
+                    <th scope="col">Images</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Retoucher</th>
+                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.Items)
+                {
+                    <tr>
+                        <th scope="row" class="fw-normal">
+                            @item.ClientName
+                            @if (item.GuardianApprovalPending)
+                            {
+                                <span class="badge text-bg-warning ms-1"
+                                      title="Under 18. Guardian approval is still outstanding.">
+                                    Guardian pending
+                                </span>
+                            }
+                        </th>
+                        <td>@item.SubmittedAt.ToString("d MMM yyyy")</td>
+                        <td>
+                            @item.ImageCount
+                            @if (item.SelectedCount > 0)
+                            {
+                                <span class="text-muted">(@item.SelectedCount on portfolio)</span>
+                            }
+                        </td>
+                        <td>@item.Status</td>
+                        <td>
+                            @(item.AssignedRetoucher ?? "—")
+                            @if (item.AssignedToMe)
+                            {
+                                <span class="badge text-bg-primary">You</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            @if (item.Status == Msm.Portfolio.Web.Domain.Enums.PortfolioStatus.ReadyForRetoucher)
+                            {
+                                <form method="post" asp-action="Start" asp-route-clientId="@item.ClientId">
+                                    <button type="submit" class="btn btn-sm btn-primary">Start work</button>
+                                </form>
+                            }
+                            else
+                            {
+                                <a class="btn btn-sm btn-outline-primary"
+                                   href="/retoucher/client/@item.ClientId">Open</a>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
