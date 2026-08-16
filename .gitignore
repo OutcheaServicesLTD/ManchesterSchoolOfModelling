@@ -1,0 +1,30 @@
+## .NET build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+*.user
+*.suo
+
+## Rider / VS / VS Code
+.vs/
+.idea/
+.vscode/
+
+## Local databases (development only)
+*.db
+*.db-shm
+*.db-wal
+
+## Local media storage (development only)
+media-storage/
+
+## Secrets — never commit; use user-secrets or environment variables
+appsettings.*.Local.json
+secrets.json
+.env
+
+## OS noise
+.DS_Store
+Thumbs.db

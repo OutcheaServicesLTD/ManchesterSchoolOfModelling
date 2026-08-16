@@ -1,0 +1,118 @@
+using Msm.Portfolio.Web.Domain.Enums;
+
+namespace Msm.Portfolio.Web.Domain.Entities;
+
+/// <summary>
+/// The model themselves (specification sections 8, 10 and 26).
+/// </summary>
+public class ClientProfile
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+
+    public Guid ApplicationUserId { get; set; }
+
+    public ApplicationUser ApplicationUser { get; set; } = null!;
+
+    /// <summary>
+    /// Permanent link to the GoHighLevel contact (specification section 25). The CRM
+    /// identifier is authoritative; email and telephone must never be used as the key
+    /// because either can change without the contact changing.
+    /// </summary>
+    public string? GhlContactId { get; set; }
+
+    public string FirstName { get; set; } = string.Empty;
+
+    public string LastName { get; set; } = string.Empty;
+
+    /// <summary>Public-facing model name, where it differs from the legal name.</summary>
+    public string? DisplayName { get; set; }
+
+    /// <summary>
+    /// Stored instead of an age so the displayed age stays correct over time and the
+    /// under-18 guardian rule can be re-evaluated at any point (specification section 8).
+    /// </summary>
+    public DateOnly? DateOfBirth { get; set; }
+
+    public string? Location { get; set; }
+
+    public ModelProfileType ModelProfileType { get; set; } = ModelProfileType.Unspecified;
+
+    public string? Biography { get; set; }
+
+    public string? HairColour { get; set; }
+
+    public string? EyeColour { get; set; }
+
+    /// <summary>Approved social links. Never used as a public contact route for the model.</summary>
+    public string? InstagramUrl { get; set; }
+
+    public string? TikTokUrl { get; set; }
+
+    public ClientAccountStatus AccountStatus { get; set; } = ClientAccountStatus.Invited;
+
+    public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
+
+    public Portfolio? Portfolio { get; set; }
+
+    public GuardianConsent? GuardianConsent { get; set; }
+
+    public ICollection<ModelMeasurement> Measurements { get; set; } = new List<ModelMeasurement>();
+
+    public ICollection<MediaAsset> MediaAssets { get; set; } = new List<MediaAsset>();
+
+    public ICollection<RetoucherAssignment> RetoucherAssignments { get; set; } = new List<RetoucherAssignment>();
+
+    public ICollection<Order> Orders { get; set; } = new List<Order>();
+
+    public string FullName => $"{FirstName} {LastName}".Trim();
+
+    public string PublicName => string.IsNullOrWhiteSpace(DisplayName) ? FullName : DisplayName;
+
+    /// <summary>
+    /// Age derived from date of birth, so no stored age can drift out of date.
+    /// Returns null when no date of birth has been captured yet.
+    /// </summary>
+    public int? AgeOn(DateOnly today)
+    {
+        if (DateOfBirth is not { } dob)
+        {
+            return null;
+        }
+
+        var age = today.Year - dob.Year;
+        if (today < AnniversaryIn(dob, today.Year))
+        {
+            age--;
+        }
+
+        return age;
+    }
+
+    /// <summary>
+    /// The date a birth anniversary falls in a given year.
+    /// </summary>
+    /// <remarks>
+    /// A 29 February birth has no anniversary in a non-leap year. The anniversary is
+    /// taken as 1 March rather than 28 February, so a client born on a leap day is
+    /// treated as still 17 for that extra day. DateOnly.AddYears would clamp to
+    /// 28 February and make them an adult a day early; because this gates guardian
+    /// consent, the boundary is set so an error requires consent rather than skips it.
+    /// </remarks>
+    private static DateOnly AnniversaryIn(DateOnly dateOfBirth, int year)
+    {
+        if (dateOfBirth is { Month: 2, Day: 29 } && !DateTime.IsLeapYear(year))
+        {
+            return new DateOnly(year, 3, 1);
+        }
+
+        return new DateOnly(year, dateOfBirth.Month, dateOfBirth.Day);
+    }
+
+    /// <summary>
+    /// Whether the guardian workflow in specification section 11 applies. Unknown date of
+    /// birth is treated as requiring consent, so an incomplete profile cannot bypass the check.
+    /// </summary>
+    public bool RequiresGuardianConsent(DateOnly today) => AgeOn(today) is not { } age || age < 18;
+}
