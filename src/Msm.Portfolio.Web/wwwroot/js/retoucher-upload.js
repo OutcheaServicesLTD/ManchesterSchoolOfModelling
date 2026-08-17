@@ -195,22 +195,28 @@
     // One at a time is also kinder to a studio's upload speed, and makes each progress
     // bar mean something: with six at once they all crawl together.
     const pending = [];
-    let sending = false;
+    let active = 0;
+
+    // Two at a time, not one and not all of them.
+    //
+    // One leaves the connection idle while the server decodes the file just sent, which
+    // on a whole shoot is a lot of waiting. Two keeps the next file uploading while the
+    // last is processed. Much beyond that and several large photographs are decoded at
+    // once, which is what exhausted the server and dropped the batch in the first place.
+    const atOnce = 2;
 
     function pump() {
-        if (sending || pending.length === 0) {
-            return;
+        while (active < atOnce && pending.length > 0) {
+            active += 1;
+            const next = pending.shift();
+            send(next.file, next.ui);
         }
-
-        sending = true;
-        const next = pending.shift();
-        send(next.file, next.ui);
     }
 
     // Called when a request finishes, whether it succeeded or not, so one bad file
     // never strands the rest of the queue.
     function sendFinished() {
-        sending = false;
+        active -= 1;
         pump();
     }
 
