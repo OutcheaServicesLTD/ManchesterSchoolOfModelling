@@ -70,9 +70,12 @@
 
                 <div class="mb-3">
                     <label asp-for="ModelProfileType" class="form-label"></label>
+                    @* Changing the type changes which measurements are asked for, so the
+                       form is re-fetched. Bound in msm.js rather than inline, because the
+                       Content Security Policy allows no inline script. *@
                     <select asp-for="ModelProfileType" class="form-select"
                             asp-items="@Html.GetEnumSelectList<ModelProfileType>()"
-                            onchange="this.form.submit()">
+                            data-auto-submit>
                     </select>
                     <span asp-validation-for="ModelProfileType" class="text-danger"></span>
                     <div class="form-text">This chooses which measurements we ask for.</div>

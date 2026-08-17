@@ -57,7 +57,7 @@
                     <div class="input-group">
                         <input id="publicUrl" class="form-control" readonly value="@Model.PublicUrl" />
                         <button class="btn btn-outline-secondary" type="button"
-                                onclick="navigator.clipboard.writeText(document.getElementById('publicUrl').value)">
+                                data-copy-target="publicUrl">
                             Copy
                         </button>
                     </div>

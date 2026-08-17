@@ -484,6 +484,58 @@ account, where the call succeeds but writes nothing.
 Until then, leave `Integrations:HighLevel:ApiKey` unset and the stub logs instead of
 sending.
 
+## The interface
+
+Built to the approved *Luxury Modelling Portfolio Platform* design: warm ivory rather
+than generic white, near-black with a warm undertone rather than pure black, Bodoni Moda
+for display and DM Sans for everything else, square corners throughout, and wide
+letter-spacing on small uppercase labels.
+
+One stylesheet, `wwwroot/css/msm.css`, covers the whole application — the public
+portfolios agencies see and the staff portal the studio works in. They share a design
+language; the portal is simply denser, because staff are in it all day.
+
+### Bootstrap is not loaded
+
+Its rounded corners, blue accents and system font stack fight this design at every turn.
+The class names it would have provided — `btn`, `card`, `row`, `form-control` and the
+rest — are implemented in `msm.css` instead, in the editorial language above. Views keep
+familiar, readable markup and look nothing like a default scaffold, and the application
+ships one 44KB stylesheet rather than a framework it uses a tenth of. Bootstrap's
+vendored files, the scaffold's `site.css` and `site.js` are deleted rather than left
+sitting unreferenced.
+
+### Light and dark
+
+Three states, not two. An explicit choice is remembered; its absence means follow the
+operating system, which the stylesheet handles through `prefers-color-scheme` alone. The
+toggle sets `data-theme` on the root element, and the script that applies it is loaded
+synchronously in `<head>` — deferred, the browser would paint an ivory page and then
+repaint it black.
+
+### Fonts are self-hosted
+
+Both families are served from `wwwroot/fonts` rather than from Google. The Content
+Security Policy allows fonts from this origin only, and a portfolio that renders in
+Times because a third party is slow or blocked is not the product MSM is selling. Both
+are variable fonts, so one file covers each family's whole weight range — three files,
+144KB, no external request anywhere on the site.
+
+### No inline script or handlers
+
+`script-src 'self'` with no inline exception is what makes the policy worth having, so
+the confirmation dialogs on destructive actions, the onboarding form's profile-type
+refresh and the client's copy-link button are declared with data attributes and bound in
+`wwwroot/js/msm.js`. This matters more than it sounds: an inline `onsubmit` handler is
+silently refused by the browser and **the form submits anyway**, so a confirmation
+written that way disappears from exactly the destructive action it was added to guard.
+
+### Verified
+
+Every page was driven in a real browser at 390px, 768px and 1400px, in both appearances:
+no external requests, no console errors, no sideways scroll, and the chosen appearance
+surviving a reload.
+
 ## Hardening
 
 Specification section 43, plus the parts of sections 35 to 42 that are not visible in a

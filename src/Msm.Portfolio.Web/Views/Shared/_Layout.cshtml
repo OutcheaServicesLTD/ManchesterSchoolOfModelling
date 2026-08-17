@@ -1,50 +1,105 @@
-﻿<!DOCTYPE html>
+@inject Microsoft.Extensions.Options.IOptions<Msm.Portfolio.Web.Configuration.MsmBrandOptions> BrandOptions
+@using Msm.Portfolio.Web.Authorization
+@{
+    var brand = BrandOptions.Value;
+    var signedIn = User.Identity?.IsAuthenticated == true;
+
+    // Which portal the signed-in user is in. Presentation only — every page behind these
+    // links re-checks the permission itself, so the nav can never grant access.
+    var isStaff = User.IsInRole(Roles.SuperAdmin) || User.IsInRole(Roles.Admin);
+    var isRetoucher = User.IsInRole(Roles.Retoucher);
+    var isClient = User.IsInRole(Roles.Client);
+
+    var area = isStaff ? "Studio" : isRetoucher ? "Retouching" : isClient ? "My portfolio" : null;
+    var currentPath = Context.Request.Path.Value ?? string.Empty;
+
+    Func<string, string> active = path =>
+        currentPath.StartsWith(path, StringComparison.OrdinalIgnoreCase) ? "active" : string.Empty;
+}
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - Msm.Portfolio.Web</title>
-    <script type="importmap"></script>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/Msm.Portfolio.Web.styles.css" asp-append-version="true" />
+    <meta name="color-scheme" content="light dark" />
+    <title>@ViewData["Title"] — @brand.BusinessName</title>
+    <link rel="stylesheet" href="~/css/msm.css" asp-append-version="true" />
+    @* Synchronous and in the head, so the chosen appearance is applied before the first
+       paint rather than flashing the wrong one. *@
+    <script src="~/js/theme.js" asp-append-version="true"></script>
 </head>
 <body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">Msm.Portfolio.Web</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </nav>
-    </header>
-    <div class="container">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
-    </div>
+    <a class="skip-link" href="#main">Skip to content</a>
 
-    <footer class="border-top footer text-muted">
+    <header class="portal-header">
+        <div class="container-fluid">
+            <a class="portal-brand" href="@(isStaff ? "/admin" : isRetoucher ? "/retoucher" : isClient ? "/client" : "/models")">
+                <span class="mark">@brand.BusinessName</span>
+                @if (area is not null)
+                {
+                    <span class="area">@area</span>
+                }
+            </a>
+
+            @if (signedIn)
+            {
+                <nav class="portal-nav" aria-label="Sections">
+                    @if (isStaff)
+                    {
+                        <a class="@active("/admin/clients")" href="/admin">Clients</a>
+                        <a class="@active("/admin/audit")" href="/admin/audit">Audit</a>
+                        <a class="@active("/admin/integrations")" href="/admin/integrations">Integrations</a>
+                        @if (User.IsInRole(Roles.SuperAdmin))
+                        {
+                            <a class="@active("/admin/users")" href="/admin/users">Staff</a>
+                        }
+                    }
+                    else if (isRetoucher)
+                    {
+                        <a class="@active("/retoucher")" href="/retoucher">Queue</a>
+                    }
+                    else if (isClient)
+                    {
+                        <a class="@active("/client/home")" href="/client">Dashboard</a>
+                        <a class="@active("/client/media")" href="/client/media">Photographs</a>
+                        <a class="@active("/client/profile")" href="/client/profile">Profile</a>
+                    }
+                </nav>
+            }
+
+            <div class="portal-utility">
+                @if (signedIn)
+                {
+                    <span class="portal-user">@User.Identity!.Name</span>
+                }
+
+                <partial name="_ThemeToggle" />
+
+                @if (signedIn)
+                {
+                    @* A POST, so signing out cannot be triggered by a link someone else
+                       persuades a member of staff to click. *@
+                    <form method="post" action="/account/logout">
+                        <button type="submit" class="btn btn-sm">Sign out</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </header>
+
+    <main id="main" class="portal-main" role="main">
         <div class="container">
-            &copy; 2026 - Msm.Portfolio.Web - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
+            @RenderBody()
+        </div>
+    </main>
+
+    <footer class="portal-footer">
+        <div class="container">
+            &copy; @DateTime.UtcNow.Year @brand.BusinessName
         </div>
     </footer>
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
+
+    <script src="~/js/msm.js" asp-append-version="true" defer></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

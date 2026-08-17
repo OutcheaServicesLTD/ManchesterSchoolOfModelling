@@ -1,0 +1,1694 @@
+/*
+ * Manchester School of Modelling — design system.
+ *
+ * One stylesheet for the whole application: the public portfolios agencies see, and the
+ * staff portal the studio works in. Bootstrap is deliberately not loaded. Its rounded
+ * corners, blue accents and system font stack fight this design at every turn, and the
+ * class names it would have provided are implemented here instead, in the editorial
+ * language below. Views therefore keep familiar markup while looking nothing like a
+ * default scaffold.
+ *
+ * The palette, typography and spacing come from the approved "Luxury Modelling Portfolio
+ * Platform" design: warm ivory rather than generic SaaS white, near-black with a warm
+ * undertone rather than pure black, Bodoni for display and DM Sans for everything else,
+ * square corners throughout, and wide letter-spacing on small uppercase labels.
+ *
+ * Mobile-first (specification section 40) and accessible by construction
+ * (specification section 41): every rule starts at phone width, contrast is checked
+ * against its own background, and focus is always visible.
+ */
+
+/* ══ Typefaces ═══════════════════════════════════════════════════════════════════
+   Self-hosted rather than loaded from Google. The Content Security Policy allows
+   fonts from this origin only, and a portfolio that renders in Times because a third
+   party is slow or blocked is not the product MSM is selling. Both are variable
+   fonts, so one file covers the whole weight range. */
+
+@font-face {
+    font-family: 'Bodoni Moda';
+    font-style: normal;
+    font-weight: 400 700;
+    font-display: swap;
+    src: url('/fonts/bodoni-moda-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+        U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+        U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'Bodoni Moda';
+    font-style: italic;
+    font-weight: 400 700;
+    font-display: swap;
+    src: url('/fonts/bodoni-moda-italic.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+        U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+        U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+    font-family: 'DM Sans';
+    font-style: normal;
+    font-weight: 300 700;
+    font-display: swap;
+    src: url('/fonts/dm-sans-normal.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+        U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+        U+2215, U+FEFF, U+FFFD;
+}
+
+/* ══ Tokens ══════════════════════════════════════════════════════════════════════
+   Light is the default so a page with no JavaScript and no stated preference still
+   renders deliberately. Dark is applied two ways: by system preference, and by an
+   explicit [data-theme] the toggle sets — which must win in both directions, so it is
+   declared after the media query. */
+
+:root {
+    --display: 'Bodoni Moda', 'Playfair Display', Georgia, serif;
+    --sans: 'DM Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+    --bg: #f4f1eb;
+    --card: #eae7e0;
+    --side: #e2dfd8;
+    --raised: #d8d5ce;
+    --fg: #181410;
+    --fg-md: #5c5850;
+    --fg-lo: #636058;
+    --line: rgba(24, 20, 16, 0.09);
+    --border: #ccc9c1;
+    --field: #e2dfd8;
+
+    --danger: #a5122e;
+    --danger-fg: #ffffff;
+    --success: #1d6b3f;
+    --warning: #8a5a00;
+    --live: #2f9e5f;
+
+    --shadow: none;
+
+    /* The checkbox tick, drawn in the page background colour so it reads on a filled box. */
+    --tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.4l2.6 2.6L10 3.2' fill='none' stroke='%23f4f1eb' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+
+    /* Wide tracking on small uppercase text is the signature of this design. */
+    --track-label: 0.28em;
+    --track-button: 0.24em;
+    --track-eyebrow: 0.32em;
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+        --bg: #080808;
+        --card: #0e0e0e;
+        --side: #060606;
+        --raised: #161616;
+        --fg: #f0ece5;
+        --fg-md: rgba(240, 236, 229, 0.62);
+        --fg-lo: rgba(240, 236, 229, 0.45);
+        --line: rgba(255, 255, 255, 0.07);
+        --border: rgba(255, 255, 255, 0.14);
+        --field: rgba(255, 255, 255, 0.04);
+    --tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.4l2.6 2.6L10 3.2' fill='none' stroke='%23080808' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+
+        --danger: #ff6b81;
+        --danger-fg: #1a0208;
+        --success: #6ee7a0;
+        --warning: #e8b761;
+        --live: #4ade80;
+    }
+}
+
+:root[data-theme="dark"] {
+    --bg: #080808;
+    --card: #0e0e0e;
+    --side: #060606;
+    --raised: #161616;
+    --fg: #f0ece5;
+    --fg-md: rgba(240, 236, 229, 0.62);
+    --fg-lo: rgba(240, 236, 229, 0.45);
+    --line: rgba(255, 255, 255, 0.07);
+    --border: rgba(255, 255, 255, 0.14);
+    --field: rgba(255, 255, 255, 0.04);
+    --tick: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M2 6.4l2.6 2.6L10 3.2' fill='none' stroke='%23080808' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+
+    --danger: #ff6b81;
+    --danger-fg: #1a0208;
+    --success: #6ee7a0;
+    --warning: #e8b761;
+    --live: #4ade80;
+}
+
+/* ══ Base ════════════════════════════════════════════════════════════════════════ */
+
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    font-size: 15px;
+    font-weight: 400;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4, h5, h6,
+.h4, .h5, .h6 {
+    font-family: var(--display);
+    font-weight: 400;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.6em;
+    color: var(--fg);
+}
+
+h1 { font-size: clamp(1.9rem, 4vw, 2.9rem); font-weight: 300; }
+h2 { font-size: clamp(1.5rem, 3vw, 2.1rem); font-weight: 300; }
+h3, .h4 { font-size: 1.35rem; }
+h4, .h5 { font-size: 1.12rem; }
+h5, .h6 { font-size: 1rem; }
+h6 { font-size: 0.94rem; }
+
+p {
+    margin: 0 0 1rem;
+}
+
+dl {
+    margin: 0;
+}
+
+/* The browser indents every <dd> by 40px. Inside a two-column definition list that
+   indent is added to the column widths, the pair overflows the row and the value wraps
+   under its own label — so it is cleared here rather than fought with per view. */
+dd {
+    margin-inline-start: 0;
+}
+
+a {
+    color: var(--fg);
+    text-decoration-color: var(--border);
+    text-underline-offset: 0.22em;
+    transition: text-decoration-color 0.25s ease, color 0.25s ease;
+}
+
+a:hover {
+    text-decoration-color: currentColor;
+}
+
+img {
+    max-width: 100%;
+}
+
+hr {
+    border: 0;
+    border-top: 1px solid var(--line);
+    margin: 2rem 0;
+}
+
+code, .font-monospace {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.86em;
+}
+
+/* WCAG 2.4.7 — a visible keyboard focus ring on everything interactive. */
+:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 3px;
+}
+
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible) {
+    outline: none;
+}
+
+::selection {
+    background: var(--fg);
+    color: var(--bg);
+}
+
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    z-index: 200;
+    background: var(--fg);
+    color: var(--bg);
+    padding: 0.9rem 1.4rem;
+    font-size: 11px;
+    letter-spacing: var(--track-button);
+    text-transform: uppercase;
+}
+
+.skip-link:focus {
+    left: 0;
+}
+
+.visually-hidden {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ══ The eyebrow ═════════════════════════════════════════════════════════════════
+   Small, wide-tracked, uppercase. Used for section labels, table headings, form
+   labels and metadata — it is what makes the whole interface read as editorial. */
+
+.eyebrow,
+.form-label,
+.section-title,
+.table > thead th {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    color: var(--fg-md);
+    line-height: 1.5;
+}
+
+/* ══ Layout ══════════════════════════════════════════════════════════════════════ */
+
+.container,
+.container-fluid {
+    width: 100%;
+    margin: 0 auto;
+    padding-left: clamp(20px, 5vw, 40px);
+    padding-right: clamp(20px, 5vw, 40px);
+}
+
+.container {
+    max-width: 1280px;
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-left: -12px;
+    margin-right: -12px;
+}
+
+.row > * {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 100%;
+    padding-left: 12px;
+    padding-right: 12px;
+}
+
+.col { flex: 1 0 0%; width: auto; }
+
+.g-1 { row-gap: 0.5rem; }
+.g-2 { row-gap: 0.85rem; }
+.g-3 { row-gap: 1.35rem; }
+
+/* row-cols has to reset flex as well as width. A child carrying .col is told to grow
+   into whatever space is left, which would otherwise fit every tile onto one line and
+   defeat the column count entirely. */
+.row-cols-1 > *,
+.row-cols-2 > * { flex: 0 0 auto; }
+.row-cols-1 > * { width: 100%; }
+.row-cols-2 > * { width: 50%; }
+
+@media (min-width: 576px) {
+    .col-sm-3 { width: 25%; }
+    .col-sm-4 { width: 33.3333%; }
+    .col-sm-6 { width: 50%; }
+    .col-sm-8 { width: 66.6667%; }
+    .col-sm-9 { width: 75%; }
+}
+
+@media (min-width: 768px) {
+    .col-md-1 { width: 8.3333%; }
+    .col-md-2 { width: 16.6667%; }
+    .col-md-3 { width: 25%; }
+    .col-md-4 { width: 33.3333%; }
+    .col-md-5 { width: 41.6667%; }
+    .col-md-6 { width: 50%; }
+    .row-cols-md-2 > *,
+    .row-cols-md-3 > *,
+    .row-cols-md-4 > * { flex: 0 0 auto; }
+    .row-cols-md-2 > * { width: 50%; }
+    .row-cols-md-3 > * { width: 33.3333%; }
+    .row-cols-md-4 > * { width: 25%; }
+}
+
+@media (min-width: 992px) {
+    .col-lg-7 { width: 58.3333%; }
+    .col-lg-8 { width: 66.6667%; }
+    .row-cols-lg-3 > *,
+    .row-cols-lg-4 > * { flex: 0 0 auto; }
+    .row-cols-lg-3 > * { width: 33.3333%; }
+    .row-cols-lg-4 > * { width: 25%; }
+}
+
+.d-flex { display: flex; }
+.d-grid { display: grid; }
+.d-none { display: none; }
+.flex-wrap { flex-wrap: wrap; }
+.flex-grow-1 { flex-grow: 1; }
+.justify-content-between { justify-content: space-between; }
+.justify-content-center { justify-content: center; }
+.justify-content-end { justify-content: flex-end; }
+.align-items-center { align-items: center; }
+.align-items-start { align-items: flex-start; }
+.align-items-end { align-items: flex-end; }
+.align-self-start { align-self: flex-start; }
+.align-self-end { align-self: flex-end; }
+.gap-1 { gap: 0.5rem; }
+.gap-2 { gap: 0.85rem; }
+.w-100 { width: 100%; }
+.h-100 { height: 100%; }
+
+@media (min-width: 576px) {
+    .d-sm-inline-flex { display: inline-flex; }
+}
+
+.mb-0 { margin-bottom: 0 !important; }
+.mb-1 { margin-bottom: 0.35rem; }
+.mb-2 { margin-bottom: 0.7rem; }
+.mb-3 { margin-bottom: 1.35rem; }
+.mb-4 { margin-bottom: 2rem; }
+.mt-2 { margin-top: 0.7rem; }
+.mt-3 { margin-top: 1.35rem; }
+.mt-4 { margin-top: 2rem; }
+.ms-1 { margin-left: 0.35rem; }
+
+.p-2 { padding: 0.7rem; }
+.p-3 { padding: 1.35rem; }
+.p-4 { padding: 2rem; }
+.pb-3 { padding-bottom: 1.35rem; }
+.pt-3 { padding-top: 1.35rem; }
+.py-2 { padding-top: 0.7rem; padding-bottom: 0.7rem; }
+.py-3 { padding-top: 1.35rem; padding-bottom: 1.35rem; }
+.py-5 { padding-top: 3.5rem; padding-bottom: 3.5rem; }
+
+.border { border: 1px solid var(--border); }
+.border-top { border-top: 1px solid var(--line); }
+.border-bottom { border-bottom: 1px solid var(--line); }
+.border-2 { border-width: 2px; }
+.border-dashed { border-style: dashed; }
+.rounded { border-radius: 0; }
+.bg-white { background: var(--card); }
+.box-shadow { box-shadow: var(--shadow); }
+
+.text-center { text-align: center; }
+.text-end { text-align: right; }
+.text-nowrap { white-space: nowrap; }
+.text-muted { color: var(--fg-md); }
+.text-danger { color: var(--danger); }
+.text-dark { color: var(--fg); }
+.fw-normal { font-weight: 400; }
+.fs-5 { font-size: 1.05rem; }
+.align-middle { vertical-align: middle; }
+.list-unstyled { list-style: none; padding: 0; margin: 0; }
+
+small, .small {
+    font-size: 0.84rem;
+}
+
+.lead {
+    font-size: 1.05rem;
+    line-height: 1.75;
+    color: var(--fg-md);
+    max-width: 62ch;
+}
+
+.display-6 {
+    font-family: var(--display);
+    font-size: clamp(1.8rem, 4vw, 2.6rem);
+    font-weight: 300;
+    line-height: 1.1;
+}
+
+/* ══ Buttons ═════════════════════════════════════════════════════════════════════
+   Square, tracked, uppercase. The filled variant is the page's single most important
+   action; everything else is a hairline outline so a screen full of controls does not
+   shout. */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.6rem;
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: var(--track-button);
+    text-transform: uppercase;
+    line-height: 1;
+    padding: 14px 26px;
+    border: 1px solid var(--border);
+    border-radius: 0;
+    background: transparent;
+    color: var(--fg);
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+    /* A comfortable target on a phone (specification section 41). */
+    min-height: 44px;
+}
+
+.btn:hover {
+    border-color: var(--fg);
+}
+
+.btn:disabled,
+.btn[disabled] {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.btn-primary,
+.btn-dark {
+    background: var(--fg);
+    border-color: var(--fg);
+    color: var(--bg);
+}
+
+.btn-primary:hover,
+.btn-dark:hover {
+    background: transparent;
+    color: var(--fg);
+}
+
+.btn-outline-primary,
+.btn-outline-secondary {
+    background: transparent;
+    color: var(--fg);
+}
+
+.btn-outline-secondary {
+    color: var(--fg-md);
+}
+
+.btn-outline-secondary:hover {
+    color: var(--fg);
+}
+
+.btn-danger {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: var(--danger-fg);
+}
+
+.btn-outline-danger {
+    color: var(--danger);
+    border-color: var(--danger);
+}
+
+.btn-danger:hover,
+.btn-outline-danger:hover {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: var(--danger-fg);
+}
+
+.btn-success {
+    background: var(--success);
+    border-color: var(--success);
+    color: var(--bg);
+}
+
+.btn-link {
+    border-color: transparent;
+    padding: 6px 0;
+    min-height: 0;
+    color: var(--fg);
+    text-decoration: underline;
+    text-underline-offset: 0.3em;
+}
+
+.btn-link:hover {
+    border-color: transparent;
+    color: var(--fg-md);
+}
+
+.btn-sm {
+    font-size: 10px;
+    padding: 10px 16px;
+    min-height: 38px;
+}
+
+.btn-lg {
+    font-size: 12px;
+    padding: 18px 40px;
+    letter-spacing: var(--track-eyebrow);
+    min-height: 52px;
+}
+
+.btn-group,
+.btn-group-sm {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 0;
+}
+
+.btn-group > .btn + .btn,
+.btn-group-sm > .btn + .btn {
+    margin-left: -1px;
+}
+
+.d-grid > .btn {
+    width: 100%;
+}
+
+/* ══ Forms ═══════════════════════════════════════════════════════════════════════ */
+
+.form-label {
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.form-control,
+.form-select {
+    display: block;
+    width: 100%;
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--fg);
+    background: var(--field);
+    border: 1px solid var(--border);
+    border-radius: 0;
+    padding: 12px 14px;
+    min-height: 46px;
+    transition: border-color 0.25s ease;
+}
+
+.form-control::placeholder {
+    color: var(--fg-lo);
+}
+
+.form-control:hover,
+.form-select:hover {
+    border-color: var(--fg-md);
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: var(--fg);
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+}
+
+textarea.form-control {
+    min-height: 120px;
+    resize: vertical;
+}
+
+.form-select {
+    appearance: none;
+    /* Encoded so no external asset is needed and the CSP stays closed. */
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23807a70' stroke-width='1.4'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    background-size: 12px 8px;
+    padding-right: 38px;
+}
+
+.form-text {
+    display: block;
+    margin-top: 0.4rem;
+    font-size: 12px;
+    line-height: 1.6;
+    color: var(--fg-lo);
+}
+
+/* Long forms are grouped into fieldsets. The browser default draws a notched box that
+   looks nothing like the rest of this design, so the group is marked by a tracked
+   heading and a hairline instead. */
+fieldset {
+    border: 0;
+    padding: 0;
+    margin: 0 0 2.5rem;
+}
+
+legend {
+    display: block;
+    width: 100%;
+    padding: 0 0 0.9rem;
+    margin-bottom: 1.6rem;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    color: var(--fg-md);
+}
+
+.form-check {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    margin-bottom: 0.6rem;
+}
+
+.form-check-input {
+    flex: 0 0 auto;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    margin: 0.2rem 0 0;
+    border: 1px solid var(--border);
+    border-radius: 0;
+    background: var(--field);
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.form-check-input:hover {
+    border-color: var(--fg-md);
+}
+
+.form-check-input:checked {
+    background-color: var(--fg);
+    border-color: var(--fg);
+    /* The tick has to be drawn in the page background colour, and a data URI cannot read
+       a custom property — so the whole image is the variable, swapped per appearance. */
+    background-image: var(--tick);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 11px 11px;
+}
+
+/* Native pickers (date, time, select) follow the page rather than always rendering
+   light chrome on a black page. */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"],
+select {
+    color-scheme: inherit;
+}
+
+.form-check-label {
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--fg);
+}
+
+.input-group {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+}
+
+.input-group > .form-control {
+    flex: 1 1 auto;
+    width: 1%;
+}
+
+.input-group-text {
+    display: flex;
+    align-items: center;
+    padding: 0 14px;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: var(--fg-md);
+    background: var(--raised);
+    border: 1px solid var(--border);
+}
+
+.input-group > * + * {
+    margin-left: -1px;
+}
+
+/* The validation summary and per-field messages Identity and MVC emit. */
+.field-validation-error,
+.validation-summary-errors {
+    display: block;
+    color: var(--danger);
+    font-size: 13px;
+}
+
+.validation-summary-errors ul {
+    margin: 0;
+    padding-left: 1.1rem;
+}
+
+.input-validation-error {
+    border-color: var(--danger);
+}
+
+/* ══ Cards and panels ════════════════════════════════════════════════════════════ */
+
+.card {
+    display: flex;
+    flex-direction: column;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 0;
+}
+
+.card-body {
+    padding: 1.5rem;
+    flex: 1 1 auto;
+}
+
+.card-title {
+    font-family: var(--display);
+    font-size: 1.2rem;
+    font-weight: 400;
+    margin: 0 0 1.2rem;
+}
+
+/* Two-column definition lists — the portfolio summary and the measurement sheet. The
+   term reads as a label and the value as content, with a hairline between rows. */
+dl.row > dt {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: var(--track-eyebrow);
+    text-transform: uppercase;
+    color: var(--fg-md);
+    border-top: 1px solid var(--line);
+}
+
+dl.row > dd {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+    margin-bottom: 0;
+    border-top: 1px solid var(--line);
+}
+
+.card-text {
+    color: var(--fg-md);
+    font-size: 14px;
+    margin: 0 0 0.5rem;
+}
+
+.card-img-top {
+    width: 100%;
+    display: block;
+    background: var(--raised);
+}
+
+/* Marks the main image inside a grid of thumbnails. A full-weight border rather than a
+   tint, so it survives both appearances and does not rely on colour alone — the card
+   also carries a "Main" badge. */
+.card.border-primary {
+    border-color: var(--fg);
+    border-width: 1px;
+    box-shadow: inset 0 0 0 1px var(--fg);
+}
+
+/* ══ Tables ══════════════════════════════════════════════════════════════════════ */
+
+.table-responsive {
+    overflow-x: auto;
+    /* The page body must never scroll sideways; wide tables scroll inside themselves. */
+    -webkit-overflow-scrolling: touch;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.table > thead th {
+    text-align: left;
+    padding: 0 14px 12px;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+}
+
+.table > tbody td,
+.table > tbody th {
+    padding: 16px 14px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+    font-weight: 400;
+    text-align: left;
+}
+
+.table > tbody tr:hover {
+    background: var(--card);
+}
+
+.table-sm > tbody td,
+.table-sm > thead th {
+    padding: 10px 12px;
+}
+
+/* ══ Alerts ══════════════════════════════════════════════════════════════════════
+   A hairline block with a single accented edge, rather than a coloured slab. */
+
+.alert {
+    padding: 1.1rem 1.35rem;
+    margin-bottom: 1.35rem;
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-left: 2px solid var(--fg-md);
+    font-size: 14px;
+    line-height: 1.7;
+}
+
+.alert :last-child { margin-bottom: 0; }
+.alert-danger { border-left-color: var(--danger); }
+.alert-success { border-left-color: var(--success); }
+.alert-warning { border-left-color: var(--warning); }
+.alert-info,
+.alert-secondary { border-left-color: var(--fg-md); }
+
+/* ══ Badges ══════════════════════════════════════════════════════════════════════ */
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 5px 10px;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    line-height: 1.4;
+    border: 1px solid var(--border);
+    border-radius: 0;
+    color: var(--fg-md);
+    white-space: nowrap;
+}
+
+.text-bg-primary { border-color: var(--fg); color: var(--fg); }
+.text-bg-success { border-color: var(--success); color: var(--success); }
+.text-bg-warning { border-color: var(--warning); color: var(--warning); }
+.text-bg-secondary,
+.text-bg-light { border-color: var(--border); color: var(--fg-md); }
+
+/* ══ Progress ════════════════════════════════════════════════════════════════════ */
+
+.progress {
+    height: 2px;
+    background: var(--border);
+    overflow: hidden;
+}
+
+.progress-bar {
+    height: 100%;
+    background: var(--fg);
+    transition: width 0.25s ease;
+}
+
+/* ══ Tabs ════════════════════════════════════════════════════════════════════════ */
+
+.nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.nav-tabs {
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 2rem;
+    gap: clamp(1rem, 3vw, 2.2rem);
+}
+
+.nav-tabs .nav-link {
+    display: inline-block;
+    padding: 0 0 14px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    color: var(--fg-md);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.25s ease, border-color 0.25s ease;
+}
+
+.nav-tabs .nav-link:hover {
+    color: var(--fg);
+}
+
+.nav-tabs .nav-link.active {
+    color: var(--fg);
+    border-bottom-color: var(--fg);
+}
+
+/* ══ List group ══════════════════════════════════════════════════════════════════ */
+
+.list-group {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    border-top: 1px solid var(--line);
+}
+
+.list-group > li,
+.list-group > .list-group-item {
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--line);
+}
+
+/* ══ Page furniture shared by both shells ════════════════════════════════════════ */
+
+.page-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1.2rem;
+    padding-bottom: 1.6rem;
+    margin-bottom: 2.2rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.page-head h1,
+.page-head h2 {
+    margin: 0;
+}
+
+.page-head .eyebrow {
+    display: block;
+    margin-bottom: 0.5rem;
+}
+
+.page-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+}
+
+.section {
+    padding: clamp(2.5rem, 6vw, 4.5rem) 0;
+    border-top: 1px solid var(--line);
+}
+
+.section-title {
+    display: block;
+    margin: 0 0 1.8rem;
+}
+
+.empty {
+    padding: 3rem 0;
+    color: var(--fg-md);
+    font-style: italic;
+}
+
+/* A single centred column: sign-in, guardian approval, checkout and the onboarding
+   confirmations are all one task with nothing else on the page. */
+.auth-panel {
+    max-width: 460px;
+    margin: clamp(1rem, 6vh, 4rem) auto;
+}
+
+.narrow {
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+/* A summary of what is being bought or agreed to, set as an itemised list. */
+.detail-list {
+    list-style: none;
+    margin: 0 0 2rem;
+    padding: 0;
+    border-top: 1px solid var(--line);
+}
+
+.detail-list > div {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1rem 0;
+    border-bottom: 1px solid var(--line);
+}
+
+.detail-list dt {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: var(--track-eyebrow);
+    text-transform: uppercase;
+    color: var(--fg-md);
+}
+
+.detail-list dd {
+    margin: 0;
+    text-align: right;
+}
+
+.detail-list dd.figure {
+    font-family: var(--display);
+    font-size: 1.6rem;
+    font-weight: 300;
+    line-height: 1;
+}
+
+/* ══ Theme toggle ════════════════════════════════════════════════════════════════ */
+
+.theme-toggle {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    padding: 0;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--fg-md);
+    cursor: pointer;
+    transition: color 0.25s ease, border-color 0.25s ease;
+}
+
+.theme-toggle:hover {
+    color: var(--fg);
+    border-color: var(--fg);
+}
+
+.theme-toggle svg {
+    width: 15px;
+    height: 15px;
+}
+
+/* Only one of the two icons is ever shown, so the control always depicts the theme
+   it switches to rather than the one already in use. */
+.theme-toggle .icon-dark { display: none; }
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) .theme-toggle .icon-dark { display: block; }
+    :root:not([data-theme="light"]) .theme-toggle .icon-light { display: none; }
+}
+
+:root[data-theme="dark"] .theme-toggle .icon-dark { display: block; }
+:root[data-theme="dark"] .theme-toggle .icon-light { display: none; }
+:root[data-theme="light"] .theme-toggle .icon-dark { display: none; }
+:root[data-theme="light"] .theme-toggle .icon-light { display: block; }
+
+/* ══════════════════════════════════════════════════════════════════════════════════
+   THE PUBLIC SITE
+   What an agency sees. No sign-in, no chrome, nothing but the model's work.
+   ══════════════════════════════════════════════════════════════════════════════════ */
+
+.public-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: color-mix(in srgb, var(--bg) 88%, transparent);
+    backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line);
+}
+
+.public-header .container {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    min-height: 68px;
+    gap: 1rem;
+}
+
+.public-header .brand {
+    grid-column: 2;
+    justify-self: center;
+    text-decoration: none;
+    text-align: center;
+}
+
+.brand-name {
+    font-family: var(--sans);
+    font-size: clamp(10px, 2.2vw, 12px);
+    font-weight: 500;
+    letter-spacing: var(--track-eyebrow);
+    text-transform: uppercase;
+    color: var(--fg);
+    white-space: nowrap;
+}
+
+.public-header .header-utility {
+    grid-column: 3;
+    justify-self: end;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+}
+
+.portfolio-nav {
+    grid-column: 1;
+    display: none;
+    gap: clamp(1rem, 2.5vw, 2rem);
+}
+
+@media (min-width: 768px) {
+    .portfolio-nav { display: flex; }
+}
+
+.portfolio-nav a {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    color: var(--fg-md);
+    text-decoration: none;
+    transition: color 0.25s ease;
+}
+
+.portfolio-nav a:hover {
+    color: var(--fg);
+}
+
+/* ── The hero ─────────────────────────────────────────────────────────────────────
+   Full-bleed photograph, the model's name set enormous in Bodoni with the surname in
+   italic beneath. The gradient exists so white type stays legible over any
+   photograph — it is a contrast guarantee, not decoration. */
+
+.hero {
+    position: relative;
+    min-height: min(88vh, 900px);
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+    background: #0a0a0a;
+}
+
+.hero-image {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    /* Cover here, and only here: a hero is a crop by nature. The gallery below shows
+       every photograph whole. */
+    object-fit: cover;
+    object-position: 50% 22%;
+}
+
+.hero::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(160deg,
+        rgba(0, 0, 0, 0.18) 0%,
+        rgba(0, 0, 0, 0.10) 35%,
+        rgba(0, 0, 0, 0.74) 76%,
+        rgba(0, 0, 0, 0.94) 100%);
+}
+
+.hero-content {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    padding: 0 clamp(20px, 5vw, 64px) clamp(40px, 8vh, 80px);
+    text-align: center;
+}
+
+@media (min-width: 992px) {
+    .hero-content { text-align: left; }
+}
+
+.hero-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 1.4rem;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: var(--track-eyebrow);
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.hero-status::before {
+    content: "";
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--live);
+}
+
+.hero-name {
+    font-family: var(--display);
+    font-size: clamp(2.6rem, 10vw, 8.5rem);
+    font-weight: 300;
+    line-height: 0.88;
+    letter-spacing: -0.015em;
+    text-transform: uppercase;
+    color: #ffffff;
+    margin: 0 0 1.2rem;
+}
+
+.hero-name .surname {
+    display: block;
+    font-style: italic;
+}
+
+.hero-strapline {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 0.9rem;
+    margin: 0 0 2.2rem;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: var(--track-eyebrow);
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.55);
+}
+
+@media (min-width: 992px) {
+    .hero-strapline { justify-content: flex-start; }
+}
+
+.hero-strapline li {
+    list-style: none;
+}
+
+.hero-strapline li + li::before {
+    content: "·";
+    margin-right: 0.9rem;
+    color: rgba(255, 255, 255, 0.25);
+}
+
+.hero-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.9rem;
+    padding: 16px 34px;
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    background: transparent;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 500;
+    letter-spacing: var(--track-eyebrow);
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: background-color 0.35s ease;
+}
+
+.hero-cta:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+/* ── Gallery ──────────────────────────────────────────────────────────────────────
+   Nothing is cropped. A landscape frame takes two columns rather than being squeezed
+   into a portrait cell (specification section 13). */
+
+.gallery {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+@media (min-width: 576px) {
+    .gallery { grid-template-columns: repeat(2, 1fr); }
+    .gallery li.landscape { grid-column: span 2; }
+}
+
+@media (min-width: 992px) {
+    .gallery { grid-template-columns: repeat(3, 1fr); gap: 14px; }
+}
+
+.gallery img {
+    width: 100%;
+    height: auto;
+    display: block;
+    background: var(--raised);
+}
+
+/* ── Measurements ─────────────────────────────────────────────────────────────────
+   A specification sheet, set like one: label above, figure below, hairline between. */
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0;
+    margin: 0;
+    border-top: 1px solid var(--line);
+}
+
+@media (min-width: 768px) {
+    .stats { grid-template-columns: repeat(4, 1fr); }
+}
+
+.stats > div {
+    padding: 1.4rem 0;
+    border-bottom: 1px solid var(--line);
+    padding-right: 1.5rem;
+}
+
+.stats dt {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: var(--track-eyebrow);
+    text-transform: uppercase;
+    color: var(--fg-md);
+    margin-bottom: 0.5rem;
+}
+
+.stats dd {
+    margin: 0;
+    font-family: var(--display);
+    font-size: 1.5rem;
+    font-weight: 300;
+    line-height: 1.2;
+}
+
+/* ── Self-tape ────────────────────────────────────────────────────────────────── */
+
+.self-tape video {
+    width: 100%;
+    max-width: 760px;
+    display: block;
+    background: #000;
+}
+
+/* ── Enquiry ──────────────────────────────────────────────────────────────────── */
+
+.contact-panel {
+    background: var(--card);
+    border: 1px solid var(--line);
+    padding: clamp(1.5rem, 4vw, 2.8rem);
+}
+
+.contact-note {
+    color: var(--fg-md);
+    font-size: 13px;
+}
+
+/* ── Model board ──────────────────────────────────────────────────────────────── */
+
+.board {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: clamp(10px, 2vw, 22px);
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+@media (min-width: 768px) { .board { grid-template-columns: repeat(3, 1fr); } }
+@media (min-width: 1200px) { .board { grid-template-columns: repeat(4, 1fr); } }
+
+.board-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+}
+
+.board-card img {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    display: block;
+    background: var(--raised);
+    transition: opacity 0.4s ease;
+}
+
+.board-card:hover img {
+    opacity: 0.82;
+}
+
+.board-name {
+    font-family: var(--display);
+    font-size: 1.05rem;
+    font-weight: 400;
+    margin: 0.9rem 0 0.2rem;
+}
+
+.board-location {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    color: var(--fg-md);
+    margin: 0;
+}
+
+/* ── Public footer ────────────────────────────────────────────────────────────── */
+
+.public-footer {
+    background: var(--side);
+    border-top: 1px solid var(--line);
+    margin-top: 0;
+}
+
+.footer-brand {
+    font-family: var(--display);
+    font-size: clamp(1.6rem, 5vw, 2.8rem);
+    font-weight: 300;
+    line-height: 1.1;
+    margin: 0 0 1.2rem;
+}
+
+.footer-company,
+.footer-legal {
+    color: var(--fg-md);
+    font-size: 12px;
+}
+
+.footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1.6rem;
+    margin: 1.6rem 0;
+    padding-top: 1.6rem;
+    border-top: 1px solid var(--line);
+}
+
+.footer-links a,
+.footer-contact a {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    color: var(--fg-md);
+    text-decoration: none;
+}
+
+.footer-links a:hover,
+.footer-contact a:hover {
+    color: var(--fg);
+}
+
+.footer-contact p {
+    margin: 0 0 0.4rem;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════
+   THE STAFF PORTAL
+   Same design language, denser. Studio staff work in this all day.
+   ══════════════════════════════════════════════════════════════════════════════════ */
+
+.portal-header {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    background: var(--side);
+    border-bottom: 1px solid var(--line);
+}
+
+.portal-header .container-fluid {
+    display: flex;
+    align-items: center;
+    gap: 1.2rem;
+    min-height: 62px;
+    flex-wrap: wrap;
+}
+
+.portal-brand {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-decoration: none;
+    margin-right: 0.6rem;
+}
+
+.portal-brand .mark {
+    font-family: var(--sans);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: var(--track-eyebrow);
+    text-transform: uppercase;
+    color: var(--fg);
+    line-height: 1.2;
+}
+
+.portal-brand .area {
+    font-size: 9px;
+    font-weight: 500;
+    letter-spacing: var(--track-eyebrow);
+    text-transform: uppercase;
+    color: var(--fg-lo);
+}
+
+.portal-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: clamp(0.9rem, 2vw, 1.8rem);
+    flex: 1 1 auto;
+}
+
+.portal-nav a {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    color: var(--fg-md);
+    text-decoration: none;
+    padding: 4px 0;
+    border-bottom: 1px solid transparent;
+    transition: color 0.25s ease, border-color 0.25s ease;
+}
+
+.portal-nav a:hover,
+.portal-nav a.active {
+    color: var(--fg);
+    border-bottom-color: var(--fg);
+}
+
+.portal-utility {
+    display: flex;
+    align-items: center;
+    gap: 0.7rem;
+    margin-left: auto;
+}
+
+.portal-user {
+    display: none;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    color: var(--fg-lo);
+    text-align: right;
+}
+
+@media (min-width: 768px) {
+    .portal-user { display: block; }
+}
+
+.portal-main {
+    padding: clamp(1.8rem, 4vw, 3rem) 0 5rem;
+    min-height: 60vh;
+}
+
+.portal-footer {
+    border-top: 1px solid var(--line);
+    padding: 1.6rem 0;
+    font-size: 11px;
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    color: var(--fg-lo);
+}
+
+/* Filter bars above the client and audit tables. */
+.filter-bar {
+    display: grid;
+    gap: 0.9rem;
+    align-items: end;
+    padding: 1.4rem;
+    margin-bottom: 2rem;
+    background: var(--card);
+    border: 1px solid var(--line);
+}
+
+@media (min-width: 768px) {
+    .filter-bar {
+        grid-template-columns: 2fr 1fr 1fr auto;
+    }
+}
+
+/* The retoucher's image grid. */
+.work-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 12px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.work-tile {
+    border: 1px solid var(--line);
+    background: var(--card);
+}
+
+.work-tile img {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    display: block;
+    background: var(--raised);
+}
+
+.work-tile.selected {
+    border-color: var(--fg);
+}
+
+.work-tile-body {
+    padding: 0.7rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+/* A metric with a large figure and a tracked label beneath. */
+.metrics {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1px;
+    background: var(--line);
+    border: 1px solid var(--line);
+    margin-bottom: 2.5rem;
+}
+
+@media (min-width: 768px) {
+    .metrics { grid-template-columns: repeat(4, 1fr); }
+}
+
+.metric {
+    background: var(--bg);
+    padding: 1.5rem 1.4rem;
+}
+
+.metric .figure {
+    font-family: var(--display);
+    font-size: 2.2rem;
+    font-weight: 300;
+    line-height: 1;
+    display: block;
+    margin-bottom: 0.6rem;
+}
+
+.metric .label {
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: var(--track-eyebrow);
+    text-transform: uppercase;
+    color: var(--fg-md);
+}
+
+/* ══ Motion ══════════════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}

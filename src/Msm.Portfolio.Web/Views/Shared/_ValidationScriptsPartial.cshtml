@@ -1,2 +1,10 @@
-﻿<script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
+@*
+    Client-side validation. jQuery is loaded here rather than in a layout because these
+    are the only pages that need it — the rest of the application ships no jQuery at all.
+
+    This is a convenience, never the check: every rule is enforced again on the server,
+    which is what actually protects the data.
+*@
+<script src="~/lib/jquery/dist/jquery.min.js"></script>
+<script src="~/lib/jquery-validation/dist/jquery.validate.min.js"></script>
 <script src="~/lib/jquery-validation-unobtrusive/dist/jquery.validate.unobtrusive.min.js"></script>

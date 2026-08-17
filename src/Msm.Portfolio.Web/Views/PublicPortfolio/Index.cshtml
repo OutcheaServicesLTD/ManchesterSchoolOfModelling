@@ -6,6 +6,12 @@
     var p = Model.Portfolio;
     var hasStats = p.Measurements.Count > 0;
     var hasAbout = !string.IsNullOrWhiteSpace(p.Biography);
+
+    // The name is set as the design specifies: forename in roman, everything after it in
+    // italic on its own line. A single-word name simply has no second line.
+    var nameParts = p.Name.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+    var forename = nameParts.Length > 0 ? nameParts[0] : p.Name;
+    var surname = nameParts.Length > 1 ? nameParts[1] : null;
 }
 
 @section Meta {
@@ -23,41 +29,100 @@
 @section HeaderNav {
     @* Minimal, per specification section 15: no join, no sign-up, no account prompt. *@
     <nav class="portfolio-nav" aria-label="Sections">
-        <a href="#portfolio">Portfolio</a>
         @if (hasAbout)
         {
             <a href="#about">About</a>
         }
         @if (hasStats)
         {
-            <a href="#stats">Stats</a>
+            <a href="#stats">Info</a>
         }
-        <a href="#contact">Contact</a>
+        <a href="#portfolio">Portfolio</a>
+        <a href="#contact">Booking</a>
     </nav>
 }
 
-<div class="container">
-    <section class="hero" aria-labelledby="model-name">
-        @if (p.FeaturedAssetId is not null)
+@* Full bleed, outside the container: the photograph runs edge to edge. *@
+<section class="hero" aria-labelledby="model-name">
+    @if (p.FeaturedAssetId is not null)
+    {
+        <img class="hero-image" src="/media/@p.FeaturedAssetId/large"
+             alt="Portrait of @p.Name" />
+    }
+    <div class="hero-content">
+        @* True whenever this page renders at all: an unpublished portfolio is not served,
+           and every enquiry is handled by MSM. *@
+        <p class="hero-status">Available for bookings</p>
+
+        <h1 class="hero-name" id="model-name">
+            @forename@if (surname is not null)
+            {<span class="surname">@surname</span>}
+        </h1>
+
+        @if (!string.IsNullOrWhiteSpace(p.Location) || p.Age is not null)
         {
-            <img class="hero-image" src="/media/@p.FeaturedAssetId/large"
-                 alt="Portrait of @p.Name" />
+            <ul class="hero-strapline">
+                @if (!string.IsNullOrWhiteSpace(p.Location))
+                {
+                    <li>@p.Location</li>
+                }
+                @if (p.Age is { } age)
+                {
+                    <li>Age @age</li>
+                }
+            </ul>
         }
-        <div>
-            <h1 class="hero-name" id="model-name">@p.Name</h1>
-            @if (Model.Strapline is not null)
-            {
-                <p class="hero-strapline">@Model.Strapline</p>
-            }
-        </div>
-    </section>
+
+        <a class="hero-cta" href="#portfolio">
+            View portfolio
+            <span aria-hidden="true">&rarr;</span>
+        </a>
+    </div>
+</section>
+
+<div class="container">
+    @if (hasAbout)
+    {
+        <section class="section" id="about" aria-labelledby="about-heading">
+            <h2 class="section-title" id="about-heading">About</h2>
+            <div class="row">
+                <div class="col-md-6">
+                    <p class="display-6">
+                        @forename@if (surname is not null)
+                        {<br /><em>@surname</em>}
+                    </p>
+                </div>
+                <div class="col-md-6">
+                    @* Plain text: rendering client-supplied HTML here would be a stored XSS
+                       route into every agency's browser. Razor encodes it. *@
+                    <p class="lead" style="white-space: pre-line;">@p.Biography</p>
+                </div>
+            </div>
+        </section>
+    }
+
+    @if (hasStats)
+    {
+        <section class="section" id="stats" aria-labelledby="stats-heading">
+            <h2 class="section-title" id="stats-heading">Information</h2>
+            <dl class="stats">
+                @foreach (var measurement in p.Measurements)
+                {
+                    <div>
+                        <dt>@measurement.Label</dt>
+                        <dd>@measurement.Value@(measurement.Unit is null ? "" : $" {measurement.Unit}")</dd>
+                    </div>
+                }
+            </dl>
+        </section>
+    }
 
     <section class="section" id="portfolio" aria-labelledby="portfolio-heading">
         <h2 class="section-title" id="portfolio-heading">Portfolio</h2>
 
         @if (p.Images.Count == 0)
         {
-            <p>No photographs are available.</p>
+            <p class="empty">No photographs are available.</p>
         }
         else
         {
@@ -79,32 +144,6 @@
         }
     </section>
 
-    @if (hasAbout)
-    {
-        <section class="section" id="about" aria-labelledby="about-heading">
-            <h2 class="section-title" id="about-heading">About me</h2>
-            @* Plain text: rendering client-supplied HTML here would be a stored XSS
-               route into every agency's browser. Razor encodes it. *@
-            <p style="white-space: pre-line; max-width: 70ch;">@p.Biography</p>
-        </section>
-    }
-
-    @if (hasStats)
-    {
-        <section class="section" id="stats" aria-labelledby="stats-heading">
-            <h2 class="section-title" id="stats-heading">Stats</h2>
-            <dl class="stats">
-                @foreach (var measurement in p.Measurements)
-                {
-                    <div>
-                        <dt>@measurement.Label</dt>
-                        <dd>@measurement.Value@(measurement.Unit is null ? "" : $" {measurement.Unit}")</dd>
-                    </div>
-                }
-            </dl>
-        </section>
-    }
-
     @* Hidden entirely when there is no self-tape (specification section 14). *@
     @if (p.HasSelfTape)
     {
@@ -122,7 +161,8 @@
     {
         <section class="section" aria-labelledby="social-heading">
             <h2 class="section-title" id="social-heading">Social media</h2>
-            <nav class="portfolio-nav" aria-label="Social media">
+            <nav class="footer-links" style="border-top: 0; padding-top: 0; margin-top: 0;"
+                 aria-label="Social media">
                 @if (!string.IsNullOrWhiteSpace(p.InstagramUrl))
                 {
                     <a href="@p.InstagramUrl" rel="nofollow noopener">Instagram</a>
@@ -136,7 +176,7 @@
     }
 
     <section class="section" id="contact" aria-labelledby="contact-heading">
-        <h2 class="section-title" id="contact-heading">Contact @Model.Brand.BusinessName</h2>
+        <h2 class="section-title" id="contact-heading">Booking</h2>
 
         <div class="contact-panel">
             @if (Model.EnquirySent)
@@ -149,7 +189,7 @@
 
             @* All professional contact routes through MSM. The model's own email and
                telephone are never shown here (specification sections 16 and 46). *@
-            <p class="contact-note">
+            <p class="contact-note mb-3">
                 All enquiries about @p.Name are handled by @Model.Brand.BusinessName.
             </p>
 
@@ -180,7 +220,7 @@
                 <div asp-validation-summary="All" class="alert alert-danger" role="alert"
                      style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
 
-                <div class="row">
+                <div class="row g-3">
                     <div class="col-md-6 mb-3">
                         <label asp-for="Enquiry.Name" class="form-label"></label>
                         <input asp-for="Enquiry.Name" class="form-control" autocomplete="name" />
@@ -192,7 +232,7 @@
                     </div>
                 </div>
 
-                <div class="row">
+                <div class="row g-3">
                     <div class="col-md-6 mb-3">
                         <label asp-for="Enquiry.Email" class="form-label"></label>
                         <input asp-for="Enquiry.Email" class="form-control" autocomplete="email" />
@@ -211,7 +251,7 @@
                     <span asp-validation-for="Enquiry.Message" class="text-danger"></span>
                 </div>
 
-                <button type="submit" class="btn btn-dark btn-lg">Send enquiry</button>
+                <button type="submit" class="btn btn-primary btn-lg">Send enquiry</button>
             </form>
         </div>
     </section>

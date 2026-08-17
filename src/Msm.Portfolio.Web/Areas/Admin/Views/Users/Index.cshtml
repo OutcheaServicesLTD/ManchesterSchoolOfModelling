@@ -77,7 +77,7 @@
                                     </button>
                                 </form>
                                 <form method="post" asp-action="ResetPassword" asp-route-userId="@member.UserId"
-                                      onsubmit="return confirm('Issue a new password for @member.Email?');">
+                                      data-confirm="Issue a new password for @member.Email?">
                                     <button type="submit" class="btn btn-sm btn-outline-secondary">Reset access</button>
                                 </form>
                             </div>

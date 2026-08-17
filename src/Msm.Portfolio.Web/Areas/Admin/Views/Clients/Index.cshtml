@@ -129,7 +129,7 @@
             @if (Model.IsPublished && await Allowed(Permissions.Portfolios.Unpublish))
             {
                 <form method="post" asp-action="Unpublish" asp-route-clientId="@Model.ClientId"
-                      onsubmit="return confirm('Take this portfolio off the web?');">
+                      data-confirm="Take this portfolio off the web?">
                     <button type="submit" class="btn btn-outline-danger">Unpublish</button>
                 </form>
             }
@@ -145,7 +145,7 @@
             @if (Model.CanMarkNoSale && await Allowed(Permissions.Payments.MarkNoSale))
             {
                 <form method="post" asp-action="MarkNoSale" asp-route-clientId="@Model.ClientId"
-                      onsubmit="return confirm('Record this as a no sale and archive it?');">
+                      data-confirm="Record this as a no sale and archive it?">
                     <button type="submit" class="btn btn-outline-secondary">No sale</button>
                 </form>
             }
@@ -176,7 +176,7 @@
                     The audit record of the deletion is kept.
                 </p>
                 <form method="post" asp-action="DeletePermanently" asp-route-clientId="@Model.ClientId"
-                      onsubmit="return confirm('Permanently delete this portfolio and all its photographs? This cannot be undone.');">
+                      data-confirm="Permanently delete this portfolio and all its photographs? This cannot be undone.">
                     <button type="submit" class="btn btn-danger btn-sm">Delete permanently</button>
                 </form>
             </div>
@@ -222,7 +222,7 @@ else
             <li class="col">
                 <div class="card h-100 @(asset.IsFeatured ? "border-primary" : "")">
                     <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
-                         style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background:#f6f6f6;"
+                         style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
                          alt="@asset.Filename" />
                     <div class="card-body p-2">
                         <p class="small text-muted mb-1">
@@ -288,7 +288,7 @@ else
             <div class="col">
                 <div class="card h-100">
                     <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
-                         style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background:#f6f6f6;"
+                         style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
                          alt="@asset.Filename" />
                     <div class="card-body p-2">
                         <p class="small text-muted mb-1">@asset.Orientation</p>
@@ -304,7 +304,7 @@ else
                         {
                             <form method="post" asp-action="RemoveMedia" asp-route-clientId="@Model.ClientId"
                                   asp-route-assetId="@asset.Id" class="d-grid"
-                                  onsubmit="return confirm('Remove this photograph?');">
+                                  data-confirm="Remove this photograph?">
                                 <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
                             </form>
                         }

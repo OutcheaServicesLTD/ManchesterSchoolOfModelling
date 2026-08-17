@@ -10,11 +10,12 @@
 
 <div class="container">
     <section class="section" style="border-top: 0;" aria-labelledby="board-heading">
-        <h1 class="section-title" id="board-heading">Model board</h1>
+        <p class="eyebrow mb-2">@Model.Brand.BusinessName</p>
+        <h1 class="mb-4" id="board-heading">Model <em>board</em></h1>
 
         @if (Model.Cards.Count == 0)
         {
-            <p>There are no models on the board at the moment.</p>
+            <p class="empty">There are no models on the board at the moment.</p>
         }
         else
         {

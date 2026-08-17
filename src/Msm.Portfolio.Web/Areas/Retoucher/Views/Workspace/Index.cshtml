@@ -106,7 +106,7 @@ else
             <li class="col">
                 <div class="card h-100 @(asset.IsFeatured ? "border-primary" : "")">
                     <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
-                         style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background:#f6f6f6;"
+                         style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
                          alt="@asset.Filename" />
                     <div class="card-body p-2">
                         <p class="small text-muted mb-1">
@@ -166,7 +166,7 @@ else
             <div class="col">
                 <div class="card h-100">
                     <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
-                         style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background:#f6f6f6;"
+                         style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
                          alt="@asset.Filename" />
                     <div class="card-body p-2">
                         <p class="small text-muted mb-1">@asset.Orientation</p>
@@ -180,7 +180,7 @@ else
 
                         <form method="post" asp-action="Remove" asp-route-clientId="@Model.ClientId"
                               asp-route-assetId="@asset.Id" class="d-grid"
-                              onsubmit="return confirm('Remove this photograph?');">
+                              data-confirm="Remove this photograph?">
                             <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
                         </form>
                     </div>

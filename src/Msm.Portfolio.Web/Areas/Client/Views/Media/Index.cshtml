@@ -89,7 +89,7 @@ else
                     <img src="/media/@asset.Id/thumbnail"
                          class="card-img-top"
                          loading="lazy"
-                         style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background:#f6f6f6;"
+                         style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
                          alt="@asset.Filename" />
 
                     <div class="card-body p-2">
@@ -122,7 +122,7 @@ else
                             }
 
                             <form method="post" asp-action="Remove" asp-route-assetId="@asset.Id"
-                                  onsubmit="return confirm('Remove this photograph from your library?');">
+                                  data-confirm="Remove this photograph from your library?">
                                 <button type="submit" class="btn btn-sm btn-outline-danger w-100">Remove</button>
                             </form>
                         </div>
