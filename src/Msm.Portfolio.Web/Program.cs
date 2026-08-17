@@ -65,6 +65,7 @@ builder.Services.AddScoped<IRetoucherService, RetoucherService>();
 builder.Services.AddScoped<ISlugService, SlugService>();
 builder.Services.AddScoped<IPortfolioService, PortfolioService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
+builder.Services.AddScoped<IPublicPortfolioService, PublicPortfolioService>();
 builder.Services.AddScoped<IStaffService, StaffService>();
 builder.Services.AddSingleton<IImageProcessor, ImageProcessor>();
 
@@ -95,7 +96,7 @@ if (app.Environment.IsDevelopment())
 }
 else
 {
-    app.UseExceptionHandler("/Home/Error");
+    app.UseExceptionHandler("/error");
     app.UseHsts();
 }
 

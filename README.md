@@ -23,7 +23,7 @@ specification section 51.
 | 3 | Media storage abstraction, upload pipeline, 60-image pool, 30-image portfolio, featured image, self-tape | Done |
 | 4 | Retoucher queue, assignments, upload workspace, submit for review | Done |
 | 5 | Admin dashboard, client management, portfolio preview, status management, publish/unpublish | Done |
-| 6 | Public portfolio, responsive gallery, contact MSM, Model Board, slugs | Not started |
+| 6 | Public portfolio, responsive gallery, contact MSM, Model Board, slugs | Done |
 | 7 | Orders, checkout, GoCardless integration, webhooks | Not started |
 | 8 | Maintenance subscription, failed payment detection, grace period, automatic unpublish | Not started |
 | 9 | GoHighLevel synchronisation | Not started |
@@ -266,6 +266,58 @@ section 48). Only a Super Admin can restore it or destroy it. Permanent deletion
 the portfolio, its media rows and the stored files, but keeps the client record and
 writes an audit entry that deliberately outlives what it describes.
 
+## The public site
+
+No sign-in anywhere. Agencies open a link and read the page.
+
+| Route | Page |
+| ----- | ---- |
+| `/` | Redirects to the Model Board — the portfolio domain has no marketing homepage |
+| `/models` | Model Board |
+| `/{slug}` | A model's portfolio, e.g. `/emma-johnson` |
+
+Portfolios are served from the site root. Route matching prefers literal segments over
+parameters, so `/admin`, `/client`, `/retoucher`, `/media` and the rest are unaffected,
+and slug creation refuses those names as a second line of defence.
+
+### What the public can and cannot see
+
+`PublicPortfolio` is a projection, not the entity. The client record holds an email
+address, a telephone number, the CRM contact id and guardian details, and none of them
+belong on a public page — building a separate shape means they cannot leak through a
+view by accident. A test asserts the serialised projection contains none of them.
+
+Unpublishing removes the portfolio page, the Model Board card **and** public access to
+the images in one move, because all three read the same `IsPublished` flag. There is no
+separate board record to fall out of step (specification section 47).
+
+### Contact routes to MSM, never to the model
+
+The enquiry form collects the *enquirer's* details. The model's own email and telephone
+are never shown and never used. The model enquired about is taken from the portfolio in
+the URL rather than the posted form, so an enquiry cannot be redirected at someone else,
+and the server re-checks the portfolio is published before storing anything. MSM staff
+are notified; the model is not.
+
+Enquiries are **stored**, not only emailed. This adds an `Enquiry` entity beyond the list
+in specification section 26 — a deliberate addition, because no email provider is
+configured yet and an unstored enquiry would simply be lost.
+
+### Presentation
+
+Mobile-first throughout: models share these links through messaging and social media far
+more often than anyone opens them on a desktop. Landscape photographs span two columns
+where there is room rather than being squeezed into a portrait-shaped cell, and images
+are contained rather than cropped.
+
+Accessibility is treated as a functional requirement (specification section 41): a skip
+link, visible focus outlines on every interactive element, labelled form fields, real
+heading structure, alt text, and Model Board cards that are a single link rather than
+two adjacent ones.
+
+MSM branding in the header and footer is rendered by the platform and is not
+client-editable.
+
 ## Database
 
 The provider is deliberately configurable, because the production database is still an
@@ -333,7 +385,12 @@ requirements.
 - **Maintenance start date** — `Commerce:MaintenanceStartsAfterDays`, currently 0.
 - **Production domain** — `Msm:PublicDomain`.
 - **MSM contact details** — `Msm:ContactEmail`, `ContactPhone`, `WhatsApp`, to be
-  supplied by MSM.
+  supplied by MSM. Until they are set, the public portfolio shows the enquiry form but
+  no direct contact options, and the footer omits them.
+- **Model Board entitlement** — specification section 18 makes board eligibility depend
+  on an active entitlement as well as publication. Publication and the visibility flag
+  are enforced now; the entitlement half arrives with the maintenance subscription in
+  Phase 8.
 - **Guardian consent wording** — `GuardianConsent:ConsentText`, to be supplied or
   approved by MSM. A clearly-labelled placeholder is shown until then. Each approval
   records the version agreed (`GuardianConsent:CurrentVersion`), so changing the wording

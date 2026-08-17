@@ -1,0 +1,350 @@
+/*
+ * Public portfolio and Model Board styling.
+ *
+ * Mobile-first (specification section 40): every layout rule starts at phone width and
+ * widens at breakpoints, because models share these links through messaging and social
+ * media far more often than anyone opens them on a desktop.
+ *
+ * Contrast and focus visibility are treated as functional requirements, not polish
+ * (specification section 41). The earlier prototype had readability problems, so
+ * colours here are deliberately high contrast against their backgrounds.
+ */
+
+:root {
+    --msm-ink: #14141c;
+    --msm-paper: #ffffff;
+    --msm-muted: #5c5c66;
+    --msm-line: #e2e2e8;
+    --msm-accent: #1a1a2e;
+    --msm-focus: #0b5ed7;
+}
+
+body.public {
+    margin: 0;
+    color: var(--msm-ink);
+    background: var(--msm-paper);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6;
+}
+
+/* Visible focus on every interactive element, for keyboard users. */
+body.public a:focus-visible,
+body.public button:focus-visible,
+body.public input:focus-visible,
+body.public textarea:focus-visible {
+    outline: 3px solid var(--msm-focus);
+    outline-offset: 2px;
+}
+
+.skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    background: var(--msm-ink);
+    color: #fff;
+    padding: 0.75rem 1rem;
+    z-index: 100;
+}
+
+.skip-link:focus {
+    left: 0;
+}
+
+/* ---------- Header ---------- */
+
+.public-header {
+    border-bottom: 1px solid var(--msm-line);
+    background: var(--msm-paper);
+}
+
+.public-header .brand {
+    text-decoration: none;
+    color: var(--msm-ink);
+}
+
+.brand-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+
+@media (min-width: 768px) {
+    .brand-name {
+        font-size: 1.3rem;
+    }
+}
+
+.portfolio-nav {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.portfolio-nav a {
+    color: var(--msm-muted);
+    text-decoration: none;
+    font-size: 0.95rem;
+}
+
+.portfolio-nav a:hover,
+.portfolio-nav a:focus {
+    color: var(--msm-ink);
+    text-decoration: underline;
+}
+
+/* ---------- Hero ---------- */
+
+.hero {
+    display: grid;
+    gap: 1.5rem;
+    padding: 2rem 0;
+}
+
+@media (min-width: 992px) {
+    .hero {
+        grid-template-columns: 1fr 1fr;
+        align-items: center;
+        gap: 3rem;
+        padding: 3rem 0;
+    }
+}
+
+.hero-image {
+    width: 100%;
+    height: auto;
+    /* Contain, never crop: the specification is explicit that portfolio photography
+       must not be cropped destructively (section 13). */
+    object-fit: contain;
+    background: #f4f4f6;
+}
+
+.hero-name {
+    font-size: 2rem;
+    font-weight: 700;
+    margin: 0 0 0.25rem;
+    line-height: 1.15;
+}
+
+@media (min-width: 768px) {
+    .hero-name {
+        font-size: 3rem;
+    }
+}
+
+.hero-strapline {
+    color: var(--msm-muted);
+    font-size: 1.05rem;
+    margin: 0;
+}
+
+/* ---------- Sections ---------- */
+
+.section {
+    padding: 2.5rem 0;
+    border-top: 1px solid var(--msm-line);
+}
+
+.section-title {
+    font-size: 1.35rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin: 0 0 1.5rem;
+}
+
+/* ---------- Gallery ---------- */
+
+.gallery {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0.75rem;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+@media (min-width: 576px) {
+    .gallery {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (min-width: 992px) {
+    .gallery {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+    }
+}
+
+.gallery img {
+    width: 100%;
+    height: auto;
+    display: block;
+    background: #f4f4f6;
+}
+
+/* A landscape photograph spans two columns where there is room, so wide frames are
+   not shrunk into a portrait-shaped cell. */
+@media (min-width: 576px) {
+    .gallery li.landscape {
+        grid-column: span 2;
+    }
+}
+
+@media (min-width: 992px) {
+    .gallery li.landscape {
+        grid-column: span 2;
+    }
+}
+
+/* ---------- Stats ---------- */
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem 1.5rem;
+    margin: 0;
+}
+
+@media (min-width: 768px) {
+    .stats {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+.stats dt {
+    font-size: 0.8rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--msm-muted);
+    font-weight: 600;
+}
+
+.stats dd {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+/* ---------- Self-tape ---------- */
+
+.self-tape video {
+    width: 100%;
+    max-width: 720px;
+    background: #000;
+}
+
+/* ---------- Contact ---------- */
+
+.contact-panel {
+    background: #f7f7f9;
+    padding: 1.5rem;
+    border-radius: 4px;
+}
+
+@media (min-width: 768px) {
+    .contact-panel {
+        padding: 2rem;
+    }
+}
+
+.contact-note {
+    color: var(--msm-muted);
+    font-size: 0.95rem;
+}
+
+/* ---------- Model board ---------- */
+
+.board {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 1rem;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+@media (min-width: 768px) {
+    .board {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media (min-width: 1200px) {
+    .board {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+.board-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+}
+
+.board-card img {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    display: block;
+    background: #f4f4f6;
+}
+
+.board-card .board-name {
+    font-weight: 600;
+    margin: 0.5rem 0 0;
+}
+
+.board-card .board-location {
+    color: var(--msm-muted);
+    font-size: 0.9rem;
+    margin: 0;
+}
+
+.board-card:hover .board-name,
+.board-card:focus .board-name {
+    text-decoration: underline;
+}
+
+/* ---------- Footer ---------- */
+
+.public-footer {
+    background: var(--msm-accent);
+    color: #f2f2f5;
+    margin-top: 3rem;
+}
+
+.footer-brand {
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    margin: 0 0 0.75rem;
+}
+
+@media (min-width: 768px) {
+    .footer-brand {
+        font-size: 1.5rem;
+    }
+}
+
+.footer-company,
+.footer-legal {
+    color: #c9c9d4;
+    font-size: 0.9rem;
+}
+
+.footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.public-footer a {
+    color: #ffffff;
+}
+
+.footer-contact p {
+    margin: 0 0 0.25rem;
+}

@@ -66,4 +66,5 @@ public static class NotificationTypes
     public const string PortfolioReturnedToRetoucher = "PortfolioReturnedToRetoucher";
     public const string PortfolioPublished = "PortfolioPublished";
     public const string PortfolioUnpublished = "PortfolioUnpublished";
+    public const string EnquiryReceived = "EnquiryReceived";
 }

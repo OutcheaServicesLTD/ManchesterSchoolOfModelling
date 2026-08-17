@@ -1,0 +1,222 @@
+@model Msm.Portfolio.Web.ViewModels.PublicPortfolioViewModel
+@using Msm.Portfolio.Web.Domain.Enums
+@{
+    Layout = "_PublicLayout";
+    ViewData["Title"] = Model.Portfolio.Name;
+    var p = Model.Portfolio;
+    var hasStats = p.Measurements.Count > 0;
+    var hasAbout = !string.IsNullOrWhiteSpace(p.Biography);
+}
+
+@section Meta {
+    <meta name="description" content="@p.Name — portfolio at @Model.Brand.BusinessName." />
+    @* Shared through messaging and social media, so the preview card matters. *@
+    <meta property="og:title" content="@p.Name — @Model.Brand.BusinessName" />
+    <meta property="og:type" content="profile" />
+    <meta property="og:url" content="@Model.ShareUrl" />
+    @if (p.FeaturedAssetId is not null)
+    {
+        <meta property="og:image" content="@Model.Brand.PublicDomain.TrimEnd('/')/media/@p.FeaturedAssetId/large" />
+    }
+}
+
+@section HeaderNav {
+    @* Minimal, per specification section 15: no join, no sign-up, no account prompt. *@
+    <nav class="portfolio-nav" aria-label="Sections">
+        <a href="#portfolio">Portfolio</a>
+        @if (hasAbout)
+        {
+            <a href="#about">About</a>
+        }
+        @if (hasStats)
+        {
+            <a href="#stats">Stats</a>
+        }
+        <a href="#contact">Contact</a>
+    </nav>
+}
+
+<div class="container">
+    <section class="hero" aria-labelledby="model-name">
+        @if (p.FeaturedAssetId is not null)
+        {
+            <img class="hero-image" src="/media/@p.FeaturedAssetId/large"
+                 alt="Portrait of @p.Name" />
+        }
+        <div>
+            <h1 class="hero-name" id="model-name">@p.Name</h1>
+            @if (Model.Strapline is not null)
+            {
+                <p class="hero-strapline">@Model.Strapline</p>
+            }
+        </div>
+    </section>
+
+    <section class="section" id="portfolio" aria-labelledby="portfolio-heading">
+        <h2 class="section-title" id="portfolio-heading">Portfolio</h2>
+
+        @if (p.Images.Count == 0)
+        {
+            <p>No photographs are available.</p>
+        }
+        else
+        {
+            <ul class="gallery">
+                @foreach (var image in p.Images)
+                {
+                    <li class="@(image.Orientation == MediaOrientation.Landscape ? "landscape" : "")">
+                        @* Medium in the grid, large behind the link: the archived original
+                           is never served to a browser (specification sections 13 and 42). *@
+                        <a href="/media/@image.AssetId/large">
+                            <img src="/media/@image.AssetId/medium"
+                                 loading="lazy"
+                                 width="@image.Width" height="@image.Height"
+                                 alt="Photograph of @p.Name" />
+                        </a>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+
+    @if (hasAbout)
+    {
+        <section class="section" id="about" aria-labelledby="about-heading">
+            <h2 class="section-title" id="about-heading">About me</h2>
+            @* Plain text: rendering client-supplied HTML here would be a stored XSS
+               route into every agency's browser. Razor encodes it. *@
+            <p style="white-space: pre-line; max-width: 70ch;">@p.Biography</p>
+        </section>
+    }
+
+    @if (hasStats)
+    {
+        <section class="section" id="stats" aria-labelledby="stats-heading">
+            <h2 class="section-title" id="stats-heading">Stats</h2>
+            <dl class="stats">
+                @foreach (var measurement in p.Measurements)
+                {
+                    <div>
+                        <dt>@measurement.Label</dt>
+                        <dd>@measurement.Value@(measurement.Unit is null ? "" : $" {measurement.Unit}")</dd>
+                    </div>
+                }
+            </dl>
+        </section>
+    }
+
+    @* Hidden entirely when there is no self-tape (specification section 14). *@
+    @if (p.HasSelfTape)
+    {
+        <section class="section self-tape" id="self-tape" aria-labelledby="self-tape-heading">
+            <h2 class="section-title" id="self-tape-heading">Self-tape</h2>
+            <video controls preload="metadata"
+                   @(p.FeaturedAssetId is null ? "" : $"poster=/media/{p.FeaturedAssetId}/medium")>
+                <source src="/media/@p.SelfTapeAssetId" />
+                Your browser cannot play this video.
+            </video>
+        </section>
+    }
+
+    @if (p.HasSocialLinks)
+    {
+        <section class="section" aria-labelledby="social-heading">
+            <h2 class="section-title" id="social-heading">Social media</h2>
+            <nav class="portfolio-nav" aria-label="Social media">
+                @if (!string.IsNullOrWhiteSpace(p.InstagramUrl))
+                {
+                    <a href="@p.InstagramUrl" rel="nofollow noopener">Instagram</a>
+                }
+                @if (!string.IsNullOrWhiteSpace(p.TikTokUrl))
+                {
+                    <a href="@p.TikTokUrl" rel="nofollow noopener">TikTok</a>
+                }
+            </nav>
+        </section>
+    }
+
+    <section class="section" id="contact" aria-labelledby="contact-heading">
+        <h2 class="section-title" id="contact-heading">Contact @Model.Brand.BusinessName</h2>
+
+        <div class="contact-panel">
+            @if (Model.EnquirySent)
+            {
+                <div class="alert alert-success" role="alert">
+                    Thank you. Your enquiry has been sent to @Model.Brand.BusinessName and
+                    someone will be in touch.
+                </div>
+            }
+
+            @* All professional contact routes through MSM. The model's own email and
+               telephone are never shown here (specification sections 16 and 46). *@
+            <p class="contact-note">
+                All enquiries about @p.Name are handled by @Model.Brand.BusinessName.
+            </p>
+
+            @if (!string.IsNullOrWhiteSpace(Model.Brand.ContactEmail)
+                 || !string.IsNullOrWhiteSpace(Model.Brand.ContactPhone)
+                 || !string.IsNullOrWhiteSpace(Model.Brand.WhatsApp))
+            {
+                <p>
+                    @if (!string.IsNullOrWhiteSpace(Model.Brand.ContactEmail))
+                    {
+                        <a href="mailto:@Model.Brand.ContactEmail">@Model.Brand.ContactEmail</a>
+                        <span aria-hidden="true"> · </span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Model.Brand.ContactPhone))
+                    {
+                        <a href="tel:@Model.Brand.ContactPhone.Replace(" ", "")">@Model.Brand.ContactPhone</a>
+                        <span aria-hidden="true"> · </span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Model.Brand.WhatsApp))
+                    {
+                        <a href="https://wa.me/@Model.Brand.WhatsApp.Replace("+", "").Replace(" ", "")"
+                           rel="nofollow noopener">WhatsApp</a>
+                    }
+                </p>
+            }
+
+            <form method="post" asp-action="Enquire" asp-route-slug="@p.Slug" novalidate>
+                <div asp-validation-summary="All" class="alert alert-danger" role="alert"
+                     style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="Enquiry.Name" class="form-label"></label>
+                        <input asp-for="Enquiry.Name" class="form-control" autocomplete="name" />
+                        <span asp-validation-for="Enquiry.Name" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="Enquiry.Company" class="form-label"></label>
+                        <input asp-for="Enquiry.Company" class="form-control" autocomplete="organization" />
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="Enquiry.Email" class="form-label"></label>
+                        <input asp-for="Enquiry.Email" class="form-control" autocomplete="email" />
+                        <span asp-validation-for="Enquiry.Email" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="Enquiry.Phone" class="form-label"></label>
+                        <input asp-for="Enquiry.Phone" class="form-control" autocomplete="tel" />
+                        <span asp-validation-for="Enquiry.Phone" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Enquiry.Message" class="form-label"></label>
+                    <textarea asp-for="Enquiry.Message" class="form-control" rows="5"></textarea>
+                    <span asp-validation-for="Enquiry.Message" class="text-danger"></span>
+                </div>
+
+                <button type="submit" class="btn btn-dark btn-lg">Send enquiry</button>
+            </form>
+        </div>
+    </section>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

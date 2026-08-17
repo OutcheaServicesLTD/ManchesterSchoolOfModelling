@@ -1,0 +1,43 @@
+@model Msm.Portfolio.Web.ViewModels.ModelBoardViewModel
+@{
+    Layout = "_PublicLayout";
+    ViewData["Title"] = "Model board";
+}
+
+@section Meta {
+    <meta name="description" content="Models represented by @Model.Brand.BusinessName." />
+}
+
+<div class="container">
+    <section class="section" style="border-top: 0;" aria-labelledby="board-heading">
+        <h1 class="section-title" id="board-heading">Model board</h1>
+
+        @if (Model.Cards.Count == 0)
+        {
+            <p>There are no models on the board at the moment.</p>
+        }
+        else
+        {
+            <ul class="board">
+                @foreach (var card in Model.Cards)
+                {
+                    <li>
+                        @* The whole card is one link, so the name and image are a single
+                           target rather than two adjacent ones (specification section 41). *@
+                        <a class="board-card" href="/@card.Slug">
+                            <img src="/media/@card.FeaturedAssetId/medium"
+                                 loading="lazy"
+                                 alt="@card.Name" />
+                            <p class="board-name">@card.Name</p>
+                            @if (!string.IsNullOrWhiteSpace(card.Location))
+                            {
+                                <p class="board-location">@card.Location</p>
+                            }
+                            <span class="visually-hidden">View portfolio</span>
+                        </a>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+</div>
