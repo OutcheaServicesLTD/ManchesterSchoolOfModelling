@@ -29,6 +29,7 @@ public class ClientsController(
     IMediaService media,
     IPortfolioService portfolios,
     IRetoucherService retouchers,
+    IMaintenanceService maintenance,
     IMeasurementTemplateProvider templates,
     IAuditService audit,
     UserManager<ApplicationUser> userManager,
@@ -277,6 +278,7 @@ public class ClientsController(
             PortfolioLimit = mediaOptions.Value.PortfolioImageLimit,
             PoolLimit = mediaOptions.Value.MediaPoolImageLimit,
             GuardianApprovalPending = client.IsBlockedPendingGuardianConsent(today),
+            MaintenanceWarning = await maintenance.GetWarningAsync(clientId, cancellationToken),
             PublishBlocker = await portfolios.DescribePublishBlockerAsync(clientId, cancellationToken),
             PublicUrlBase = brand.PublicDomain.TrimEnd('/'),
             HasPaid = await db.Orders.AnyAsync(

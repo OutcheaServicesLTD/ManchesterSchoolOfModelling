@@ -19,6 +19,7 @@ namespace Msm.Portfolio.Web.Areas.Client.Controllers;
 [Authorize(Policy = Policies.ClientArea)]
 public class HomeController(
     IClientProfileAccessor profiles,
+    IMaintenanceService maintenance,
     ApplicationDbContext db,
     IOptions<MediaOptions> mediaOptions,
     IOptions<MsmBrandOptions> brandOptions) : Controller
@@ -60,7 +61,8 @@ public class HomeController(
             MediaPoolCount = total,
             MediaPoolLimit = media.MediaPoolImageLimit,
             ProfileCompletionPercent = CalculateCompletion(client),
-            GuardianApprovalPending = client.IsBlockedPendingGuardianConsent(today)
+            GuardianApprovalPending = client.IsBlockedPendingGuardianConsent(today),
+            MaintenanceWarning = await maintenance.GetWarningAsync(client.Id, cancellationToken)
         };
 
         return View(model);

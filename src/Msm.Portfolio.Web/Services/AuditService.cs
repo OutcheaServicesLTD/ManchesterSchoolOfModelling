@@ -74,4 +74,8 @@ public static class AuditActions
     public const string PaymentFailed = "PaymentFailed";
     public const string PaymentStateChanged = "PaymentStateChanged";
     public const string WebhookProcessed = "WebhookProcessed";
+    public const string MaintenancePaymentFailed = "MaintenancePaymentFailed";
+    public const string MaintenancePaymentResolved = "MaintenancePaymentResolved";
+    public const string MaintenanceGracePeriodExpired = "MaintenanceGracePeriodExpired";
+    public const string MaintenanceActivated = "MaintenanceActivated";
 }

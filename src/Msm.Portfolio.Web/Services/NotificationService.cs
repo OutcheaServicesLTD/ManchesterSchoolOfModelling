@@ -70,4 +70,7 @@ public static class NotificationTypes
     public const string PublicationBlockedAfterPurchase = "PublicationBlockedAfterPurchase";
     public const string PaymentFailed = "PaymentFailed";
     public const string PurchaseConfirmed = "PurchaseConfirmed";
+    public const string MaintenancePaymentFailed = "MaintenancePaymentFailed";
+    public const string MaintenancePaymentResolved = "MaintenancePaymentResolved";
+    public const string MaintenanceGracePeriodEnding = "MaintenanceGracePeriodEnding";
 }

@@ -70,6 +70,11 @@ builder.Services.AddScoped<IPublicPortfolioService, PublicPortfolioService>();
 builder.Services.AddScoped<IStaffService, StaffService>();
 builder.Services.AddScoped<ICheckoutService, CheckoutService>();
 builder.Services.AddScoped<IPaymentWebhookProcessor, PaymentWebhookProcessor>();
+builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
+
+// A grace period expires by the passage of time, so nothing in a request can be
+// relied on to notice it (specification section 23).
+builder.Services.AddHostedService<MaintenanceGracePeriodWorker>();
 builder.Services.AddScoped<IWebhookVerifier, GoCardlessWebhookVerifier>();
 
 // The real GoCardless client is used only when an access token is configured. Its HTTP

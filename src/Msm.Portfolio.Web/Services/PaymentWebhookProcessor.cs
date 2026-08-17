@@ -28,6 +28,7 @@ public class PaymentWebhookProcessor(
     ApplicationDbContext db,
     IWebhookVerifier verifier,
     ICheckoutService checkout,
+    IMaintenanceService maintenance,
     IAuditService audit,
     INotificationService notifications,
     ILogger<PaymentWebhookProcessor> logger) : IPaymentWebhookProcessor
@@ -111,10 +112,15 @@ public class PaymentWebhookProcessor(
 
     private async Task ApplyAsync(ProviderEvent providerEvent, CancellationToken cancellationToken)
     {
+        if (string.Equals(providerEvent.ResourceType, "subscriptions", StringComparison.OrdinalIgnoreCase))
+        {
+            await ApplySubscriptionEventAsync(providerEvent, cancellationToken);
+            return;
+        }
+
         if (!string.Equals(providerEvent.ResourceType, "payments", StringComparison.OrdinalIgnoreCase))
         {
-            // Other resource types are acknowledged and recorded but change nothing yet.
-            // Subscription events are handled when maintenance billing arrives in Phase 8.
+            // Other resource types are acknowledged and recorded but change nothing.
             return;
         }
 
@@ -122,6 +128,15 @@ public class PaymentWebhookProcessor(
 
         if (status is null)
         {
+            return;
+        }
+
+        // A payment carrying a subscription link is a maintenance collection, not the
+        // one-off programme purchase. Treating it as the latter would let a routine
+        // monthly failure look like the £3,499 sale failing.
+        if (!string.IsNullOrWhiteSpace(providerEvent.SubscriptionId))
+        {
+            await ApplyMaintenancePaymentAsync(providerEvent, status.Value, cancellationToken);
             return;
         }
 
@@ -200,6 +215,76 @@ public class PaymentWebhookProcessor(
             $"The payment for {order.Client.PublicName} failed: {providerEvent.Reason ?? "no reason given"}.",
             $"/admin/clients/{order.ClientId}",
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Applies a recurring maintenance collection (specification section 23).
+    /// </summary>
+    private async Task ApplyMaintenancePaymentAsync(
+        ProviderEvent providerEvent, PaymentStatus status, CancellationToken cancellationToken)
+    {
+        var subscription = await maintenance.FindByProviderIdAsync(
+            providerEvent.SubscriptionId!, cancellationToken);
+
+        if (subscription is null)
+        {
+            logger.LogWarning(
+                "Webhook event {EventId} referenced subscription {SubscriptionId}, which matches no client.",
+                providerEvent.EventId, providerEvent.SubscriptionId);
+            return;
+        }
+
+        switch (status)
+        {
+            case PaymentStatus.Failed:
+                await maintenance.RecordPaymentFailureAsync(
+                    subscription.ClientId, providerEvent.Reason, cancellationToken);
+                break;
+
+            case PaymentStatus.Confirmed:
+                await maintenance.RecordPaymentSuccessAsync(subscription.ClientId, cancellationToken);
+                break;
+        }
+    }
+
+    /// <summary>
+    /// Applies a subscription lifecycle event. A cancelled or finished arrangement ends
+    /// the entitlement, which removes the client from the Model Board.
+    /// </summary>
+    private async Task ApplySubscriptionEventAsync(
+        ProviderEvent providerEvent, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(providerEvent.SubscriptionId))
+        {
+            return;
+        }
+
+        var subscription = await maintenance.FindByProviderIdAsync(
+            providerEvent.SubscriptionId, cancellationToken);
+
+        if (subscription is null)
+        {
+            return;
+        }
+
+        var status = providerEvent.Action.ToLowerInvariant() switch
+        {
+            "cancelled" => MaintenanceSubscriptionStatus.Cancelled,
+            "finished" => MaintenanceSubscriptionStatus.Ended,
+            "created" or "customer_approval_granted" => MaintenanceSubscriptionStatus.Active,
+            _ => (MaintenanceSubscriptionStatus?)null
+        };
+
+        if (status is null)
+        {
+            return;
+        }
+
+        subscription.Status = status.Value;
+        subscription.UpdatedAt = DateTimeOffset.UtcNow;
+
+        audit.Record(nameof(MaintenanceSubscription), subscription.Id.ToString(),
+            AuditActions.PaymentStateChanged, newValue: status.Value.ToString());
     }
 
     private Task<PaymentTransaction?> FindTransactionAsync(

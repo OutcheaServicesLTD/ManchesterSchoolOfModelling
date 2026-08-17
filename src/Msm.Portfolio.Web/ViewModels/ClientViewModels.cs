@@ -29,6 +29,12 @@ public class ClientDashboardViewModel
 
     public bool GuardianApprovalPending { get; set; }
 
+    /// <summary>
+    /// Shown to the client and to staff, never on the public portfolio
+    /// (specification section 23).
+    /// </summary>
+    public Services.MaintenanceWarning? MaintenanceWarning { get; set; }
+
     public string StatusDescription => PortfolioStatus switch
     {
         PortfolioStatus.AwaitingClientInformation => "We are waiting for your details.",

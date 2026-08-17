@@ -42,6 +42,34 @@
     </div>
 }
 
+@if (Model.MaintenanceWarning is { } warning)
+{
+    @* Staff-facing only; agencies never see this on the public portfolio (spec 23). *@
+    <div class="alert @(warning.PortfolioTakenDown ? "alert-danger" : "alert-warning")" role="alert">
+        @if (warning.PortfolioTakenDown)
+        {
+            <strong>Maintenance unpaid — portfolio taken down.</strong>
+            <span>
+                The grace period ended @warning.GracePeriodEndsAt?.ToString("d MMMM yyyy")
+                and the portfolio was unpublished. Republish once payment is resolved.
+            </span>
+        }
+        else
+        {
+            <strong>Maintenance payment failed.</strong>
+            <span>
+                The portfolio stays live until
+                @warning.GracePeriodEndsAt?.ToString("d MMMM yyyy")
+                @if (warning.DaysRemaining is { } days)
+                {
+                    <text>(@days day@(days == 1 ? "" : "s") remaining)</text>
+                }
+                , then it is taken down automatically.
+            </span>
+        }
+    </div>
+}
+
 <div class="card mb-4">
     <div class="card-body">
         <h2 class="h5 card-title">Portfolio</h2>

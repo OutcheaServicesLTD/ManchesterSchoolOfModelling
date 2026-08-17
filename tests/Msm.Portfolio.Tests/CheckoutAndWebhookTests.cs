@@ -39,10 +39,14 @@ public class CheckoutAndWebhookTests : IDisposable
             _db, new SlugService(_db), new InMemoryStorage(), audit, notifications,
             NullLogger<PortfolioService>.Instance);
 
+        var commerce = new OptionsWrapper<CommerceOptions>(new CommerceOptions());
+
         _checkout = new CheckoutService(
-            _db, _provider, portfolios, audit, notifications,
-            new OptionsWrapper<CommerceOptions>(new CommerceOptions()),
+            _db, _provider, portfolios, audit, notifications, commerce,
             NullLogger<CheckoutService>.Instance);
+
+        var maintenance = new MaintenanceService(
+            _db, portfolios, audit, notifications, commerce, NullLogger<MaintenanceService>.Instance);
 
         var verifier = new GoCardlessWebhookVerifier(
             new OptionsWrapper<IntegrationOptions>(new IntegrationOptions
@@ -52,7 +56,8 @@ public class CheckoutAndWebhookTests : IDisposable
             NullLogger<GoCardlessWebhookVerifier>.Instance);
 
         _webhooks = new PaymentWebhookProcessor(
-            _db, verifier, _checkout, audit, notifications, NullLogger<PaymentWebhookProcessor>.Instance);
+            _db, verifier, _checkout, maintenance, audit, notifications,
+            NullLogger<PaymentWebhookProcessor>.Instance);
     }
 
     public void Dispose()

@@ -46,6 +46,9 @@ public class AdminClientDetailViewModel
 
     public bool GuardianApprovalPending { get; set; }
 
+    /// <summary>Shown to staff, never on the public portfolio (specification section 23).</summary>
+    public Services.MaintenanceWarning? MaintenanceWarning { get; set; }
+
     /// <summary>Why publishing is not currently possible, or null when it is.</summary>
     public string? PublishBlocker { get; set; }
 

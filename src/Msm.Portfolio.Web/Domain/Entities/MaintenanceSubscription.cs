@@ -57,4 +57,38 @@ public class MaintenanceSubscription
         Status == MaintenanceSubscriptionStatus.PaymentIssue
         && GracePeriodEndsAt is { } endsAt
         && now < endsAt;
+
+    /// <summary>
+    /// True when the grace period has run out and the portfolio should come down
+    /// (specification section 23).
+    /// </summary>
+    public bool HasGracePeriodExpired(DateTimeOffset now) =>
+        Status == MaintenanceSubscriptionStatus.PaymentIssue
+        && GracePeriodEndsAt is { } endsAt
+        && now >= endsAt;
+
+    /// <summary>
+    /// Whether the client is still entitled to be shown publicly, which the Model Board
+    /// requires in addition to publication (specification section 18).
+    /// </summary>
+    /// <remarks>
+    /// A failed payment inside its grace period keeps entitlement: specification section
+    /// 23 is explicit that the portfolio stays live for those seven days. Entitlement is
+    /// only lost once the grace period has run out, or the arrangement has ended.
+    /// </remarks>
+    public bool IsEntitlementActive(DateTimeOffset now) => Status switch
+    {
+        // Maintenance has not begun yet, because the initial period is included in the
+        // programme price (specification section 22).
+        MaintenanceSubscriptionStatus.NotStarted => true,
+        MaintenanceSubscriptionStatus.Active => true,
+        MaintenanceSubscriptionStatus.PaymentIssue => IsInGracePeriod(now),
+        _ => false
+    };
+
+    /// <summary>Days left before the portfolio comes down, for the staff and client warnings.</summary>
+    public int? DaysRemainingInGracePeriod(DateTimeOffset now) =>
+        IsInGracePeriod(now) && GracePeriodEndsAt is { } endsAt
+            ? Math.Max(0, (int)Math.Ceiling((endsAt - now).TotalDays))
+            : null;
 }

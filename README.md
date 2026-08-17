@@ -13,7 +13,7 @@ code point back to it.
 
 ## Status
 
-Phases 1 to 7 are complete. Later phases follow the implementation order in
+Phases 1 to 8 are complete. Later phases follow the implementation order in
 specification section 51.
 
 | Phase | Scope | State |
@@ -25,7 +25,7 @@ specification section 51.
 | 5 | Admin dashboard, client management, portfolio preview, status management, publish/unpublish | Done |
 | 6 | Public portfolio, responsive gallery, contact MSM, Model Board, slugs | Done |
 | 7 | Orders, checkout, GoCardless integration, webhooks | Done, except the provider's own HTTP calls — see below |
-| 8 | Maintenance subscription, failed payment detection, grace period, automatic unpublish | Not started |
+| 8 | Maintenance subscription, failed payment detection, grace period, automatic unpublish | Done |
 | 9 | GoHighLevel synchronisation | Not started |
 | 10 | Audit, security, permissions, upload, payment, mobile, accessibility and performance hardening | Not started |
 
@@ -378,6 +378,55 @@ cannot corrupt an order.
 - **A payment failure after confirmation does not unpublish anything.** That concerns the
   money, not the sale; tearing the portfolio down there would bypass the grace period in
   specification section 23.
+
+## Maintenance and the grace period
+
+The monthly portfolio maintenance charge is a separate product from the £3,499
+programme. A subscription record is created when the programme is purchased, fixing the
+price agreed that day so a later change cannot alter it, and starting at the offset in
+`Commerce:MaintenanceStartsAfterDays`.
+
+### What happens when a payment fails
+
+Exactly what specification section 23 describes:
+
+1. The subscription moves to `PaymentIssue` and a grace period opens, its length set by
+   `Commerce:MaintenanceGracePeriodDays` (7 by default).
+2. Staff and the client are both notified, and both dashboards show a warning counting
+   down the days.
+3. **The portfolio stays public throughout.** Nothing changes for an agency looking at
+   it.
+4. If payment is resolved, the warning clears and the portfolio carries on.
+5. If it is not, the portfolio is unpublished and the Model Board listing goes with it.
+
+Two details worth knowing:
+
+- **A second failure does not restart the clock.** Otherwise a repeatedly failing
+  payment would keep a portfolio live indefinitely without being paid for.
+- **Paying after expiry does not republish automatically.** The portfolio has already
+  come down; putting it back is a deliberate act, and staff are told it is now possible.
+
+### The warning is never public
+
+The payment problem is between MSM and the client. It appears on the admin and client
+dashboards and nowhere else — a test asserts the public portfolio contains no trace of
+it.
+
+### Expiry runs on a timer
+
+A grace period elapses by the passage of time, not by anyone doing anything, so
+`MaintenanceGracePeriodWorker` checks hourly. A portfolio therefore comes down on the
+seventh day even if no staff member signs in and the client never returns. The check is
+idempotent — expiring a subscription moves it out of the set the query matches — so a
+missed run catches up and a duplicate run does nothing.
+
+### Model Board entitlement
+
+Specification section 18 requires an active entitlement as well as publication, which
+Phase 6 left open. It is enforced now: a failed payment keeps entitlement while inside
+its grace period, and loses it once the period elapses or the arrangement ends. Because
+this is evaluated per request, a model drops off the board the moment their grace period
+runs out, rather than waiting for the worker's next hourly pass.
 
 ## Database
 

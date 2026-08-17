@@ -157,13 +157,24 @@ public class PublicPortfolioService(
                 p.Client.LastName,
                 p.Client.DisplayName,
                 p.Client.Location,
-                p.PublishedAt
+                p.PublishedAt,
+                Subscription = db.MaintenanceSubscriptions
+                    .Where(s => s.ClientId == p.ClientId)
+                    .OrderByDescending(s => s.CreatedAt)
+                    .FirstOrDefault()
             })
             .ToListAsync(cancellationToken);
+
+        var now = DateTimeOffset.UtcNow;
 
         return
         [
             .. rows
+                // Specification section 18 requires an active entitlement as well as
+                // publication. Unpublishing on expiry already removes a model, but this
+                // covers the window between a grace period elapsing and the worker
+                // noticing, so nobody is listed while unentitled.
+                .Where(r => r.Subscription is null || r.Subscription.IsEntitlementActive(now))
                 .OrderByDescending(r => r.PublishedAt)
                 .Select(r => new ModelBoardCard(
                     r.Slug!,
