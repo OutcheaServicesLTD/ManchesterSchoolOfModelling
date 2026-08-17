@@ -42,6 +42,14 @@ services:
       - key: Msm__DiscourageSearchEngines
         value: "true"
 
+      # Creates six invented clients on first start, one at each stage of the workflow,
+      # so every screen has something in it: two published on the Model Board, one
+      # waiting for review, one part-way through retouching, one just onboarded, and one
+      # under 18 whose guardian has not approved. Ignored once any client exists, and
+      # refused outside Development.
+      - key: Seed__DemoData
+        value: "true"
+
       # Set this to the address the preview is actually served on, once known — every
       # shared link, preview card and guardian approval link is built from it.
       - key: Msm__PublicDomain

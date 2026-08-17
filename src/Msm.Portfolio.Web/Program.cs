@@ -66,6 +66,10 @@ builder.Services.ConfigureApplicationCookie(options =>
 builder.Services.AddMsmAuthorization();
 builder.Services.AddScoped<DbSeeder>();
 
+// Invented clients for a preview deployment. Refuses to run unless explicitly asked,
+// outside Development, or when any client already exists.
+builder.Services.AddScoped<DemoDataSeeder>();
+
 builder.Services.AddSingleton<IMeasurementTemplateProvider, MeasurementTemplateProvider>();
 builder.Services.AddScoped<IAuditService, AuditService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
@@ -253,6 +257,10 @@ static async Task InitialiseDatabaseAsync(WebApplication app)
         }
 
         await services.GetRequiredService<DbSeeder>().SeedAsync();
+
+        // After the reference data, because it creates clients through the same services
+        // the application uses and those need the roles and products to exist.
+        await services.GetRequiredService<DemoDataSeeder>().SeedAsync();
     }
     catch (Exception ex)
     {

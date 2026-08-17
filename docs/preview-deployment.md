@@ -48,9 +48,30 @@ The first build takes around five minutes.
 ## 2. Check it works
 
 Render gives the service an address like `https://msm-portfolio-preview.onrender.com`.
-Open it. You should land on the Model Board, empty to begin with.
+Open it and you should land on the Model Board with two models on it.
 
 Sign in at `/account/login` with the email and password from step 1.
+
+### What is already in it
+
+Six invented clients are created on first start, one at each stage of the workflow, so
+every screen has something to look at rather than an empty list:
+
+| Client | Stage | What it demonstrates |
+| ------ | ----- | -------------------- |
+| Amara Whitfield | Published | A live portfolio and a Model Board card |
+| Tobias Fenwick | Published | A second board card, and a male measurement template |
+| Priya Raval | Ready for review | An Admin's review queue |
+| Callum Reid | Retouching | A retoucher's workspace, part-way through |
+| Niamh O'Connell | Just onboarded | Unclaimed work waiting to be picked up |
+| Elsie Hartley | Retouching, under 18 | Guardian approval outstanding, and publication blocked because of it |
+
+There is also a second sign-in, `retoucher@msm.local`, using the **same password** you
+set for the owner. Use it to see the retoucher's view of the queue, which is narrower
+than an Admin's.
+
+These are invented people. Real client details do not belong here — see
+[What this preview is not](#what-this-preview-is-not).
 
 ## 3. Tell the application its own address
 
