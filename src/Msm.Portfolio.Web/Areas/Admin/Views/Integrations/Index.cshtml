@@ -1,0 +1,130 @@
+@model Msm.Portfolio.Web.ViewModels.IntegrationsViewModel
+@using Msm.Portfolio.Web.Domain.Enums
+@{
+    ViewData["Title"] = "Integrations";
+    var saved = TempData["Saved"] as string;
+    var error = TempData["Error"] as string;
+}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <h1 class="mb-0">Integrations</h1>
+    <a class="btn btn-outline-secondary btn-sm" href="/admin">Back to clients</a>
+</div>
+
+@if (saved is not null) { <div class="alert alert-success" role="alert">@saved</div> }
+@if (error is not null) { <div class="alert alert-danger" role="alert">@error</div> }
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 class="h6 card-title">GoHighLevel</h2>
+                @if (Model.CrmIsLive)
+                {
+                    <span class="badge text-bg-success">Connected</span>
+                }
+                else
+                {
+                    <span class="badge text-bg-secondary">Not configured</span>
+                    <p class="small text-muted mt-2 mb-0">
+                        Portfolio changes are recorded but nothing is sent. Set
+                        <code>Integrations:HighLevel:ApiKey</code> to connect.
+                    </p>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 class="h6 card-title">GoCardless</h2>
+                @if (Model.PaymentsIsLive)
+                {
+                    <span class="badge text-bg-success">Connected</span>
+                }
+                else
+                {
+                    <span class="badge text-bg-warning">Stub — no money is taken</span>
+                    <p class="small text-muted mt-2 mb-0">
+                        Set <code>Integrations:GoCardless:AccessToken</code> once the
+                        provider has been verified.
+                    </p>
+                }
+                <p class="small mb-0 mt-2">
+                    @Model.WebhookEventsReceived webhook event(s) received,
+                    @Model.WebhookEventsFailed failed.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h2 class="h5 card-title">CRM sync</h2>
+
+        <dl class="row mb-0">
+            <dt class="col-sm-4">Up to date</dt>
+            <dd class="col-sm-8">@Model.CountFor(CrmSyncStatus.Synced)</dd>
+
+            <dt class="col-sm-4">Waiting to send</dt>
+            <dd class="col-sm-8">@Model.CountFor(CrmSyncStatus.Pending)</dd>
+
+            <dt class="col-sm-4">Failing</dt>
+            <dd class="col-sm-8">@Model.CountFor(CrmSyncStatus.Failed)</dd>
+
+            <dt class="col-sm-4">No CRM contact linked</dt>
+            <dd class="col-sm-8">@Model.CountFor(CrmSyncStatus.NotSynced)</dd>
+        </dl>
+    </div>
+</div>
+
+@if (Model.RecentCrmFailures.Count > 0)
+{
+    <h2 class="h5">Clients the CRM has not accepted</h2>
+    @* Reassurance, because a CRM problem sounds alarming and is not: the portfolio is
+       unaffected either way (specification section 45). *@
+    <p class="text-muted small">
+        These portfolios are unaffected and remain exactly as they are. Only the CRM
+        record is behind.
+    </p>
+
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <caption class="visually-hidden">Clients whose CRM update failed</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Client</th>
+                    <th scope="col">Attempts</th>
+                    <th scope="col">Last error</th>
+                    <th scope="col">Next try</th>
+                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.RecentCrmFailures)
+                {
+                    <tr>
+                        <th scope="row" class="fw-normal">
+                            <a href="/admin/clients/@row.ClientId">@row.ClientName</a>
+                        </th>
+                        <td>@row.Attempts</td>
+                        <td class="small">@row.Error</td>
+                        <td class="small">
+                            @(row.NextAttemptAt?.ToString("d MMM HH:mm") ?? "Not scheduled")
+                        </td>
+                        <td class="text-end">
+                            <form method="post" asp-action="Retry" asp-route-clientId="@row.ClientId">
+                                <button type="submit" class="btn btn-sm btn-outline-primary">Retry now</button>
+                            </form>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+else if (Model.AwaitingSync == 0)
+{
+    <p class="text-muted">Every portfolio is up to date in the CRM.</p>
+}

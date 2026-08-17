@@ -13,7 +13,7 @@ code point back to it.
 
 ## Status
 
-Phases 1 to 8 are complete. Later phases follow the implementation order in
+Phases 1 to 9 are complete. Later phases follow the implementation order in
 specification section 51.
 
 | Phase | Scope | State |
@@ -26,7 +26,7 @@ specification section 51.
 | 6 | Public portfolio, responsive gallery, contact MSM, Model Board, slugs | Done |
 | 7 | Orders, checkout, GoCardless integration, webhooks | Done, except the provider's own HTTP calls — see below |
 | 8 | Maintenance subscription, failed payment detection, grace period, automatic unpublish | Done |
-| 9 | GoHighLevel synchronisation | Not started |
+| 9 | GoHighLevel synchronisation | Done, except the provider's own HTTP calls — see below |
 | 10 | Audit, security, permissions, upload, payment, mobile, accessibility and performance hardening | Not started |
 
 ## Requirements
@@ -428,6 +428,55 @@ its grace period, and loses it once the period elapses or the arrangement ends. 
 this is evaluated per request, a model drops off the board the moment their grace period
 runs out, rather than waiting for the worker's next hourly pass.
 
+## GoHighLevel synchronisation
+
+The CRM is downstream of this application, never the other way round. The contact id
+captured at onboarding is the permanent link, and six fields are mirrored onto the
+contact: portfolio URL, portfolio status, purchase status, purchase date, maintenance
+status and published date (specification section 25).
+
+### A CRM problem never disturbs a portfolio
+
+This is the rule specification section 45 exists for, and it shapes the design.
+Publishing, purchasing or a maintenance change **marks** the portfolio as needing a
+sync and then finishes. The push itself happens on a worker, so a CRM that is slow or
+down cannot delay the studio and cannot roll back a purchase that already succeeded.
+
+Verified against a genuinely unreachable CRM: the portfolio stayed published, kept its
+slug, stayed on the Model Board and served normally, while only the sync state recorded
+the failure.
+
+Failures retry with an exponential backoff held on the row, so a restart during an
+outage does not reset it and hammer a service that is already struggling. A request the
+CRM rejects outright — an unknown contact, a malformed payload — is marked terminal
+rather than retried forever, because nothing will change by trying again. Staff are
+alerted once, after three consecutive failures, not on every pass.
+
+A client with no CRM contact — one created directly by staff — is recorded as not
+synced rather than failed, since retrying would be pointless.
+
+### Only the listed fields leave the application
+
+`CrmContactFields` is a small named record rather than an open dictionary. Nothing else
+about a client — their measurements, photographs or guardian's details — can reach an
+external system by accident, and a test asserts it.
+
+### Integration status
+
+`/admin/integrations` shows whether each provider is connected, how many portfolios are
+up to date, and which are failing with a retry-now action (specification section 4).
+
+### Not verified
+
+**`HighLevelService` — the HTTP calls to GoHighLevel — is unverified.** Their API and
+documentation were both unreachable from the environment this was built in. Work through
+[`docs/gohighlevel-verification.md`](docs/gohighlevel-verification.md) before relying on
+it; the most likely silent failure is a custom-field key that does not exist in MSM's
+account, where the call succeeds but writes nothing.
+
+Until then, leave `Integrations:HighLevel:ApiKey` unset and the stub logs instead of
+sending.
+
 ## Database
 
 The provider is deliberately configurable, because the production database is still an
@@ -511,6 +560,9 @@ requirements.
 - **GoCardless** — `Integrations:GoCardless:AccessToken` and `WebhookSecret`. The HTTP
   client is written but unverified; see `docs/gocardless-verification.md`. Leave the
   token unset until it is checked, and the stub takes over.
+- **GoHighLevel** — `Integrations:HighLevel:ApiKey` and `LocationId`, plus the six
+  custom fields listed in `docs/gohighlevel-verification.md`. Same position as
+  GoCardless: written, unverified, stub by default.
 - **Image and video size limits** — `Media:MaxImageBytes`, `Media:MaxVideoBytes`.
 
 ### One judgement call worth confirming

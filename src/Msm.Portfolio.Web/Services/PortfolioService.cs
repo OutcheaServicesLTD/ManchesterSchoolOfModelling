@@ -170,9 +170,10 @@ public class PortfolioService(
         portfolio.PublishedAt ??= DateTimeOffset.UtcNow;
         portfolio.UnpublishedAt = null;
 
-        // The CRM needs to learn the new URL and status; the push itself happens in
-        // Phase 9 and must not block publication (specification section 45).
-        portfolio.CrmSyncStatus = CrmSyncStatus.Pending;
+        // The CRM needs to learn the new URL and status. Marked only: the push itself
+        // happens on a worker, so a CRM that is down cannot delay publication
+        // (specification section 45).
+        portfolio.RequestCrmSync();
 
         Transition(portfolio, PortfolioStatus.Published, userId);
 
@@ -205,7 +206,7 @@ public class PortfolioService(
 
         portfolio.IsPublished = false;
         portfolio.UnpublishedAt = DateTimeOffset.UtcNow;
-        portfolio.CrmSyncStatus = CrmSyncStatus.Pending;
+        portfolio.RequestCrmSync();
 
         Transition(portfolio, PortfolioStatus.Unpublished, userId, reason);
 
@@ -338,7 +339,7 @@ public class PortfolioService(
         var previous = portfolio.Slug;
         portfolio.Slug = normalised;
         portfolio.UpdatedAt = DateTimeOffset.UtcNow;
-        portfolio.CrmSyncStatus = CrmSyncStatus.Pending;
+        portfolio.RequestCrmSync();
 
         audit.Record(nameof(Domain.Entities.Portfolio), portfolio.Id.ToString(), AuditActions.SlugChanged,
             userId: userId, oldValue: previous, newValue: normalised);

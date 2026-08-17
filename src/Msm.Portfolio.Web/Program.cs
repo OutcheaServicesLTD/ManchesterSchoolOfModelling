@@ -7,6 +7,7 @@ using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.Services;
 using Msm.Portfolio.Web.Integrations.GoCardless;
+using Msm.Portfolio.Web.Integrations.HighLevel;
 using Msm.Portfolio.Web.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -75,6 +76,26 @@ builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
 // A grace period expires by the passage of time, so nothing in a request can be
 // relied on to notice it (specification section 23).
 builder.Services.AddHostedService<MaintenanceGracePeriodWorker>();
+
+builder.Services.AddScoped<ICrmSyncService, CrmSyncService>();
+
+// The CRM push runs on a worker, never inside the operation that caused it, so a CRM
+// that is down cannot delay the studio or roll back a purchase (specification section 45).
+builder.Services.AddHostedService<CrmSyncWorker>();
+
+// As with GoCardless, the real client is only used when configured, and its HTTP calls
+// have not been verified against the provider.
+var highLevelKey = builder.Configuration[$"{IntegrationOptions.SectionName}:HighLevel:ApiKey"];
+
+if (string.IsNullOrWhiteSpace(highLevelKey))
+{
+    builder.Services.AddScoped<IHighLevelService, StubHighLevelService>();
+}
+else
+{
+    builder.Services.AddHttpClient<IHighLevelService, HighLevelService>()
+        .SetHandlerLifetime(TimeSpan.FromMinutes(5));
+}
 builder.Services.AddScoped<IWebhookVerifier, GoCardlessWebhookVerifier>();
 
 // The real GoCardless client is used only when an access token is configured. Its HTTP

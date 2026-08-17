@@ -51,6 +51,34 @@ public class Portfolio
 
     public string? CrmSyncError { get; set; }
 
+    /// <summary>
+    /// Consecutive failed pushes. Drives the backoff and tells staff how long the CRM
+    /// has been unreachable for this client.
+    /// </summary>
+    public int CrmSyncAttempts { get; set; }
+
+    /// <summary>
+    /// When the next push may be attempted. Kept on the row rather than in memory so a
+    /// restart does not lose the backoff and immediately hammer a CRM that is down.
+    /// </summary>
+    public DateTimeOffset? CrmSyncNextAttemptAt { get; set; }
+
+    /// <summary>Whether this portfolio is waiting to be pushed to the CRM.</summary>
+    public bool NeedsCrmSync(DateTimeOffset now) =>
+        CrmSyncStatus is CrmSyncStatus.Pending or CrmSyncStatus.Failed
+        && (CrmSyncNextAttemptAt is null || CrmSyncNextAttemptAt <= now);
+
+    /// <summary>
+    /// Marks the portfolio as needing a push. Called after any change to a field the
+    /// CRM shows, and deliberately never fails: a CRM problem must not disturb the
+    /// operation that triggered it (specification section 45).
+    /// </summary>
+    public void RequestCrmSync()
+    {
+        CrmSyncStatus = CrmSyncStatus.Pending;
+        CrmSyncNextAttemptAt = null;
+    }
+
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 
     public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;

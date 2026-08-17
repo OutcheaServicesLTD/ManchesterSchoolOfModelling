@@ -73,4 +73,5 @@ public static class NotificationTypes
     public const string MaintenancePaymentFailed = "MaintenancePaymentFailed";
     public const string MaintenancePaymentResolved = "MaintenancePaymentResolved";
     public const string MaintenanceGracePeriodEnding = "MaintenanceGracePeriodEnding";
+    public const string CrmSyncFailing = "CrmSyncFailing";
 }

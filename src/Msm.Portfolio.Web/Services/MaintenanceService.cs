@@ -91,6 +91,8 @@ public class MaintenanceService(
             portfolio.UpdatedAt = now;
         }
 
+        portfolio?.RequestCrmSync();
+
         audit.Record(nameof(MaintenanceSubscription), subscription.Id.ToString(),
             AuditActions.MaintenancePaymentFailed,
             newValue: $"Grace period ends {subscription.GracePeriodEndsAt:d MMMM yyyy}. {reason}");
@@ -151,6 +153,8 @@ public class MaintenanceService(
             portfolio.Status = PortfolioStatus.Published;
             portfolio.UpdatedAt = DateTimeOffset.UtcNow;
         }
+
+        portfolio?.RequestCrmSync();
 
         notifications.NotifyUser(
             subscription.Client.ApplicationUserId,

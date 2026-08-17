@@ -306,6 +306,10 @@ public class CheckoutService(
             portfolio.UpdatedAt = DateTimeOffset.UtcNow;
         }
 
+        // Purchase status and date are CRM-visible, so the contact needs updating. Only
+        // marked here; the push happens on a worker (specification section 45).
+        portfolio?.RequestCrmSync();
+
         await StartMaintenanceAsync(order, cancellationToken);
 
         // Saved before publishing so the sale is durable even if publication is refused.
