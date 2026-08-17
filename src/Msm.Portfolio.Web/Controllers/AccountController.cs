@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Msm.Portfolio.Web.Authorization;
+using Msm.Portfolio.Web.Configuration;
 using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.ViewModels;
 
@@ -24,6 +26,7 @@ public class AccountController(
 
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting(RateLimitPolicies.SignIn)]
     public async Task<IActionResult> Login(LoginViewModel model)
     {
         if (!ModelState.IsValid)

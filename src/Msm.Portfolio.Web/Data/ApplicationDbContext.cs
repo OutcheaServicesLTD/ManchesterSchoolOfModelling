@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
@@ -10,8 +11,22 @@ namespace Msm.Portfolio.Web.Data;
 /// database decision stays open (specification section 32).
 /// </summary>
 public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
-    : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>(options)
+    : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>(options), IDataProtectionKeyContext
 {
+    /// <summary>
+    /// The data protection key ring, held in the database rather than on disk.
+    /// </summary>
+    /// <remarks>
+    /// The default key store is a folder in the user profile. In a container that folder
+    /// is discarded on every rebuild and is not shared between instances, which would
+    /// sign every member of staff out on each deployment and make anti-forgery tokens
+    /// fail whenever a request landed on a different instance from the one that issued
+    /// the page. The database is the one durable, shared thing every deployment already
+    /// has, so the keys live here.
+    /// </remarks>
+    public DbSet<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey>
+        DataProtectionKeys => Set<Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey>();
+
     public DbSet<ClientProfile> ClientProfiles => Set<ClientProfile>();
     public DbSet<ModelMeasurement> ModelMeasurements => Set<ModelMeasurement>();
     public DbSet<GuardianConsent> GuardianConsents => Set<GuardianConsent>();

@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -20,6 +21,15 @@ builder.Services.Configure<GuardianConsentOptions>(builder.Configuration.GetSect
 builder.Services.Configure<MeasurementTemplateOptions>(builder.Configuration.GetSection(MeasurementTemplateOptions.SectionName));
 
 builder.Services.AddApplicationData(builder.Configuration);
+
+// Keys are shared through the database so that a deployment does not sign every member
+// of staff out, and so two instances can read each other's cookies and anti-forgery
+// tokens. The application name is fixed rather than derived from the assembly, because a
+// changed name silently produces a different key ring.
+builder.Services
+    .AddDataProtection()
+    .SetApplicationName("Msm.Portfolio")
+    .PersistKeysToDbContext<ApplicationDbContext>();
 
 builder.Services
     .AddIdentity<ApplicationUser, ApplicationRole>(options =>
@@ -133,6 +143,12 @@ builder.Services.AddControllersWithViews(options =>
 // token has to be accepted from a header as well as a form field.
 builder.Services.AddAntiforgery(options => options.HeaderName = "RequestVerificationToken");
 
+builder.Services.AddMsmRateLimiting();
+
+// Probed by the deployment platform to decide whether an instance is serving.
+builder.Services.AddHealthChecks()
+    .AddDbContextCheck<ApplicationDbContext>("database");
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
@@ -145,10 +161,14 @@ else
     app.UseHsts();
 }
 
+app.UseMsmSecurityHeaders(app.Environment.IsDevelopment());
+
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 
 app.UseRouting();
+
+app.UseRateLimiter();
 
 app.UseAuthentication();
 app.UseAuthorization();
@@ -161,9 +181,43 @@ app.MapControllerRoute(
     name: "default",
     pattern: "{controller=Home}/{action=Index}/{id?}");
 
+// Anonymous and unthrottled: a probe that could be rate limited would report a healthy
+// instance as unhealthy under load and take it out of rotation.
+app.MapHealthChecks("/health").AllowAnonymous().DisableRateLimiting();
+
+CheckProductionReadiness(app);
+
 await InitialiseDatabaseAsync(app);
 
 app.Run();
+
+/// <summary>
+/// Refuses to start a production deployment that still has development stand-ins in
+/// place, rather than letting it fail quietly and expensively later.
+/// </summary>
+static void CheckProductionReadiness(WebApplication app)
+{
+    using var scope = app.Services.CreateScope();
+    var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>();
+
+    if (app.Configuration.GetValue<bool>("ALLOW_INCOMPLETE_DEPLOYMENT"))
+    {
+        logger.LogWarning(
+            "ALLOW_INCOMPLETE_DEPLOYMENT is set, so readiness checks are being skipped.");
+        return;
+    }
+
+    var problems = ProductionReadiness.Check(
+        app.Configuration,
+        services.GetRequiredService<IGoCardlessService>(),
+        services.GetRequiredService<IHighLevelService>(),
+        emailSenderIsStub: services.GetRequiredService<IEmailSender>() is LoggingEmailSender,
+        mediaStorageProvider: services.GetRequiredService<IOptions<MediaOptions>>().Value.StorageProvider,
+        migrateOnStartup: services.GetRequiredService<IOptions<DatabaseOptions>>().Value.MigrateOnStartup);
+
+    ProductionReadiness.Enforce(problems, app.Environment, logger);
+}
 
 /// <summary>
 /// Applies migrations and seeds reference data before the application serves traffic.

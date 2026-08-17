@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using Msm.Portfolio.Web.Configuration;
 using Msm.Portfolio.Web.Services;
@@ -48,6 +49,7 @@ public class PublicPortfolioController(
     /// telephone are never disclosed (specification section 46).
     /// </summary>
     [HttpPost("/{slug}/enquire")]
+    [EnableRateLimiting(RateLimitPolicies.PublicEnquiry)]
     public async Task<IActionResult> Enquire(
         string slug, EnquiryViewModel model, CancellationToken cancellationToken = default)
     {

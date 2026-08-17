@@ -13,8 +13,9 @@ code point back to it.
 
 ## Status
 
-Phases 1 to 9 are complete. Later phases follow the implementation order in
-specification section 51.
+All ten phases from specification section 51 are complete. Four deployment decisions
+remain open — see [Decisions still open](#decisions-still-open) and
+[`docs/deployment.md`](docs/deployment.md).
 
 | Phase | Scope | State |
 | ----- | ----- | ----- |
@@ -27,7 +28,7 @@ specification section 51.
 | 7 | Orders, checkout, GoCardless integration, webhooks | Done, except the provider's own HTTP calls — see below |
 | 8 | Maintenance subscription, failed payment detection, grace period, automatic unpublish | Done |
 | 9 | GoHighLevel synchronisation | Done, except the provider's own HTTP calls — see below |
-| 10 | Audit, security, permissions, upload, payment, mobile, accessibility and performance hardening | Not started |
+| 10 | Audit, security, permissions, upload, payment, mobile, accessibility and performance hardening | Done |
 
 ## Requirements
 
@@ -59,6 +60,12 @@ dotnet user-secrets set "Seed:SuperAdmin:Password" "<a strong password>" --proje
 ```bash
 dotnet test
 ```
+
+## Deploying
+
+See [`docs/deployment.md`](docs/deployment.md): required configuration, the readiness
+guard, migrations, proxies and rate limits, and the four things outstanding before
+go-live.
 
 ## Project layout
 
@@ -127,10 +134,10 @@ tokenised approval link at `/guardian/approve/{token}`. The token is 32 bytes of
 cryptographic randomness, time limited, and rotated on use so a forwarded or logged
 link cannot be replayed.
 
-Until Phase 9 connects GoHighLevel messaging, `IEmailSender` is a logging
-implementation: in development the approval link appears in the application log, and
-outside development it logs an error rather than silently dropping a real guardian's
-email.
+**No email provider is configured yet**, so `IEmailSender` is a logging implementation:
+in development the approval link appears in the application log, and outside development
+it logs an error rather than silently dropping a real guardian's email. The readiness
+guard treats this as fatal outside Development, so it cannot reach production unnoticed.
 
 ### Where the under-18 block applies
 
@@ -477,6 +484,89 @@ account, where the call succeeds but writes nothing.
 Until then, leave `Integrations:HighLevel:ApiKey` unset and the stub logs instead of
 sending.
 
+## Hardening
+
+Specification section 43, plus the parts of sections 35 to 42 that are not visible in a
+feature.
+
+### The application refuses to start half-configured
+
+Several parts of this application deliberately ship with stand-ins: payments take no
+money, the CRM logs instead of sending, guardian emails only reach the log, media sits
+on local disk. Each is the right default while the corresponding account or decision is
+outstanding, and each fails quietly and expensively if it reaches production unnoticed.
+
+So outside Development the application checks its own configuration at startup and
+**refuses to start** when a stand-in that matters is still in place — missing payment
+credentials, no webhook secret, stubbed email, local disk media. Lesser problems are
+logged as warnings instead. `ALLOW_INCOMPLETE_DEPLOYMENT=true` overrides it for a
+staging environment, which should only ever be done knowingly.
+
+The full list, and what each deployment has to set, is in
+[`docs/deployment.md`](docs/deployment.md).
+
+### Rate limits
+
+| Endpoint | Limit per address |
+| -------- | ----------------- |
+| `POST /account/login` | 10 per 5 minutes |
+| `POST /onboarding`, `GET`/`POST /guardian/approve/{token}` | 30 per 10 minutes |
+| `POST /{slug}/enquire` | 5 per 10 minutes |
+| `POST /webhooks/gocardless` | 300 per minute |
+
+Sized against how the application is genuinely used rather than as low as possible: a
+studio onboarding a queue of clients after a shoot must never reach one.
+
+Sign-in is the tightest because Identity's account lockout is **per account** and does
+nothing about one source working through a list of addresses. The guardian approval link
+is limited on `GET` as well as `POST`, unlike the other anonymous forms, because the
+token in that URL is the only thing standing between a stranger and a minor's consent
+record — guessing at it must not be free. The webhook limit is high on purpose:
+providers retry a backlog in bursts, so it bounds a flood rather than shaping normal
+delivery.
+
+Over-limit requests are rejected with `429` and a `Retry-After` header rather than
+queued — queuing would hold connections open under exactly the load the limit exists to
+shed — and each rejection is logged.
+
+Limits are keyed by client IP, so a deployment behind a proxy must honour forwarded
+headers or every limit becomes global. That is called out in the deployment
+documentation.
+
+### Response headers
+
+`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` and
+a Content Security Policy, on every response rather than selected pages: a header that
+is only sometimes present protects only sometimes, and the pages most worth protecting
+are the ones carrying a client's private media.
+
+The CSP is restrictive because it can be — everything is same-origin, including media,
+so no external origin needs allowing. `'unsafe-inline'` is permitted for **styles only**,
+because the gallery sets each image's aspect ratio inline to stop the page jumping as
+thumbnails load. Scripts carry no such exception, and a test asserts they never acquire
+one.
+
+`Referrer-Policy` matters more here than it looks: a portfolio slug identifies a real
+person, and trimming the referrer to the origin stops it being handed to every site a
+visitor clicks through to.
+
+### Data protection keys live in the database
+
+Sign-in cookies and anti-forgery tokens are protected by a key ring. The framework
+default is a folder in the user profile, which a container discards on every rebuild and
+does not share between instances — so every deployment would sign all staff out, and
+anti-forgery would fail whenever a request landed on a different instance from the one
+that rendered the page. The keys are therefore persisted through the same `DbContext` as
+everything else. Verified by signing in, restarting the process, and finding the session
+still valid.
+
+### Health checks
+
+`GET /health` is anonymous, exempt from rate limiting, and reports healthy only when the
+database is reachable. It is unthrottled deliberately: a probe that could be rate limited
+would report a healthy instance as unhealthy under load and take it out of rotation at
+the worst possible moment.
+
 ## Database
 
 The provider is deliberately configurable, because the production database is still an
@@ -546,17 +636,14 @@ requirements.
 - **MSM contact details** — `Msm:ContactEmail`, `ContactPhone`, `WhatsApp`, to be
   supplied by MSM. Until they are set, the public portfolio shows the enquiry form but
   no direct contact options, and the footer omits them.
-- **Model Board entitlement** — specification section 18 makes board eligibility depend
-  on an active entitlement as well as publication. Publication and the visibility flag
-  are enforced now; the entitlement half arrives with the maintenance subscription in
-  Phase 8.
 - **Guardian consent wording** — `GuardianConsent:ConsentText`, to be supplied or
   approved by MSM. A clearly-labelled placeholder is shown until then. Each approval
   records the version agreed (`GuardianConsent:CurrentVersion`), so changing the wording
   later cannot retrospectively alter what was consented to.
 - **Email delivery** — no provider is configured. Guardian approval emails are only
-  logged. Either connect GoHighLevel in Phase 9 or register a real `IEmailSender`
-  before go-live.
+  logged. Either route guardian messaging through GoHighLevel or register a real
+  `IEmailSender` before go-live. The readiness guard blocks a production start until
+  one exists.
 - **GoCardless** — `Integrations:GoCardless:AccessToken` and `WebhookSecret`. The HTTP
   client is written but unverified; see `docs/gocardless-verification.md`. Leave the
   token unset until it is checked, and the stub takes over.

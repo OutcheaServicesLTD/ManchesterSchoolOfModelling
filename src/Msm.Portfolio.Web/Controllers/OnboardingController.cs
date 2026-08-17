@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Msm.Portfolio.Web.Configuration;
 using Msm.Portfolio.Web.Domain.Enums;
 using Msm.Portfolio.Web.Services;
 using Msm.Portfolio.Web.ViewModels;
@@ -44,6 +46,7 @@ public class OnboardingController(
     }
 
     [HttpPost("")]
+    [EnableRateLimiting(RateLimitPolicies.AnonymousForm)]
     public async Task<IActionResult> Index(
         OnboardingViewModel model,
         CancellationToken cancellationToken = default)

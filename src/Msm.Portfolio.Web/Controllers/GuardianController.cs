@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.Extensions.Options;
 using Msm.Portfolio.Web.Configuration;
 using Msm.Portfolio.Web.Domain.Enums;
@@ -22,7 +23,11 @@ public class GuardianController(
     IOptions<GuardianConsentOptions> consentOptions,
     IOptions<MsmBrandOptions> brandOptions) : Controller
 {
+    // Limited on GET as well as POST, unlike the other anonymous forms: the token is the
+    // only thing standing between a stranger and a minor's consent record, so guessing
+    // at it must not be free.
     [HttpGet("approve/{token}")]
+    [EnableRateLimiting(RateLimitPolicies.AnonymousForm)]
     public async Task<IActionResult> Approve(string token, CancellationToken cancellationToken = default)
     {
         var consent = await consentService.FindByTokenAsync(token, cancellationToken);
@@ -46,6 +51,7 @@ public class GuardianController(
     }
 
     [HttpPost("approve/{token}")]
+    [EnableRateLimiting(RateLimitPolicies.AnonymousForm)]
     public async Task<IActionResult> Approve(
         string token,
         GuardianApprovalViewModel model,

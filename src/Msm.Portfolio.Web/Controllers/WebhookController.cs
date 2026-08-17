@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
+using Msm.Portfolio.Web.Configuration;
 using Msm.Portfolio.Web.Services;
 
 namespace Msm.Portfolio.Web.Controllers;
@@ -20,6 +22,7 @@ public class WebhookController(
     ILogger<WebhookController> logger) : ControllerBase
 {
     [HttpPost("gocardless")]
+    [EnableRateLimiting(RateLimitPolicies.Webhook)]
     public async Task<IActionResult> GoCardless(CancellationToken cancellationToken = default)
     {
         // Read as raw text: the signature covers the exact bytes sent, so re-serialising
