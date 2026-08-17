@@ -35,6 +35,20 @@ public interface IMediaService
     Task<(bool Succeeded, string? Error)> SetSelectedAsync(
         Guid clientId, Guid assetId, bool selected, Guid? actingUserId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Adds several images to the portfolio in one go, up to the 30-image limit.
+    /// </summary>
+    /// <remarks>
+    /// Choosing a shoot's worth of photographs one button at a time is the slowest part
+    /// of a retoucher's job. Returns how many were added, and says so when the limit cut
+    /// the batch short.
+    /// </remarks>
+    Task<(int Added, string? Error)> SetSelectedManyAsync(
+        Guid clientId,
+        IReadOnlyList<Guid> assetIds,
+        Guid? actingUserId,
+        CancellationToken cancellationToken = default);
+
     Task<(bool Succeeded, string? Error)> SetFeaturedAsync(
         Guid clientId, Guid assetId, Guid? actingUserId, CancellationToken cancellationToken = default);
 
@@ -311,6 +325,59 @@ public class MediaService(
         await db.SaveChangesAsync(cancellationToken);
 
         return (true, null);
+    }
+
+    public async Task<(int Added, string? Error)> SetSelectedManyAsync(
+        Guid clientId,
+        IReadOnlyList<Guid> assetIds,
+        Guid? actingUserId,
+        CancellationToken cancellationToken = default)
+    {
+        if (assetIds.Count == 0)
+        {
+            return (0, "Choose at least one photograph first.");
+        }
+
+        var images = await LoadImagesAsync(clientId, cancellationToken);
+        var limit = mediaOptions.Value.PortfolioImageLimit;
+        var alreadyOn = images.Count(m => m.IsSelectedForPortfolio);
+        var room = limit - alreadyOn;
+
+        if (room <= 0)
+        {
+            return (0, $"A portfolio can show at most {limit} images.");
+        }
+
+        // Taken in the order they were chosen, so a partial result is predictable rather
+        // than whichever the database happened to return first.
+        var toAdd = assetIds
+            .Select(id => images.FirstOrDefault(m => m.Id == id))
+            .Where(m => m is not null && !m.IsSelectedForPortfolio)
+            .Take(room)
+            .ToList();
+
+        foreach (var asset in toAdd)
+        {
+            asset!.IsSelectedForPortfolio = true;
+
+            audit.Record(nameof(MediaAsset), asset.Id.ToString(),
+                "MediaSelectedForPortfolio", userId: actingUserId);
+        }
+
+        // Once, after the whole batch: the first selected image becomes the main one, and
+        // doing this per image would rewrite it for every photograph added.
+        await EnsureFeaturedIsValidAsync(clientId, images, actingUserId, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+
+        var skipped = assetIds.Count - toAdd.Count;
+
+        // Says so plainly when the limit cut the batch short, rather than silently
+        // adding some and leaving the retoucher to count what happened.
+        var error = skipped > 0
+            ? $"Added {toAdd.Count}. The portfolio holds {limit} images, so {skipped} could not be added."
+            : null;
+
+        return (toAdd.Count, error);
     }
 
     public async Task<(bool Succeeded, string? Error)> SetFeaturedAsync(

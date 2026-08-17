@@ -36,6 +36,62 @@
             });
         });
 
+        // ── Choosing photographs in bulk ─────────────────────────────────────────
+        // Keeps the count honest, the "select all" box in step with the individual
+        // ones, and the button disabled until something is actually chosen.
+        (function () {
+            var boxes = Array.prototype.slice.call(document.querySelectorAll('[data-pick]'));
+
+            if (boxes.length === 0) {
+                return;
+            }
+
+            var all = document.querySelector('[data-pick-all]');
+            var count = document.querySelector('[data-pick-count]');
+            var submit = document.querySelector('[data-pick-submit]');
+
+            function chosen() {
+                return boxes.filter(function (box) { return box.checked; }).length;
+            }
+
+            function refresh() {
+                var n = chosen();
+
+                if (count) {
+                    count.textContent = n === 0
+                        ? 'None chosen'
+                        : n + (n === 1 ? ' chosen' : ' chosen');
+                }
+
+                if (submit) {
+                    submit.disabled = n === 0;
+                }
+
+                if (all) {
+                    all.checked = n === boxes.length;
+                    // Neither all nor none, shown as a dash rather than a tick.
+                    all.indeterminate = n > 0 && n < boxes.length;
+                }
+            }
+
+            boxes.forEach(function (box) {
+                box.addEventListener('change', refresh);
+            });
+
+            if (all) {
+                all.addEventListener('change', function () {
+                    boxes.forEach(function (box) {
+                        if (!box.disabled) {
+                            box.checked = all.checked;
+                        }
+                    });
+                    refresh();
+                });
+            }
+
+            refresh();
+        })();
+
         // ── Copy a value to the clipboard ────────────────────────────────────────
         // The model's own portfolio address, so they can paste it into a message.
         document.querySelectorAll('[data-copy-target]').forEach(function (button) {

@@ -200,6 +200,62 @@ public class MediaServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Several_images_can_be_added_to_the_portfolio_at_once()
+    {
+        // Choosing a shoot's worth one at a time is the slowest part of the job.
+        var ids = await UploadAsync(3);
+
+        var (added, error) = await _service.SetSelectedManyAsync(_clientId, ids, null);
+
+        Assert.Equal(3, added);
+        Assert.Null(error);
+        Assert.Equal(3, await _db.MediaAssets.CountAsync(m => m.IsSelectedForPortfolio));
+    }
+
+    [Fact]
+    public async Task Adding_more_than_the_limit_adds_what_fits_and_says_what_did_not()
+    {
+        // Partial success has to be reported: silently adding some and dropping the rest
+        // would leave a retoucher counting thumbnails to work out what happened.
+        var ids = await UploadAsync(Options.PortfolioImageLimit + 2);
+
+        var (added, error) = await _service.SetSelectedManyAsync(_clientId, ids, null);
+
+        Assert.Equal(Options.PortfolioImageLimit, added);
+        Assert.Contains("2 could not be added", error);
+        Assert.Equal(
+            Options.PortfolioImageLimit,
+            await _db.MediaAssets.CountAsync(m => m.IsSelectedForPortfolio));
+    }
+
+    [Fact]
+    public async Task Adding_a_batch_that_is_already_on_the_portfolio_changes_nothing()
+    {
+        var ids = await UploadAsync(2);
+        await _service.SetSelectedManyAsync(_clientId, ids, null);
+
+        var (added, _) = await _service.SetSelectedManyAsync(_clientId, ids, null);
+
+        Assert.Equal(0, added);
+        Assert.Equal(2, await _db.MediaAssets.CountAsync(m => m.IsSelectedForPortfolio));
+    }
+
+    [Fact]
+    public async Task A_batch_sets_the_main_image_once()
+    {
+        // The first of the batch becomes the main image, and the rest do not each
+        // overwrite it on their way through.
+        var ids = await UploadAsync(3);
+
+        await _service.SetSelectedManyAsync(_clientId, ids, null);
+
+        var portfolio = await _db.Portfolios.SingleAsync();
+
+        Assert.Equal(ids[0], portfolio.FeaturedMediaId);
+        Assert.Equal(1, await _db.MediaAssets.CountAsync(m => m.IsFeatured));
+    }
+
+    [Fact]
     public async Task The_first_selected_image_becomes_the_main_image()
     {
         var ids = await UploadAsync(2);

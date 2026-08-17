@@ -103,6 +103,41 @@ public class WorkspaceController(
         return RedirectToAction(nameof(Index), new { clientId });
     }
 
+    /// <summary>
+    /// Adds every ticked photograph to the portfolio at once.
+    /// </summary>
+    /// <remarks>
+    /// Working through a shoot one button at a time was the slowest part of preparing a
+    /// portfolio. The per-image action is kept for removing a single photograph.
+    /// </remarks>
+    [HttpPost("select")]
+    public async Task<IActionResult> SelectMany(
+        Guid clientId,
+        [FromForm(Name = "assetIds")] Guid[]? assetIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await IsAllowedAsync(clientId, cancellationToken))
+        {
+            return Forbid();
+        }
+
+        var (added, error) = await media.SetSelectedManyAsync(
+            clientId, assetIds ?? [], CurrentUserId(), cancellationToken);
+
+        if (error is not null)
+        {
+            TempData["Error"] = error;
+        }
+        else if (added > 0)
+        {
+            TempData["Saved"] = added == 1
+                ? "1 photograph added to the portfolio."
+                : $"{added} photographs added to the portfolio.";
+        }
+
+        return RedirectToAction(nameof(Index), new { clientId });
+    }
+
     [HttpPost("featured/{assetId:guid}")]
     public async Task<IActionResult> Featured(
         Guid clientId, Guid assetId, CancellationToken cancellationToken = default)

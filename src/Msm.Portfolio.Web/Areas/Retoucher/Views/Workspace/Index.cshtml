@@ -160,34 +160,59 @@ else
 }
 else
 {
-    <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
-        @foreach (var asset in Model.Unselected)
-        {
-            <div class="col">
-                <div class="card h-100">
-                    <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
-                         style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
-                         alt="@asset.Filename" />
-                    <div class="card-body p-2">
-                        <p class="small text-muted mb-1">@asset.Orientation</p>
+    @* Tick the ones wanted and add them together. Choosing a shoot's worth one button
+       at a time was the slowest part of the job. *@
+    <form method="post" asp-action="SelectMany" asp-route-clientId="@Model.ClientId" id="picker">
+        <div class="picker-bar">
+            <div class="form-check mb-0">
+                <input class="form-check-input" type="checkbox" id="pick-all" data-pick-all />
+                <label class="form-check-label" for="pick-all">Select all</label>
+            </div>
 
-                        <form method="post" asp-action="Select" asp-route-clientId="@Model.ClientId"
-                              asp-route-assetId="@asset.Id" class="d-grid mb-1">
-                            <input type="hidden" name="selected" value="true" />
-                            <button type="submit" class="btn btn-sm btn-outline-primary"
-                                    @(Model.PortfolioIsFull ? "disabled" : "")>Add to portfolio</button>
-                        </form>
+            <span class="eyebrow" data-pick-count aria-live="polite">None chosen</span>
 
-                        <form method="post" asp-action="Remove" asp-route-clientId="@Model.ClientId"
-                              asp-route-assetId="@asset.Id" class="d-grid"
-                              data-confirm="Remove this photograph?">
-                            <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
-                        </form>
+            <button type="submit" class="btn btn-primary" data-pick-submit disabled
+                    @(Model.PortfolioIsFull ? "disabled" : "")>
+                Add to portfolio
+            </button>
+        </div>
+
+        <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
+            @foreach (var asset in Model.Unselected)
+            {
+                <div class="col">
+                    <div class="card h-100">
+                        @* The whole tile is the label, so clicking anywhere on the
+                           photograph ticks it rather than only the small box. *@
+                        <label class="pick-tile">
+                            <input class="form-check-input pick" type="checkbox"
+                                   name="assetIds" value="@asset.Id" data-pick
+                                   @(Model.PortfolioIsFull ? "disabled" : "") />
+                            <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
+                                 style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
+                                 alt="@asset.Filename" />
+                        </label>
+
+                        <div class="card-body p-2">
+                            <p class="small text-muted mb-1">@asset.Orientation</p>
+
+                            @* Deliberately not in the picker form: removal is destructive
+                               and should never ride along with a bulk add. *@
+                            <button type="submit" class="btn btn-sm btn-outline-danger w-100"
+                                    form="remove-@asset.Id">Remove</button>
+                        </div>
                     </div>
                 </div>
-            </div>
-        }
-    </div>
+            }
+        </div>
+    </form>
+
+    @foreach (var asset in Model.Unselected)
+    {
+        <form method="post" asp-action="Remove" asp-route-clientId="@Model.ClientId"
+              asp-route-assetId="@asset.Id" id="remove-@asset.Id" class="d-none"
+              data-confirm="Remove this photograph?"></form>
+    }
 }
 
 <div class="border-top pt-3 d-flex gap-2 flex-wrap">

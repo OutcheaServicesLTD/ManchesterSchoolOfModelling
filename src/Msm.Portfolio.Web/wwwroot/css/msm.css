@@ -1685,6 +1685,67 @@ img.wordmark-paper { display: none; }
     gap: 0.5rem;
 }
 
+/* ── Choosing photographs in bulk ───────────────────────────────────────────────
+   The whole thumbnail is the target, not just a small box beside it: a retoucher
+   works through a shoot quickly and should be able to hit the picture. */
+
+.picker-bar {
+    position: sticky;
+    top: 76px;
+    z-index: 20;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.9rem 1.1rem;
+    margin-bottom: 1.2rem;
+    background: var(--card);
+    border: 1px solid var(--line);
+}
+
+/* Sticky, so the button stays reachable while scrolling a library of sixty. */
+.picker-bar [data-pick-submit] {
+    margin-left: auto;
+}
+
+.pick-tile {
+    position: relative;
+    display: block;
+    cursor: pointer;
+}
+
+.pick-tile input.pick {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    z-index: 2;
+    width: 26px;
+    height: 26px;
+    /* Readable over a photograph of any brightness. */
+    background-color: color-mix(in srgb, var(--bg) 80%, transparent);
+    border-color: var(--fg);
+    backdrop-filter: blur(4px);
+}
+
+.pick-tile img {
+    transition: opacity 0.2s ease;
+}
+
+.pick-tile:hover img {
+    opacity: 0.86;
+}
+
+/* A chosen photograph is outlined as well as ticked, so the selection is legible
+   at a glance across a grid rather than needing each box read. */
+.pick-tile:has(input.pick:checked) {
+    outline: 2px solid var(--fg);
+    outline-offset: -2px;
+}
+
+.pick-tile:has(input.pick:checked) img {
+    opacity: 0.72;
+}
+
 /* A metric with a large figure and a tracked label beneath. */
 .metrics {
     display: grid;
