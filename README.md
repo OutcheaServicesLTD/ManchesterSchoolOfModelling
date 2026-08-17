@@ -30,6 +30,26 @@ remain open — see [Decisions still open](#decisions-still-open) and
 | 9 | GoHighLevel synchronisation | Done, except the provider's own HTTP calls — see below |
 | 10 | Audit, security, permissions, upload, payment, mobile, accessibility and performance hardening | Done |
 
+## Just want to look at the site?
+
+No terminal needed.
+
+1. Install the **.NET 10 SDK** from
+   [dotnet.microsoft.com/download/dotnet/10.0](https://dotnet.microsoft.com/download/dotnet/10.0).
+   Choose the button marked **SDK**, not the one marked *Runtime* — only the SDK can
+   build the site, and picking the wrong one is the usual reason "I installed .NET" still
+   does not work.
+2. Restart the computer.
+3. Double-click **`Start Website.bat`** in this folder.
+
+A black window opens and stays open — that is the site running, so leave it there. After
+about a minute your browser opens at the Model Board. Close the black window to stop.
+
+On macOS or Linux, run `./start-website.sh` instead.
+
+Sign in at `/account/login` with `superadmin@msm.local` and `Dev!Passw0rd`. That account
+exists only in local development.
+
 ## Requirements
 
 - .NET SDK 10.0 or later
