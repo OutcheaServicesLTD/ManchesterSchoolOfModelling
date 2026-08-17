@@ -72,7 +72,9 @@
         button.addEventListener('click', function () {
             button.remove();
             // Only this file is sent again; everything already uploaded is untouched.
-            send(file, ui);
+            // Queued rather than sent directly, so clicking several Retry buttons in a
+            // row cannot put the server back under the load that failed them.
+            queue(file, ui);
         });
 
         ui.element.appendChild(button);
@@ -114,6 +116,7 @@
 
         request.addEventListener('load', function () {
             inFlight -= 1;
+            sendFinished();
 
             let payload = null;
             try {
@@ -157,7 +160,8 @@
 
         request.addEventListener('error', function () {
             inFlight -= 1;
-            fail(ui, file, 'The connection dropped.');
+            sendFinished();
+            fail(ui, file, 'The connection dropped. The server may have been busy — try again.');
         });
 
         request.send(body);
@@ -181,6 +185,41 @@
         }
     }
 
+    // Files wait here rather than all being sent at once.
+    //
+    // Sending a whole selection simultaneously means the server decodes several large
+    // photographs at the same moment. A camera file is tens of megabytes of pixels once
+    // decoded, and a modest server runs out of memory and restarts — which arrives here
+    // as "the connection dropped" partway through a batch, with no indication why.
+    //
+    // One at a time is also kinder to a studio's upload speed, and makes each progress
+    // bar mean something: with six at once they all crawl together.
+    const pending = [];
+    let sending = false;
+
+    function pump() {
+        if (sending || pending.length === 0) {
+            return;
+        }
+
+        sending = true;
+        const next = pending.shift();
+        send(next.file, next.ui);
+    }
+
+    // Called when a request finishes, whether it succeeded or not, so one bad file
+    // never strands the rest of the queue.
+    function sendFinished() {
+        sending = false;
+        pump();
+    }
+
+    function queue(file, ui) {
+        pending.push({ file: file, ui: ui });
+        setState(ui, 'Waiting', 'secondary');
+        pump();
+    }
+
     function handle(files) {
         Array.prototype.forEach.call(files, function (file) {
             const ui = row(file);
@@ -201,7 +240,7 @@
             }
 
             remaining -= 1;
-            send(file, ui);
+            queue(file, ui);
         });
     }
 

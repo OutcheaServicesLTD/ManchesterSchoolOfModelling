@@ -46,21 +46,38 @@ public class ImageProcessor(ILogger<ImageProcessor> logger) : IImageProcessor
         (MediaVariant.Thumbnail, 400, 80)
     ];
 
+    /// <summary>
+    /// Reads the header only. A modern camera file is around 6000 by 4000 pixels, which
+    /// is 96MB once decoded — reading dimensions by decoding it would cost that much to
+    /// learn two numbers, and this runs before the image is even accepted.
+    /// </summary>
     public ImageDetails? Inspect(Stream content)
     {
-        using var bitmap = Decode(content);
-
-        if (bitmap is null)
+        try
         {
+            using var codec = SKCodec.Create(new SKManagedStream(content));
+
+            if (codec is null)
+            {
+                return null;
+            }
+
+            var (width, height) = Dimensions(codec.Info.Width, codec.Info.Height, codec.EncodedOrigin);
+
+            return new ImageDetails(width, height, Classify(width, height));
+        }
+        catch (Exception ex)
+        {
+            // A corrupt or non-image upload must not take the request down; the caller
+            // reports it as a rejected file.
+            logger.LogWarning(ex, "Could not read an uploaded image.");
             return null;
         }
-
-        return new ImageDetails(bitmap.Width, bitmap.Height, Classify(bitmap.Width, bitmap.Height));
     }
 
     public IReadOnlyList<GeneratedVariant> GenerateVariants(Stream content)
     {
-        using var source = Decode(content);
+        using var source = DecodeForVariants(content, out var originalWidth, out var originalHeight);
 
         if (source is null)
         {
@@ -71,14 +88,16 @@ public class ImageProcessor(ILogger<ImageProcessor> logger) : IImageProcessor
 
         foreach (var (variant, longestEdge, quality) in Targets)
         {
-            var (width, height) = ScaleToFit(source.Width, source.Height, longestEdge);
+            // Measured against the original, not the decoded copy, so "never scale up"
+            // still means what it says when the decode was downsampled.
+            var (width, height) = ScaleToFit(originalWidth, originalHeight, longestEdge);
 
             // Never scale up. Enlarging a small original would add file size without
             // adding detail, and would misrepresent the photograph's real resolution.
-            if (width >= source.Width && height >= source.Height)
+            if (width >= originalWidth && height >= originalHeight)
             {
-                width = source.Width;
-                height = source.Height;
+                width = Math.Min(originalWidth, source.Width);
+                height = Math.Min(originalHeight, source.Height);
             }
 
             using var resized = source.Resize(
@@ -133,6 +152,87 @@ public class ImageProcessor(ILogger<ImageProcessor> logger) : IImageProcessor
         }
 
         return width > height ? MediaOrientation.Landscape : MediaOrientation.Portrait;
+    }
+
+    /// <summary>
+    /// Decodes only as much of the image as the renditions actually need.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// A full-resolution decode of a professional camera file is roughly 96MB of pixels
+    /// — for a set of renditions whose largest edge is 2000 pixels. Uploading a handful
+    /// at once exhausted a small container's memory, and the process being killed
+    /// reached the retoucher as "the connection dropped" partway through a batch.
+    /// </para>
+    /// <para>
+    /// JPEG can be decoded at a fraction of its stored size almost for free, so this
+    /// asks the codec for the smallest size that still covers the largest rendition.
+    /// The result is visually identical and costs a fraction of the memory.
+    /// </para>
+    /// </remarks>
+    private SKBitmap? DecodeForVariants(Stream content, out int originalWidth, out int originalHeight)
+    {
+        originalWidth = 0;
+        originalHeight = 0;
+
+        try
+        {
+            using var codec = SKCodec.Create(new SKManagedStream(content));
+
+            if (codec is null)
+            {
+                return null;
+            }
+
+            (originalWidth, originalHeight) =
+                Dimensions(codec.Info.Width, codec.Info.Height, codec.EncodedOrigin);
+
+            var largestEdge = Targets.Max(t => t.LongestEdge);
+            var storedLongest = Math.Max(codec.Info.Width, codec.Info.Height);
+
+            // Only ever downwards, and never below what the largest rendition needs.
+            var desired = storedLongest > largestEdge
+                ? (float)largestEdge / storedLongest
+                : 1f;
+
+            var scaled = codec.GetScaledDimensions(desired);
+            var info = codec.Info.WithSize(scaled.Width, scaled.Height)
+                                 .WithColorType(SKColorType.Rgba8888)
+                                 .WithAlphaType(SKAlphaType.Premul);
+
+            var bitmap = new SKBitmap(info);
+
+            var result = codec.GetPixels(info, bitmap.GetPixels());
+
+            // IncompleteInput means a truncated file that still decoded usefully, so it
+            // is accepted; anything else is a decode failure.
+            if (result is not (SKCodecResult.Success or SKCodecResult.IncompleteInput))
+            {
+                bitmap.Dispose();
+                logger.LogWarning("Could not decode an uploaded image.");
+                return null;
+            }
+
+            return ApplyOrientation(bitmap, codec.EncodedOrigin);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Could not decode an uploaded image.");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// The dimensions as they will be seen, accounting for an EXIF rotation that swaps
+    /// width and height. Without it a phone photograph shot in portrait is recorded as
+    /// landscape and laid out in the wrong column.
+    /// </summary>
+    private static (int Width, int Height) Dimensions(int width, int height, SKEncodedOrigin origin)
+    {
+        var swaps = origin is SKEncodedOrigin.LeftTop or SKEncodedOrigin.RightTop
+            or SKEncodedOrigin.RightBottom or SKEncodedOrigin.LeftBottom;
+
+        return swaps ? (height, width) : (width, height);
     }
 
     /// <summary>
