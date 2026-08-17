@@ -55,6 +55,41 @@ dotnet user-secrets set "Seed:SuperAdmin:Email" "owner@example.com" --project sr
 dotnet user-secrets set "Seed:SuperAdmin:Password" "<a strong password>" --project src/Msm.Portfolio.Web
 ```
 
+### Which address
+
+`dotnet run` uses the `http` profile, so the application is at:
+
+```
+http://localhost:5213
+```
+
+`dotnet run --launch-profile https` adds `https://localhost:7165`, which needs a trusted
+development certificate (`dotnet dev-certs https --trust`).
+
+In VS Code, **F5** runs "Run MSM Portfolio (http)" and opens the Model Board once Kestrel
+reports it is listening. That configuration deliberately uses plain HTTP: it is the one
+that works everywhere, including a Codespace or a container.
+
+### If the browser says the page isn't working
+
+| What you see | What it means |
+| ------------ | ------------- |
+| `ERR_CONNECTION_REFUSED` | Nothing is listening on that port. Check the terminal for `Now listening on:` and use the address it prints. |
+| `ERR_EMPTY_RESPONSE` | Something accepted the connection and closed it without replying — almost always `http://` sent to an HTTPS port. Try `https://` on the same port, or use the HTTP one. |
+| A certificate warning | Expected on `https://localhost:7165` until you run `dotnet dev-certs https --trust`. |
+
+The port is whatever the terminal prints, not a fixed number — if an editor or debug
+configuration opens a different one (8080 is a common template default), it will not
+find the application no matter how long you wait.
+
+Running inside a container, bind to all interfaces rather than loopback so the port can
+be forwarded out:
+
+```bash
+ASPNETCORE_ENVIRONMENT=Development ASPNETCORE_URLS=http://0.0.0.0:8080 \
+    dotnet run --project src/Msm.Portfolio.Web --no-launch-profile
+```
+
 ## Tests
 
 ```bash
