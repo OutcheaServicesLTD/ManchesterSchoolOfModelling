@@ -1,0 +1,60 @@
+{
+    // Press F5 to run the application and open it at the right address.
+    //
+    // The "http" profile is used rather than "https" on purpose: it is the one that
+    // works everywhere. A Codespace or a container forwards a plain HTTP port cleanly,
+    // whereas an HTTPS endpoint needs a development certificate the forwarding proxy
+    // does not have — which shows up in the browser as ERR_EMPTY_RESPONSE, because the
+    // connection is accepted and then dropped without a reply.
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Run MSM Portfolio (http)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/Msm.Portfolio.Web/bin/Debug/net10.0/Msm.Portfolio.Web.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Msm.Portfolio.Web",
+            "stopAtEntry": false,
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development",
+                "ASPNETCORE_URLS": "http://localhost:5213"
+            },
+            // Waits for Kestrel to say it is listening before opening the browser, so
+            // the first request cannot arrive before the application is ready.
+            "serverReadyAction": {
+                "action": "openExternally",
+                "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+                "uriFormat": "%s/models"
+            },
+            "sourceFileMap": {
+                "/Views": "${workspaceFolder}/src/Msm.Portfolio.Web/Views"
+            }
+        },
+        {
+            "name": "Run MSM Portfolio (https)",
+            "type": "coreclr",
+            "request": "launch",
+            "preLaunchTask": "build",
+            "program": "${workspaceFolder}/src/Msm.Portfolio.Web/bin/Debug/net10.0/Msm.Portfolio.Web.dll",
+            "args": [],
+            "cwd": "${workspaceFolder}/src/Msm.Portfolio.Web",
+            "stopAtEntry": false,
+            "env": {
+                "ASPNETCORE_ENVIRONMENT": "Development",
+                "ASPNETCORE_URLS": "https://localhost:7165;http://localhost:5213"
+            },
+            // Needs a trusted development certificate first:
+            //   dotnet dev-certs https --trust
+            "serverReadyAction": {
+                "action": "openExternally",
+                "pattern": "\\bNow listening on:\\s+(https://\\S+)",
+                "uriFormat": "%s/models"
+            },
+            "sourceFileMap": {
+                "/Views": "${workspaceFolder}/src/Msm.Portfolio.Web/Views"
+            }
+        }
+    ]
+}

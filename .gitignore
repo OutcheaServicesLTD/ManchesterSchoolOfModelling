@@ -10,7 +10,15 @@ artifacts/
 ## Rider / VS / VS Code
 .vs/
 .idea/
-.vscode/
+## The contents rather than the directory itself: git never looks inside an ignored
+## directory, so a negation below it would have no effect.
+.vscode/*
+
+## ...except the two files that tell every contributor how to run this, rather than
+## leaving each editor to generate its own — a generated one commonly points at a port
+## nothing here listens on.
+!.vscode/launch.json
+!.vscode/tasks.json
 
 ## Local databases (development only)
 *.db
