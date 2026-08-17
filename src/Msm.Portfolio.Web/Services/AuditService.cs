@@ -67,4 +67,11 @@ public static class AuditActions
     public const string StaffPasswordReset = "StaffPasswordReset";
     public const string PermissionsChanged = "PermissionsChanged";
     public const string AdminEditedClient = "AdminEditedClient";
+    public const string CheckoutOpened = "CheckoutOpened";
+    public const string CheckoutStarted = "CheckoutStarted";
+    public const string CheckoutCancelled = "CheckoutCancelled";
+    public const string PaymentConfirmed = "PaymentConfirmed";
+    public const string PaymentFailed = "PaymentFailed";
+    public const string PaymentStateChanged = "PaymentStateChanged";
+    public const string WebhookProcessed = "WebhookProcessed";
 }

@@ -1,0 +1,27 @@
+@model Msm.Portfolio.Web.ViewModels.CheckoutViewModel
+@{
+    ViewData["Title"] = "Checking payment";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <h1>We are checking this payment</h1>
+
+        @* The provider's own notification may still confirm this, so it is deliberately
+           not reported as a failure (specification section 44). *@
+        <p class="lead">
+            We could not confirm @Model.ClientName's payment straight away.
+        </p>
+        @if (Model.Error is not null)
+        {
+            <p class="text-muted">@Model.Error</p>
+        }
+        <p>
+            If the payment did go through, it will be confirmed automatically within a
+            few minutes and the portfolio will be published. Please do not take payment
+            again without checking first.
+        </p>
+
+        <a class="btn btn-outline-primary" href="/admin/clients/@Model.ClientId">Back to client</a>
+    </div>
+</div>

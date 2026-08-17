@@ -6,6 +6,7 @@ using Msm.Portfolio.Web.Configuration;
 using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.Services;
+using Msm.Portfolio.Web.Integrations.GoCardless;
 using Msm.Portfolio.Web.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -67,6 +68,24 @@ builder.Services.AddScoped<IPortfolioService, PortfolioService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IPublicPortfolioService, PublicPortfolioService>();
 builder.Services.AddScoped<IStaffService, StaffService>();
+builder.Services.AddScoped<ICheckoutService, CheckoutService>();
+builder.Services.AddScoped<IPaymentWebhookProcessor, PaymentWebhookProcessor>();
+builder.Services.AddScoped<IWebhookVerifier, GoCardlessWebhookVerifier>();
+
+// The real GoCardless client is used only when an access token is configured. Its HTTP
+// calls have not been verified against the provider's sandbox, so the stub stays the
+// default: a half-right payment client is worse than an obvious placeholder.
+var goCardlessToken = builder.Configuration[$"{IntegrationOptions.SectionName}:GoCardless:AccessToken"];
+
+if (string.IsNullOrWhiteSpace(goCardlessToken))
+{
+    builder.Services.AddScoped<IGoCardlessService, StubGoCardlessService>();
+}
+else
+{
+    builder.Services.AddHttpClient<IGoCardlessService, GoCardlessService>()
+        .SetHandlerLifetime(TimeSpan.FromMinutes(5));
+}
 builder.Services.AddSingleton<IImageProcessor, ImageProcessor>();
 
 // Local disk for now. Object storage replaces this registration once MSM's hosting is

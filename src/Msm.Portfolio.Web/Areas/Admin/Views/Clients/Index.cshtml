@@ -106,6 +106,14 @@
                 </form>
             }
 
+            @if (Model.CanStartCheckout && await Allowed(Permissions.Payments.StartCheckout))
+            {
+                @* Opened with the client present in the studio (specification section 20). *@
+                <a class="btn btn-primary" href="/checkout/@Model.ClientId">
+                    Purchase — @Model.ProgrammePrice
+                </a>
+            }
+
             @if (Model.CanMarkNoSale && await Allowed(Permissions.Payments.MarkNoSale))
             {
                 <form method="post" asp-action="MarkNoSale" asp-route-clientId="@Model.ClientId"

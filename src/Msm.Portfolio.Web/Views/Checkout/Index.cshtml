@@ -1,0 +1,58 @@
+@model Msm.Portfolio.Web.ViewModels.CheckoutViewModel
+@{
+    ViewData["Title"] = "Checkout";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <h1>Checkout</h1>
+        <p class="lead">@Model.ClientName</p>
+
+        @if (Model.Error is not null)
+        {
+            <div class="alert alert-danger" role="alert">@Model.Error</div>
+        }
+
+        @if (!Model.ProviderIsLive)
+        {
+            @* Unmistakable, so nobody believes a real payment has been taken. *@
+            <div class="alert alert-warning" role="alert">
+                <strong>No payment provider is configured.</strong>
+                This checkout will not take any money. It exists so the journey can be
+                walked through before GoCardless is connected.
+            </div>
+        }
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h2 class="h5 card-title">@Model.ProductName</h2>
+                @if (Model.ProductDescription is not null)
+                {
+                    <p class="card-text text-muted">@Model.ProductDescription</p>
+                }
+                <p class="display-6 mb-0">@Model.FormattedAmount</p>
+            </div>
+        </div>
+
+        <form method="post" asp-action="Start" asp-route-orderId="@Model.OrderId">
+            <div class="form-check mb-3">
+                <input class="form-check-input" type="checkbox" id="termsAccepted"
+                       name="termsAccepted" value="true" />
+                <label class="form-check-label" for="termsAccepted">
+                    The client has read and accepted the terms of the
+                    @Model.ProductName.
+                </label>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg">
+                Continue to payment
+            </button>
+            <a class="btn btn-link" href="/admin/clients/@Model.ClientId">Back to client</a>
+        </form>
+
+        <p class="form-text mt-3">
+            Payment details are collected by @(Model.ProviderIsLive ? "GoCardless" : "the payment provider"),
+            not by @Model.Brand.BusinessName. All sales are final.
+        </p>
+    </div>
+</div>

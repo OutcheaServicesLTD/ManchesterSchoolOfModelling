@@ -67,4 +67,7 @@ public static class NotificationTypes
     public const string PortfolioPublished = "PortfolioPublished";
     public const string PortfolioUnpublished = "PortfolioUnpublished";
     public const string EnquiryReceived = "EnquiryReceived";
+    public const string PublicationBlockedAfterPurchase = "PublicationBlockedAfterPurchase";
+    public const string PaymentFailed = "PaymentFailed";
+    public const string PurchaseConfirmed = "PurchaseConfirmed";
 }

@@ -13,7 +13,7 @@ code point back to it.
 
 ## Status
 
-Phase 1 (Foundation) is complete. Later phases follow the implementation order in
+Phases 1 to 7 are complete. Later phases follow the implementation order in
 specification section 51.
 
 | Phase | Scope | State |
@@ -24,7 +24,7 @@ specification section 51.
 | 4 | Retoucher queue, assignments, upload workspace, submit for review | Done |
 | 5 | Admin dashboard, client management, portfolio preview, status management, publish/unpublish | Done |
 | 6 | Public portfolio, responsive gallery, contact MSM, Model Board, slugs | Done |
-| 7 | Orders, checkout, GoCardless integration, webhooks | Not started |
+| 7 | Orders, checkout, GoCardless integration, webhooks | Done, except the provider's own HTTP calls — see below |
 | 8 | Maintenance subscription, failed payment detection, grace period, automatic unpublish | Not started |
 | 9 | GoHighLevel synchronisation | Not started |
 | 10 | Audit, security, permissions, upload, payment, mobile, accessibility and performance hardening | Not started |
@@ -318,6 +318,67 @@ two adjacent ones.
 MSM branding in the header and footer is rendered by the platform and is not
 client-editable.
 
+## Payments
+
+The £3,499 programme is sold from the studio: Admin opens the checkout with the client
+present, the client accepts the terms, and the provider's hosted page collects the
+payment details. None are handled by this application.
+
+### What is built and tested, and what is not
+
+Everything up to the provider boundary is real and covered by tests: the order
+lifecycle, the payment states from specification section 21, webhook signature
+verification, replay-safe idempotency, and the rule that publishes a portfolio on a
+successful payment.
+
+**`GoCardlessService` — the HTTP calls to GoCardless — is not verified.** Their API and
+their documentation were both unreachable from the environment this was built in, so the
+request and response shapes come from documented knowledge rather than an observed
+exchange. Before taking real payments, work through
+[`docs/gocardless-verification.md`](docs/gocardless-verification.md).
+
+Until then, leave `Integrations:GoCardless:AccessToken` unset. `StubGoCardlessService` is
+registered automatically when it is: it takes no money, says so plainly on every page,
+and refuses to authorise anything outside Development, so it cannot quietly publish
+portfolios nobody paid for.
+
+### The order
+
+The agreed amount is copied onto the order at checkout and never read back from the
+product, so changing the advertised price later cannot alter what a client was charged
+(specification section 19). Reopening a checkout reuses the unfinished order rather than
+creating a second one, and a client who has already paid cannot open another.
+
+Checkout refuses to open for a portfolio the client has not been shown, and for an
+under-18 client whose guardian has not approved — both enforced in the service as well
+as the page, so opening the URL directly achieves nothing.
+
+### Webhooks
+
+`POST /webhooks/gocardless` is anonymous and exempt from anti-forgery by necessity: the
+provider has no session and no token. The payload signature is therefore the only thing
+separating a real payment notification from a forged one, and it is verified before
+anything is read from the body. With no signing secret configured, everything is
+refused — accepting unsigned webhooks would let anyone who found the URL mark an order
+as paid and publish a portfolio.
+
+Providers retry until they get a success, so the same event arrives repeatedly. Each is
+recorded under a unique provider event id first; a repeat is acknowledged and skipped
+rather than applied again. Processing does not depend on a browser, so a client who
+closed the tab mid-payment still gets their portfolio published.
+
+An unrecognised provider action is recorded and changes nothing, so a new event type
+cannot corrupt an order.
+
+### Two deliberate behaviours
+
+- **A paid order stands even if publication is refused.** If payment succeeds but the
+  portfolio cannot go live, the sale is kept and staff are notified — the client has paid
+  either way, and a person resolves it.
+- **A payment failure after confirmation does not unpublish anything.** That concerns the
+  money, not the sale; tearing the portfolio down there would bypass the grace period in
+  specification section 23.
+
 ## Database
 
 The provider is deliberately configurable, because the production database is still an
@@ -398,6 +459,9 @@ requirements.
 - **Email delivery** — no provider is configured. Guardian approval emails are only
   logged. Either connect GoHighLevel in Phase 9 or register a real `IEmailSender`
   before go-live.
+- **GoCardless** — `Integrations:GoCardless:AccessToken` and `WebhookSecret`. The HTTP
+  client is written but unverified; see `docs/gocardless-verification.md`. Leave the
+  token unset until it is checked, and the stub takes over.
 - **Image and video size limits** — `Media:MaxImageBytes`, `Media:MaxVideoBytes`.
 
 ### One judgement call worth confirming

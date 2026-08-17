@@ -71,6 +71,22 @@ public class AdminClientDetailViewModel
     public bool CanMarkNoSale =>
         !IsPublished && Status is PortfolioStatus.InViewing or PortfolioStatus.AwaitingPurchase;
 
+    /// <summary>
+    /// Checkout opens once the client has seen their portfolio. Guardian approval is
+    /// re-checked when the checkout is actually opened, so a blocked minor is refused
+    /// there rather than only being hidden here.
+    /// </summary>
+    public bool CanStartCheckout =>
+        !IsPublished
+        && !HasPaid
+        && Status is PortfolioStatus.InViewing or PortfolioStatus.AwaitingPurchase;
+
+    public bool HasPaid { get; set; }
+
+    public decimal ProgrammePriceValue { get; set; }
+
+    public string ProgrammePrice => $"£{ProgrammePriceValue:N2}";
+
     public bool IsArchived => Status == PortfolioStatus.Archived;
 
     public AdminClientEditViewModel ToEditModel() => new()
