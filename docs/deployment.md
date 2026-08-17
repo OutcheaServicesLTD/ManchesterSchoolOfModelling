@@ -19,6 +19,8 @@ startup is far cheaper than discovering either later.
 | Media storage is local disk | Yes | Files do not survive a container rebuild and are not shared between instances |
 | GoHighLevel API key missing | No | The application works; MSM's CRM simply falls behind |
 | `Database:MigrateOnStartup` is true | No | Two instances starting together race each other |
+| `Msm:PublicDomain` is a local address | Yes | Every shared link, social preview and guardian approval link points somewhere unreachable |
+| `Msm:PublicDomain` is `http://` | No | The links work, but hand an agency an insecure URL |
 | `Msm:ContactEmail` missing | No | Public portfolios show the enquiry form but no direct contact details |
 
 Non-fatal problems are logged as warnings on every start.
@@ -32,6 +34,52 @@ ALLOW_INCOMPLETE_DEPLOYMENT=true
 
 The application then logs that checks were skipped and starts. This should never be set
 on the environment MSM's clients use.
+
+## The domain
+
+```
+model-portfolio.manchesterschoolofmodelling.co.uk
+```
+
+Public portfolios are served from the root of this host, so a model's page is
+`https://model-portfolio.manchesterschoolofmodelling.co.uk/emma-johnson` and the Model
+Board is `/models`.
+
+### DNS
+
+Point the subdomain at wherever the application is hosted — a `CNAME` to the platform's
+hostname, or an `A`/`AAAA` record to its address. It is a subdomain of MSM's existing
+site, so it can be added without touching the main website's records, and the main site
+is unaffected if this one is ever moved.
+
+### TLS
+
+The site redirects to HTTPS and sends HSTS, so the certificate must cover this exact
+host. Most platforms issue one automatically once DNS resolves; if the certificate is
+managed manually, remember that HSTS makes a lapsed certificate a hard failure for
+anyone who has visited before rather than a warning they can click through.
+
+### Msm:PublicDomain
+
+```
+Msm__PublicDomain=https://model-portfolio.manchesterschoolofmodelling.co.uk
+```
+
+No trailing slash. This is not cosmetic — the value is baked into every outbound link:
+
+- the address shared with an agency, and the one shown on the client's own dashboard
+- the `og:url` and `og:image` tags that build the preview card when a model shares their
+  portfolio in a message or on social media
+- **the guardian's approval link**
+- the portfolio URL mirrored onto the GoHighLevel contact
+
+Get it wrong and the site still appears to work. Only the people who receive its links
+find out otherwise — and one of those people is the guardian of an under-18 client, who
+would be unable to approve, with nobody told why. The readiness guard therefore refuses
+to start if this is left at a local address.
+
+`AllowedHosts` should be set to the same host rather than `*`, unless the platform's
+health probe uses a different one — `/health` is the probe to point it at.
 
 ## Configuration
 
@@ -50,7 +98,7 @@ Database__ConnectionString=...
 Database__MigrateOnStartup=false
 
 Media__StorageProvider=...               # once object storage is chosen
-Msm__PublicDomain=https://portfolio.example.com
+Msm__PublicDomain=https://model-portfolio.manchesterschoolofmodelling.co.uk
 Msm__ContactEmail=...
 Msm__ContactPhone=...
 
@@ -116,7 +164,8 @@ app.UseForwardedHeaders(new ForwardedHeadersOptions
 This is left unconfigured on purpose: the correct value depends on hosting that has not
 been chosen, and a wrong `KnownProxies` is worse than none.
 
-Also set `AllowedHosts` to the real domain rather than `*`.
+Also set `AllowedHosts` to `model-portfolio.manchesterschoolofmodelling.co.uk` rather
+than `*`.
 
 ## Data protection keys
 
@@ -186,7 +235,13 @@ rules entirely and expose every client's unpublished photographs.
 
 ## Webhook endpoint
 
-Register `https://<domain>/webhooks/gocardless` with GoCardless and set
+Register this endpoint with GoCardless:
+
+```
+https://model-portfolio.manchesterschoolofmodelling.co.uk/webhooks/gocardless
+```
+
+Set
 `Integrations__GoCardless__WebhookSecret` to the secret shown when the endpoint is
 created. With no secret configured every webhook is refused, so payments will never
 confirm.

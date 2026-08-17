@@ -332,11 +332,22 @@ writes an audit entry that deliberately outlives what it describes.
 
 No sign-in anywhere. Agencies open a link and read the page.
 
+Served from **`model-portfolio.manchesterschoolofmodelling.co.uk`**, a subdomain of MSM's
+existing site, so portfolios can be hosted and moved without touching the main website.
+
 | Route | Page |
 | ----- | ---- |
 | `/` | Redirects to the Model Board — the portfolio domain has no marketing homepage |
 | `/models` | Model Board |
 | `/{slug}` | A model's portfolio, e.g. `/emma-johnson` |
+
+`Msm:PublicDomain` carries this value, and it is not cosmetic: every outbound link is
+built from it — the address shared with an agency, the social preview tags, the CRM
+contact's portfolio URL and **the guardian's approval link**. Set wrongly, the site still
+looks fine and only the recipients of its links ever discover otherwise, so the readiness
+guard refuses to start a deployment where it is still a local address. Locally it is
+overridden to `http://localhost:5213` in `appsettings.Development.json`, so the links on
+the dashboards are ones that actually open on the machine you are working on.
 
 Portfolios are served from the site root. Route matching prefers literal segments over
 parameters, so `/admin`, `/client`, `/retoucher`, `/media` and the rest are unaffected,
@@ -759,7 +770,6 @@ requirements.
 - **Final maintenance price** — `Commerce:MaintenancePrice`, placeholder £19.99.
   Existing subscriptions keep the price agreed when they started.
 - **Maintenance start date** — `Commerce:MaintenanceStartsAfterDays`, currently 0.
-- **Production domain** — `Msm:PublicDomain`.
 - **MSM contact details** — `Msm:ContactEmail`, `ContactPhone`, `WhatsApp`, to be
   supplied by MSM. Until they are set, the public portfolio shows the enquiry form but
   no direct contact options, and the footer omits them.

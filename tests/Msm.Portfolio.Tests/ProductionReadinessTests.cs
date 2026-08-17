@@ -15,13 +15,18 @@ namespace Msm.Portfolio.Tests;
 /// </summary>
 public class ProductionReadinessTests
 {
+    private const string LiveDomain = "https://model-portfolio.manchesterschoolofmodelling.co.uk";
+
     private static IConfiguration Configuration(
-        string? webhookSecret = "a-secret", string? contactEmail = "hello@example.com")
+        string? webhookSecret = "a-secret",
+        string? contactEmail = "hello@example.com",
+        string? publicDomain = LiveDomain)
     {
         var values = new Dictionary<string, string?>
         {
             ["Integrations:GoCardless:WebhookSecret"] = webhookSecret,
-            ["Msm:ContactEmail"] = contactEmail
+            ["Msm:ContactEmail"] = contactEmail,
+            ["Msm:PublicDomain"] = publicDomain
         };
 
         return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
@@ -34,9 +39,10 @@ public class ProductionReadinessTests
         string mediaStorageProvider = "ObjectStorage",
         bool migrateOnStartup = false,
         string? webhookSecret = "a-secret",
-        string? contactEmail = "hello@example.com") =>
+        string? contactEmail = "hello@example.com",
+        string? publicDomain = LiveDomain) =>
         ProductionReadiness.Check(
-            Configuration(webhookSecret, contactEmail),
+            Configuration(webhookSecret, contactEmail, publicDomain),
             new FakePayments(paymentsLive),
             new FakeCrm(crmLive),
             emailSenderIsStub,
@@ -93,6 +99,47 @@ public class ProductionReadinessTests
     public void The_local_disk_check_ignores_casing()
     {
         Assert.Single(Check(mediaStorageProvider: "localdisk"));
+    }
+
+    [Theory]
+    [InlineData("http://localhost:5213")]
+    [InlineData("https://localhost:7165")]
+    [InlineData("http://127.0.0.1:8080")]
+    [InlineData("https://[::1]")]
+    [InlineData("http://0.0.0.0:5000")]
+    // No dot, so it cannot resolve from outside the network it is on.
+    [InlineData("https://msm-staging")]
+    // Not a URL at all, so it cannot be a working address either.
+    [InlineData("manchesterschoolofmodelling.co.uk")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void A_public_domain_that_is_not_public_is_fatal(string? domain)
+    {
+        // Every shared link, social preview and guardian approval link is built from
+        // this value. Left local, the site looks fine and only the people who receive
+        // its links ever find out otherwise.
+        var problem = Assert.Single(Check(publicDomain: domain));
+
+        Assert.Equal("Public domain", problem.Area);
+        Assert.True(problem.IsFatal);
+    }
+
+    [Fact]
+    public void The_live_domain_is_accepted()
+    {
+        Assert.Empty(Check(publicDomain: LiveDomain));
+    }
+
+    [Fact]
+    public void A_plain_http_public_domain_is_reported_but_not_fatal()
+    {
+        // The links work; they are simply the wrong scheme to hand an agency, and the
+        // site redirects to HTTPS anyway.
+        var problem = Assert.Single(
+            Check(publicDomain: "http://model-portfolio.manchesterschoolofmodelling.co.uk"));
+
+        Assert.Equal("Public domain", problem.Area);
+        Assert.False(problem.IsFatal);
     }
 
     [Fact]

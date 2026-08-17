@@ -102,8 +102,16 @@ public class MsmBrandOptions
 
     public string BusinessName { get; set; } = "Manchester School of Modelling";
 
-    /// <summary>Host serving public portfolios, used to build shareable URLs.</summary>
-    public string PublicDomain { get; set; } = "https://localhost:5001";
+    /// <summary>
+    /// Host serving public portfolios, used to build every outbound URL: the address
+    /// shared with an agency, the social preview image, the guardian's approval link and
+    /// the portfolio URL mirrored onto the CRM contact.
+    /// </summary>
+    /// <remarks>
+    /// No trailing slash. Every use trims one anyway, but the value is also shown to
+    /// staff on the client record, where a stray slash looks like a mistake.
+    /// </remarks>
+    public string PublicDomain { get; set; } = "https://model-portfolio.manchesterschoolofmodelling.co.uk";
 
     public string? ContactEmail { get; set; }
 

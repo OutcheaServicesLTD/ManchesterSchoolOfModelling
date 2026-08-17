@@ -84,6 +84,33 @@ public static class ProductionReadiness
                 IsFatal: true));
         }
 
+        // Fatal: this value is baked into every outbound link. Left at a local address
+        // it would send agencies to a page that does not exist, and — far worse — send
+        // a guardian an approval link they cannot open, so an under-18 client could
+        // never be approved and nobody would be told why. It fails silently in the sense
+        // that matters: the application appears to work, and only the recipients of its
+        // links ever discover otherwise.
+        var domain = configuration["Msm:PublicDomain"];
+
+        if (string.IsNullOrWhiteSpace(domain) || IsLocalAddress(domain))
+        {
+            problems.Add(new ReadinessProblem(
+                "Public domain",
+                $"Msm:PublicDomain is '{domain}', which is not a public address. Every shared "
+                + "portfolio link, social preview and guardian approval link is built from it. "
+                + "Set it to the live domain, with no trailing slash.",
+                IsFatal: true));
+        }
+        else if (domain.StartsWith("http://", StringComparison.OrdinalIgnoreCase))
+        {
+            // Not fatal — the links work — but they would hand an agency an insecure URL
+            // and the site redirects to HTTPS anyway, so the value is simply wrong.
+            problems.Add(new ReadinessProblem(
+                "Public domain",
+                $"Msm:PublicDomain is '{domain}'. Shared links should be https.",
+                IsFatal: false));
+        }
+
         // Not fatal: the application works, MSM's CRM simply falls behind, and the
         // integrations page shows it.
         if (!crm.IsLive)
@@ -117,6 +144,28 @@ public static class ProductionReadiness
         }
 
         return problems;
+    }
+
+    /// <summary>
+    /// Whether a configured public domain is really only reachable from the machine
+    /// running the application.
+    /// </summary>
+    private static bool IsLocalAddress(string domain)
+    {
+        if (!Uri.TryCreate(domain, UriKind.Absolute, out var uri))
+        {
+            // Not a URL at all, so it cannot be a working public address either.
+            return true;
+        }
+
+        var host = uri.Host;
+
+        return host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+            || host.Equals("127.0.0.1", StringComparison.Ordinal)
+            || host.Equals("::1", StringComparison.Ordinal)
+            || host.Equals("0.0.0.0", StringComparison.Ordinal)
+            // A hostname with no dot cannot be resolved from outside this network.
+            || !host.Contains('.');
     }
 
     /// <summary>
