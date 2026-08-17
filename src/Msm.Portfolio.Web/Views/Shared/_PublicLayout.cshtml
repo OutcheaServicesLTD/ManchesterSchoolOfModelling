@@ -12,6 +12,7 @@
     <meta name="color-scheme" content="light dark" />
     <title>@ViewData["Title"] — @brand.BusinessName</title>
     @await RenderSectionAsync("Meta", required: false)
+    <partial name="_Favicons" />
     <link rel="stylesheet" href="~/css/msm.css" asp-append-version="true" />
     @* Synchronous and in the head, so the chosen appearance is applied before the first
        paint rather than flashing the wrong one. *@
@@ -29,7 +30,7 @@
             @* MSM branding is rendered by the platform and is not client-editable
                (specification section 16). *@
             <a class="brand" href="/models">
-                <span class="brand-name">@brand.BusinessName</span>
+                <partial name="_Wordmark" model="@("header")" />
             </a>
 
             <div class="header-utility">
@@ -44,7 +45,9 @@
 
     <footer class="public-footer">
         <div class="container py-5">
-            <p class="footer-brand">@brand.BusinessName</p>
+            <p class="footer-brand">
+                <partial name="_Wordmark" model="@("footer")" />
+            </p>
 
             @if (!string.IsNullOrWhiteSpace(brand.CompanyInformation))
             {

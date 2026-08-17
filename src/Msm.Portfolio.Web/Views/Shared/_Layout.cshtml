@@ -23,6 +23,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light dark" />
     <title>@ViewData["Title"] — @brand.BusinessName</title>
+    <partial name="_Favicons" />
     <link rel="stylesheet" href="~/css/msm.css" asp-append-version="true" />
     @* Synchronous and in the head, so the chosen appearance is applied before the first
        paint rather than flashing the wrong one. *@
@@ -34,7 +35,7 @@
     <header class="portal-header">
         <div class="container-fluid">
             <a class="portal-brand" href="@(isStaff ? "/admin" : isRetoucher ? "/retoucher" : isClient ? "/client" : "/models")">
-                <span class="mark">@brand.BusinessName</span>
+                <partial name="_Wordmark" model="@("portal")" />
                 @if (area is not null)
                 {
                     <span class="area">@area</span>

@@ -1012,6 +1012,12 @@ dl.row > dd {
     margin: clamp(1rem, 6vh, 4rem) auto;
 }
 
+.auth-mark {
+    padding-bottom: 2rem;
+    margin-bottom: 2.5rem;
+    border-bottom: 1px solid var(--line);
+}
+
 .narrow {
     max-width: 720px;
     margin-left: auto;
@@ -1054,6 +1060,59 @@ dl.row > dd {
     font-weight: 300;
     line-height: 1;
 }
+
+/* ══ The wordmark ════════════════════════════════════════════════════════════════
+   MSM's registered mark, rendered by the platform and never client-editable
+   (specification section 16). Supplied as two files, one per appearance: recolouring a
+   single file with a CSS filter blurs the hairline strokes this Bodoni wordmark is
+   built from, which is exactly the detail that makes it read as expensive. */
+
+.wordmark {
+    display: inline-block;
+    line-height: 0;
+}
+
+.wordmark img {
+    display: block;
+    width: 100%;
+    height: auto;
+}
+
+/* Only one colourway is ever shown. The rules mirror the appearance cascade: light by
+   default, dark by system preference, and an explicit [data-theme] winning either way.
+   Each selector names the element as well as the class, so it outweighs the
+   `.wordmark img` rule above — otherwise both files paint, one over the other. */
+img.wordmark-paper { display: none; }
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) img.wordmark-ink { display: none; }
+    :root:not([data-theme="light"]) img.wordmark-paper { display: block; }
+}
+
+:root[data-theme="dark"] img.wordmark-ink { display: none; }
+:root[data-theme="dark"] img.wordmark-paper { display: block; }
+:root[data-theme="light"] img.wordmark-ink { display: block; }
+:root[data-theme="light"] img.wordmark-paper { display: none; }
+
+/* Sized by width, because the mark is five times wider than it is tall and its height
+   is what has to stay within a 68px header. */
+.wordmark-header {
+    width: clamp(150px, 26vw, 210px);
+}
+
+.wordmark-footer {
+    width: clamp(220px, 46vw, 420px);
+}
+
+/* Smaller again in the staff portal, where the navigation is what matters and the mark
+   is only there to say whose studio this is. */
+.wordmark-portal {
+    width: clamp(112px, 18vw, 152px);
+}
+
+/* Over a photograph the mark is always the light one, whatever the appearance. */
+.on-photograph img.wordmark-ink { display: none; }
+.on-photograph img.wordmark-paper { display: block; }
 
 /* ══ Theme toggle ════════════════════════════════════════════════════════════════ */
 
@@ -1122,16 +1181,6 @@ dl.row > dd {
     justify-self: center;
     text-decoration: none;
     text-align: center;
-}
-
-.brand-name {
-    font-family: var(--sans);
-    font-size: clamp(10px, 2.2vw, 12px);
-    font-weight: 500;
-    letter-spacing: var(--track-eyebrow);
-    text-transform: uppercase;
-    color: var(--fg);
-    white-space: nowrap;
 }
 
 .public-header .header-utility {
@@ -1445,11 +1494,7 @@ dl.row > dd {
 }
 
 .footer-brand {
-    font-family: var(--display);
-    font-size: clamp(1.6rem, 5vw, 2.8rem);
-    font-weight: 300;
-    line-height: 1.1;
-    margin: 0 0 1.2rem;
+    margin: 0 0 1.4rem;
 }
 
 .footer-company,
@@ -1503,26 +1548,21 @@ dl.row > dd {
     display: flex;
     align-items: center;
     gap: 1.2rem;
-    min-height: 62px;
+    /* Room for the wordmark and the area label stacked beneath it, without either
+       touching the rule at the bottom of the bar. */
+    min-height: 76px;
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
     flex-wrap: wrap;
 }
 
 .portal-brand {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    align-items: flex-start;
+    gap: 5px;
     text-decoration: none;
     margin-right: 0.6rem;
-}
-
-.portal-brand .mark {
-    font-family: var(--sans);
-    font-size: 11px;
-    font-weight: 500;
-    letter-spacing: var(--track-eyebrow);
-    text-transform: uppercase;
-    color: var(--fg);
-    line-height: 1.2;
 }
 
 .portal-brand .area {

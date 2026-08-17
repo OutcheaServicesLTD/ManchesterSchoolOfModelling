@@ -1,0 +1,14 @@
+@*
+    The browser-tab mark: the initial M from the wordmark, set on a square. The full
+    wordmark is five times wider than it is tall and would be an illegible smudge at
+    32 pixels.
+
+    Two PNGs with a media query, so the tab icon suits whichever appearance the visitor
+    is in, plus an .ico for the browsers that ask for /favicon.ico regardless of what is
+    declared here.
+*@
+<link rel="icon" href="~/img/favicon-light.png" type="image/png" media="(prefers-color-scheme: light)" />
+<link rel="icon" href="~/img/favicon-dark.png" type="image/png" media="(prefers-color-scheme: dark)" />
+<link rel="icon" href="~/favicon.ico" sizes="any" />
+@* Composited on a solid ground by iOS, so this one carries the ivory itself. *@
+<link rel="apple-touch-icon" href="~/img/apple-touch-icon.png" />

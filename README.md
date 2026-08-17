@@ -495,6 +495,26 @@ One stylesheet, `wwwroot/css/msm.css`, covers the whole application — the publ
 portfolios agencies see and the staff portal the studio works in. They share a design
 language; the portal is simply denser, because staff are in it all day.
 
+### The wordmark
+
+MSM's registered mark appears in the public header and footer, in the staff portal
+header, and on the sign-in page. It is rendered by the platform and is never
+client-editable (specification section 16).
+
+Two files, not one recoloured with a CSS filter: this is a fine Bodoni wordmark built
+from hairline strokes, and a filter muddies exactly the detail that makes it read as
+expensive. `wwwroot/img/msom-logo.png` is used on light backgrounds and
+`msom-logo-white.png` on dark, with the stylesheet showing whichever suits the current
+appearance and the alt text sitting on the pair so a screen reader hears the name once.
+Both were trimmed from the supplied artwork and given a real alpha channel, so they sit
+on any ground without a white box around them.
+
+The browser-tab icon is the initial **M** on a square. The full wordmark is five times
+wider than it is tall and would be an illegible smudge at 32 pixels. Light and dark PNGs
+are declared with a media query, an `.ico` covers browsers that ask for `/favicon.ico`
+regardless, and the Apple touch icon carries the ivory ground itself because iOS
+composites it onto a solid colour.
+
 ### Bootstrap is not loaded
 
 Its rounded corners, blue accents and system font stack fight this design at every turn.
