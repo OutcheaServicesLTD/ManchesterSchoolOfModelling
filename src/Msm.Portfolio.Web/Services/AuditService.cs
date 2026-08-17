@@ -57,4 +57,14 @@ public static class AuditActions
     public const string GuardianConsentApproved = "GuardianConsentApproved";
     public const string MeasurementsUpdated = "MeasurementsUpdated";
     public const string PortfolioStatusChanged = "PortfolioStatusChanged";
+    public const string PortfolioPublished = "PortfolioPublished";
+    public const string PortfolioUnpublished = "PortfolioUnpublished";
+    public const string PortfolioDeletedPermanently = "PortfolioDeletedPermanently";
+    public const string SlugChanged = "SlugChanged";
+    public const string StaffAccountCreated = "StaffAccountCreated";
+    public const string StaffAccountDisabled = "StaffAccountDisabled";
+    public const string StaffAccountEnabled = "StaffAccountEnabled";
+    public const string StaffPasswordReset = "StaffPasswordReset";
+    public const string PermissionsChanged = "PermissionsChanged";
+    public const string AdminEditedClient = "AdminEditedClient";
 }

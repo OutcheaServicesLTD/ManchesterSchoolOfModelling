@@ -63,4 +63,7 @@ public static class NotificationTypes
     public const string GuardianApprovalRequired = "GuardianApprovalRequired";
     public const string GuardianApprovalReceived = "GuardianApprovalReceived";
     public const string PortfolioReadyForReview = "PortfolioReadyForReview";
+    public const string PortfolioReturnedToRetoucher = "PortfolioReturnedToRetoucher";
+    public const string PortfolioPublished = "PortfolioPublished";
+    public const string PortfolioUnpublished = "PortfolioUnpublished";
 }

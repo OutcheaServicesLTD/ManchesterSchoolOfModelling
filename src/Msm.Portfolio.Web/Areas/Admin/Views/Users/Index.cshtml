@@ -1,0 +1,168 @@
+@model Msm.Portfolio.Web.ViewModels.StaffListViewModel
+@using Microsoft.AspNetCore.Authorization
+@using Msm.Portfolio.Web.Authorization
+@using Msm.Portfolio.Web.ViewModels
+@inject IAuthorizationService Auth
+@{
+    ViewData["Title"] = "Staff";
+    var saved = TempData["Saved"] as string;
+    var error = TempData["Error"] as string;
+    var password = TempData["GeneratedPassword"] as string;
+    var passwordFor = TempData["GeneratedFor"] as string;
+    var canManage = (await Auth.AuthorizeAsync(User, Permissions.Users.ManageAdministrators)).Succeeded;
+}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <h1 class="mb-0">Staff</h1>
+    <a class="btn btn-outline-secondary btn-sm" href="/admin">Back to clients</a>
+</div>
+
+@if (saved is not null) { <div class="alert alert-success" role="alert">@saved</div> }
+@if (error is not null) { <div class="alert alert-danger" role="alert">@error</div> }
+
+@if (password is not null)
+{
+    @* Shown once. The password is stored only as a hash, so it cannot be shown again. *@
+    <div class="alert alert-warning" role="alert">
+        <h2 class="h6">One-time password for @passwordFor</h2>
+        <p class="mb-1">
+            <code class="fs-5">@password</code>
+        </p>
+        <p class="mb-0 small">
+            Copy this now and give it to them directly. It cannot be shown again, and
+            they should change it after signing in.
+        </p>
+    </div>
+}
+
+<div class="table-responsive mb-4">
+    <table class="table align-middle">
+        <caption class="visually-hidden">Staff accounts</caption>
+        <thead>
+            <tr>
+                <th scope="col">Name</th>
+                <th scope="col">Email</th>
+                <th scope="col">Role</th>
+                <th scope="col">Status</th>
+                <th scope="col">Last signed in</th>
+                <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var member in Model.Staff)
+            {
+                <tr>
+                    <th scope="row" class="fw-normal">@member.Name</th>
+                    <td>@member.Email</td>
+                    <td>@member.Role</td>
+                    <td>
+                        @if (member.IsActive)
+                        {
+                            <span class="badge text-bg-success">Active</span>
+                        }
+                        else
+                        {
+                            <span class="badge text-bg-secondary">Disabled</span>
+                        }
+                    </td>
+                    <td>@(member.LastLoginAt?.ToString("d MMM yyyy") ?? "Never")</td>
+                    <td class="text-end">
+                        @if (canManage && member.Role != Roles.SuperAdmin)
+                        {
+                            <div class="d-flex gap-1 justify-content-end flex-wrap">
+                                <form method="post" asp-action="SetActive" asp-route-userId="@member.UserId">
+                                    <input type="hidden" name="active" value="@((!member.IsActive).ToString().ToLowerInvariant())" />
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">
+                                        @(member.IsActive ? "Disable" : "Enable")
+                                    </button>
+                                </form>
+                                <form method="post" asp-action="ResetPassword" asp-route-userId="@member.UserId"
+                                      onsubmit="return confirm('Issue a new password for @member.Email?');">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Reset access</button>
+                                </form>
+                            </div>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@if (canManage)
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">Add a staff account</h2>
+            <form method="post" asp-action="Create" class="row g-2">
+                <div class="col-md-3">
+                    <label for="FirstName" class="form-label">First name</label>
+                    <input id="FirstName" name="FirstName" class="form-control" required />
+                </div>
+                <div class="col-md-3">
+                    <label for="LastName" class="form-label">Last name</label>
+                    <input id="LastName" name="LastName" class="form-control" required />
+                </div>
+                <div class="col-md-3">
+                    <label for="Email" class="form-label">Email address</label>
+                    <input id="Email" name="Email" type="email" class="form-control" required />
+                </div>
+                <div class="col-md-2">
+                    <label for="Role" class="form-label">Role</label>
+                    <select id="Role" name="Role" class="form-select">
+                        <option value="@Roles.Retoucher">Retoucher</option>
+                        <option value="@Roles.Admin">Admin</option>
+                    </select>
+                </div>
+                <div class="col-md-1 d-grid align-self-end">
+                    <button type="submit" class="btn btn-primary">Add</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    @foreach (var role in new[] { Roles.Admin, Roles.Retoucher })
+    {
+        var granted = Model.GrantedTo(role);
+
+        <div class="card mb-4">
+            <div class="card-body">
+                <h2 class="h5 card-title">@role permissions</h2>
+                <p class="text-muted small">
+                    Everyone in the @role role holds these. Changes take effect when
+                    they next sign in.
+                </p>
+
+                <form method="post" asp-action="SetPermissions">
+                    <input type="hidden" name="role" value="@role" />
+
+                    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-1 mb-3">
+                        @foreach (var permission in Model.AllPermissions)
+                        {
+                            var reserved = Model.IsReserved(permission);
+                            var id = $"{role}-{permission.Replace('.', '-')}";
+
+                            <div class="col">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="@id"
+                                           name="permissions" value="@permission"
+                                           checked="@granted.Contains(permission)"
+                                           disabled="@reserved" />
+                                    <label class="form-check-label @(reserved ? "text-muted" : "")" for="@id">
+                                        @StaffListViewModel.Humanise(permission)
+                                        @if (reserved)
+                                        {
+                                            <span class="badge text-bg-light">Super Admin only</span>
+                                        }
+                                    </label>
+                                </div>
+                            </div>
+                        }
+                    </div>
+
+                    <button type="submit" class="btn btn-outline-primary">Save @role permissions</button>
+                </form>
+            </div>
+        </div>
+    }
+}

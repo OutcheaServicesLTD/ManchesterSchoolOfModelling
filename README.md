@@ -22,7 +22,7 @@ specification section 51.
 | 2 | Client onboarding, GHL contact ID capture, profile, measurements, guardian workflow | Done |
 | 3 | Media storage abstraction, upload pipeline, 60-image pool, 30-image portfolio, featured image, self-tape | Done |
 | 4 | Retoucher queue, assignments, upload workspace, submit for review | Done |
-| 5 | Admin dashboard, client management, portfolio preview, status management, publish/unpublish | Not started |
+| 5 | Admin dashboard, client management, portfolio preview, status management, publish/unpublish | Done |
 | 6 | Public portfolio, responsive gallery, contact MSM, Model Board, slugs | Not started |
 | 7 | Orders, checkout, GoCardless integration, webhooks | Not started |
 | 8 | Maintenance subscription, failed payment detection, grace period, automatic unpublish | Not started |
@@ -229,6 +229,42 @@ the portfolio would reach Admin with nothing to review. It moves the assignment 
 portfolio to Ready for review, notifies staff and writes an audit entry, all in one
 transaction. Changes save as they are made, so there is no separate "save draft" step —
 the draft is simply the portfolio before it is submitted.
+
+## Admin and the portfolio lifecycle
+
+The client table at `/admin` is searchable by name or email and filterable by portfolio
+status and retoucher (specification section 5). Each client record shows the full media
+library, not only the public selection.
+
+### Permissions, not roles
+
+Admin actions are gated by individual permission rather than by the Admin role, because
+the specification requires staff accounts to hold different privileges. A button the
+signed-in user cannot use is not rendered, **and** the action itself is gated, so posting
+directly achieves nothing. The capabilities reserved to Super Admin in section 4
+(permanent deletion, restore, payment override, managing administrators, changing system
+configuration) cannot be delegated: an attempt to grant one to another role is stripped
+rather than honoured.
+
+### Publishing
+
+Publishing enforces the hard stop from specification section 11: **an under-18 client
+cannot be published until their guardian has approved.** It also requires at least one
+photograph and a main image. The reason publishing is unavailable is shown on the page
+rather than only surfacing when the attempt is refused.
+
+Slugs are assigned once, at first publication, and left alone afterwards — so a link
+already shared with an agency keeps working even if the model later changes their
+display name. Unpublishing keeps the slug, so the same address returns if the portfolio
+goes live again. Reserved slugs are refused: public portfolios are served from the site
+root as `/{slug}`, so a model named "Admin" would otherwise shadow the admin area.
+
+### No sale and deletion
+
+A declined sale is archived, not deleted, and stays available to staff (specification
+section 48). Only a Super Admin can restore it or destroy it. Permanent deletion removes
+the portfolio, its media rows and the stored files, but keeps the client record and
+writes an audit entry that deliberately outlives what it describes.
 
 ## Database
 

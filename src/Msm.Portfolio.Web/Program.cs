@@ -62,6 +62,10 @@ builder.Services.AddScoped<IGuardianConsentService, GuardianConsentService>();
 builder.Services.AddScoped<IClientOnboardingService, ClientOnboardingService>();
 builder.Services.AddScoped<IMediaService, MediaService>();
 builder.Services.AddScoped<IRetoucherService, RetoucherService>();
+builder.Services.AddScoped<ISlugService, SlugService>();
+builder.Services.AddScoped<IPortfolioService, PortfolioService>();
+builder.Services.AddScoped<IAdminService, AdminService>();
+builder.Services.AddScoped<IStaffService, StaffService>();
 builder.Services.AddSingleton<IImageProcessor, ImageProcessor>();
 
 // Local disk for now. Object storage replaces this registration once MSM's hosting is

@@ -1,11 +1,109 @@
+@model Msm.Portfolio.Web.ViewModels.AdminDashboardViewModel
+@using Msm.Portfolio.Web.Domain.Enums
 @{
-    ViewData["Title"] = "Admin";
+    ViewData["Title"] = "Clients";
+    var saved = TempData["Saved"] as string;
 }
 
-<h1>Admin</h1>
-<p class="lead">Signed in as @User.Identity?.Name</p>
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <h1 class="mb-0">Clients</h1>
+    <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary btn-sm" href="/admin/audit">Audit history</a>
+        <a class="btn btn-outline-secondary btn-sm" href="/admin/users">Staff</a>
+    </div>
+</div>
 
-<p>
-    Foundation only. The client table, portfolio review and payment views described in
-    specification section 5 are built in Phase 5.
-</p>
+@if (saved is not null)
+{
+    <div class="alert alert-success" role="alert">@saved</div>
+}
+
+<form method="get" class="row g-2 align-items-end mb-4">
+    <div class="col-md-4">
+        <label for="search" class="form-label">Search</label>
+        <input id="search" name="search" value="@Model.Search" class="form-control"
+               placeholder="Name or email" />
+    </div>
+    <div class="col-md-3">
+        <label for="status" class="form-label">Portfolio status</label>
+        <select id="status" name="status" class="form-select">
+            <option value="">All</option>
+            @foreach (var status in Enum.GetValues<PortfolioStatus>())
+            {
+                <option value="@status" selected="@(Model.Status == status)">@status</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-3">
+        <label for="retoucher" class="form-label">Retoucher</label>
+        <select id="retoucher" name="retoucher" class="form-select">
+            <option value="">All</option>
+            @foreach (var option in Model.Retouchers)
+            {
+                <option value="@option.UserId" selected="@(Model.RetoucherUserId == option.UserId)">@option.Name</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-2 d-grid gap-1">
+        <button type="submit" class="btn btn-primary">Filter</button>
+        @if (Model.HasFilters)
+        {
+            <a class="btn btn-link btn-sm" href="/admin">Clear</a>
+        }
+    </div>
+</form>
+
+@if (Model.Rows.Count == 0)
+{
+    <p class="text-muted">No clients match.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <caption class="visually-hidden">Clients</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Client</th>
+                    <th scope="col">Portfolio status</th>
+                    <th scope="col">Retoucher</th>
+                    <th scope="col">Images</th>
+                    <th scope="col">Submitted</th>
+                    <th scope="col">Payment</th>
+                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var row in Model.Rows)
+                {
+                    <tr>
+                        <th scope="row" class="fw-normal">
+                            <div>@row.ClientName</div>
+                            <div class="small text-muted">@row.Email</div>
+                            @if (row.GuardianApprovalPending)
+                            {
+                                <span class="badge text-bg-warning">Guardian pending</span>
+                            }
+                        </th>
+                        <td>
+                            @row.Status
+                            @if (row.IsPublished)
+                            {
+                                <span class="badge text-bg-success">Live</span>
+                            }
+                        </td>
+                        <td>@(row.Retoucher ?? "—")</td>
+                        <td>@row.SelectedCount / @row.ImageCount</td>
+                        <td>@row.SubmittedAt.ToString("d MMM yyyy")</td>
+                        <td>@(row.PaymentStatus?.ToString() ?? "—")</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-outline-primary"
+                               href="/admin/clients/@row.ClientId">Open</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+    <p class="text-muted small">@Model.Rows.Count client(s).</p>
+}

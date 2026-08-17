@@ -1,0 +1,117 @@
+@model Msm.Portfolio.Web.ViewModels.AuditViewModel
+@{
+    ViewData["Title"] = "Audit history";
+
+    // Paging links are built by hand rather than with asp-route-*, because a route
+    // value named "action" is reserved by MVC and would be dropped from the URL.
+    string PageLink(int page)
+    {
+        var query = new List<string> { $"page={page}" };
+
+        if (!string.IsNullOrWhiteSpace(Model.EntityType))
+        {
+            query.Add($"entityType={Uri.EscapeDataString(Model.EntityType)}");
+        }
+
+        if (!string.IsNullOrWhiteSpace(Model.Action))
+        {
+            query.Add($"auditAction={Uri.EscapeDataString(Model.Action)}");
+        }
+
+        return $"/admin/audit?{string.Join("&", query)}";
+    }
+}
+
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <h1 class="mb-0">Audit history</h1>
+    <a class="btn btn-outline-secondary btn-sm" href="/admin">Back to clients</a>
+</div>
+
+<form method="get" class="row g-2 align-items-end mb-4">
+    <div class="col-md-4">
+        <label for="entityType" class="form-label">Record type</label>
+        <select id="entityType" name="entityType" class="form-select">
+            <option value="">All</option>
+            @foreach (var type in Model.EntityTypes)
+            {
+                <option value="@type" selected="@(Model.EntityType == type)">@type</option>
+            }
+        </select>
+    </div>
+    @* Named auditAction, not action: "action" is a reserved MVC route value and would
+       be shadowed by the action method's own name. *@
+    <div class="col-md-4">
+        <label for="auditAction" class="form-label">Action</label>
+        <select id="auditAction" name="auditAction" class="form-select">
+            <option value="">All</option>
+            @foreach (var action in Model.Actions)
+            {
+                <option value="@action" selected="@(Model.Action == action)">@action</option>
+            }
+        </select>
+    </div>
+    <div class="col-md-4 d-grid gap-1">
+        <button type="submit" class="btn btn-primary">Filter</button>
+        @if (Model.EntityType is not null || Model.Action is not null)
+        {
+            <a class="btn btn-link btn-sm" href="/admin/audit">Clear</a>
+        }
+    </div>
+</form>
+
+@if (Model.Entries.Count == 0)
+{
+    <p class="text-muted">No audit entries match.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm align-middle">
+            <caption class="visually-hidden">Audit entries, most recent first</caption>
+            <thead>
+                <tr>
+                    <th scope="col">When</th>
+                    <th scope="col">Who</th>
+                    <th scope="col">Record</th>
+                    <th scope="col">Action</th>
+                    <th scope="col">Change</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var entry in Model.Entries)
+                {
+                    <tr>
+                        <td class="text-nowrap">@entry.Timestamp.ToString("d MMM yyyy HH:mm")</td>
+                        <td>@(entry.User ?? "System")</td>
+                        <td>
+                            <div>@entry.EntityType</div>
+                            <div class="small text-muted font-monospace">@entry.EntityId</div>
+                        </td>
+                        <td>@entry.Action</td>
+                        <td class="small">
+                            @if (entry.OldValue is not null)
+                            {
+                                <div class="text-muted">From: @entry.OldValue</div>
+                            }
+                            @if (entry.NewValue is not null)
+                            {
+                                <div>To: @entry.NewValue</div>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <nav aria-label="Audit history pages" class="d-flex gap-2">
+        @if (Model.Page > 0)
+        {
+            <a class="btn btn-outline-secondary btn-sm" href="@PageLink(Model.Page - 1)">Newer</a>
+        }
+        @if (Model.HasMore)
+        {
+            <a class="btn btn-outline-secondary btn-sm" href="@PageLink(Model.Page + 1)">Older</a>
+        }
+    </nav>
+}
