@@ -126,6 +126,16 @@ public class MsmBrandOptions
     public string? TikTokUrl { get; set; }
 
     public string? CompanyInformation { get; set; }
+
+    /// <summary>
+    /// Asks search engines to ignore the whole site.
+    /// </summary>
+    /// <remarks>
+    /// Set on a preview or staging deployment. A demonstration site carrying invented
+    /// models, sitting on a subdomain of MSM's real brand, must not turn up in a search
+    /// for MSM — and once indexed, that is slow and awkward to undo.
+    /// </remarks>
+    public bool DiscourageSearchEngines { get; set; }
 }
 
 /// <summary>

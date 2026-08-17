@@ -118,9 +118,15 @@ dotnet test
 
 ## Deploying
 
-See [`docs/deployment.md`](docs/deployment.md): required configuration, the readiness
-guard, migrations, proxies and rate limits, and the four things outstanding before
-go-live.
+- [`docs/preview-deployment.md`](docs/preview-deployment.md) — putting a **preview**
+  online for MSM to click through, without a terminal. A demonstration site: payments
+  take no money, emails are not delivered, and no real client's details belong in it.
+- [`docs/deployment.md`](docs/deployment.md) — the **live** system: required
+  configuration, the readiness guard, migrations, proxies and rate limits, and the four
+  things outstanding before go-live.
+
+The `Dockerfile` is host-agnostic and runs the same on Render, Fly, Azure Container Apps
+or a plain Linux server, so choosing a host now does not lock the project in.
 
 ## Project layout
 

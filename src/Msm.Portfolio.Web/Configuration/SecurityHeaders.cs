@@ -10,11 +10,17 @@ namespace Msm.Portfolio.Web.Configuration;
 /// </remarks>
 public static class SecurityHeaders
 {
-    public static IApplicationBuilder UseMsmSecurityHeaders(this IApplicationBuilder app, bool isDevelopment)
+    public static IApplicationBuilder UseMsmSecurityHeaders(
+        this IApplicationBuilder app, bool isDevelopment, bool discourageSearchEngines = false)
     {
         return app.Use(async (context, next) =>
         {
             var headers = context.Response.Headers;
+
+            if (RobotsHeaderFor(discourageSearchEngines) is { } robots)
+            {
+                headers["X-Robots-Tag"] = robots;
+            }
 
             // Stops a browser second-guessing a declared content type. Without it, an
             // uploaded file served as an image could be sniffed as something executable.
@@ -36,6 +42,21 @@ public static class SecurityHeaders
             await next();
         });
     }
+
+    /// <summary>
+    /// What to tell search engines, or null to say nothing at all.
+    /// </summary>
+    /// <remarks>
+    /// A preview deployment carries invented models on a subdomain of MSM's real brand
+    /// and must not turn up in a search for MSM. Sent on every response rather than only
+    /// on pages, because a portfolio photograph indexed on its own is the same problem.
+    /// <para>
+    /// The live site says nothing here: portfolios are meant to be findable, and
+    /// emitting this by accident would quietly remove every model from search results.
+    /// </para>
+    /// </remarks>
+    internal static string? RobotsHeaderFor(bool discourageSearchEngines) =>
+        discourageSearchEngines ? "noindex, nofollow, noarchive, noimageindex" : null;
 
     /// <summary>
     /// The Content Security Policy.

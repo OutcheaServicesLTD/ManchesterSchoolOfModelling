@@ -161,7 +161,17 @@ else
     app.UseHsts();
 }
 
-app.UseMsmSecurityHeaders(app.Environment.IsDevelopment());
+var brand = app.Services.GetRequiredService<IOptions<MsmBrandOptions>>().Value;
+
+app.UseMsmSecurityHeaders(app.Environment.IsDevelopment(), brand.DiscourageSearchEngines);
+
+// A preview deployment also serves a robots file saying the same thing, because some
+// crawlers read it and never look at the response headers.
+if (brand.DiscourageSearchEngines)
+{
+    app.MapGet("/robots.txt", () => Results.Text(
+        "User-agent: *\nDisallow: /\n", "text/plain")).AllowAnonymous();
+}
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();

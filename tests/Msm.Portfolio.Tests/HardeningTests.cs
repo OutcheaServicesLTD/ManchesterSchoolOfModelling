@@ -113,6 +113,24 @@ public class HardeningTests
     }
 
     [Fact]
+    public void A_preview_deployment_asks_search_engines_to_stay_away()
+    {
+        // A demonstration site carrying invented models, on a subdomain of MSM's real
+        // brand, must not turn up in a search for MSM — and un-indexing is slow.
+        var headers = SecurityHeaders.RobotsHeaderFor(discourageSearchEngines: true);
+
+        Assert.Equal("noindex, nofollow, noarchive, noimageindex", headers);
+    }
+
+    [Fact]
+    public void The_live_site_says_nothing_to_search_engines()
+    {
+        // Portfolios are meant to be findable. Emitting noindex by accident would
+        // quietly remove every model from search results.
+        Assert.Null(SecurityHeaders.RobotsHeaderFor(discourageSearchEngines: false));
+    }
+
+    [Fact]
     public void Insecure_requests_are_upgraded_outside_development()
     {
         Assert.Contains(
