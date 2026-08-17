@@ -234,6 +234,76 @@ static void CheckProductionReadiness(WebApplication app)
 }
 
 /// <summary>
+/// Empties a preview so its seed data can be built again from scratch.
+/// </summary>
+/// <remarks>
+/// <para>
+/// The seeders deliberately never touch a database that already has clients, which
+/// means changing what they create has no effect until the existing data is gone. On a
+/// hosted preview that otherwise means deleting the platform's disk by hand — fiddly,
+/// and easy to get wrong. This turns it into one setting.
+/// </para>
+/// <para>
+/// <b>It destroys everything: the database and every uploaded photograph.</b> Guarded
+/// three ways — an explicit setting, Development only, and it refuses when media storage
+/// is anything other than local disk, since a shared object store may hold a real
+/// studio's work. Turn the setting off again once the preview is rebuilt, or the next
+/// restart wipes it a second time.
+/// </para>
+/// </remarks>
+static async Task ResetPreviewDataIfRequestedAsync(
+    WebApplication app, IServiceProvider services, ApplicationDbContext db, ILogger logger)
+{
+    if (!app.Configuration.GetValue<bool>("Seed:ResetPreviewData"))
+    {
+        return;
+    }
+
+    if (!app.Environment.IsDevelopment())
+    {
+        logger.LogWarning(
+            "Seed:ResetPreviewData is set but the environment is {Environment}. Refusing to erase data.",
+            app.Environment.EnvironmentName);
+        return;
+    }
+
+    var media = services.GetRequiredService<IOptions<MediaOptions>>().Value;
+
+    if (!media.StorageProvider.Equals("LocalDisk", StringComparison.OrdinalIgnoreCase))
+    {
+        logger.LogWarning(
+            "Seed:ResetPreviewData is set but media storage is {Provider}. Refusing: that store may "
+            + "hold real work.", media.StorageProvider);
+        return;
+    }
+
+    logger.LogWarning(
+        "Seed:ResetPreviewData is set. Erasing the database and all stored media, then seeding "
+        + "again. Turn this setting off once the preview looks right.");
+
+    await db.Database.EnsureDeletedAsync();
+
+    // Rebuilt here rather than relying on the migration step below, which is optional:
+    // with it turned off, dropping the database and not recreating it would leave the
+    // application with nothing to serve.
+    await db.Database.MigrateAsync();
+
+    // The rows are gone, so the files they described are orphaned. Left behind they
+    // would accumulate on every reset until the disk filled.
+    var root = Path.IsPathRooted(media.LocalStorageRoot)
+        ? media.LocalStorageRoot
+        : Path.Combine(app.Environment.ContentRootPath, media.LocalStorageRoot);
+
+    if (Directory.Exists(root))
+    {
+        Directory.Delete(root, recursive: true);
+        Directory.CreateDirectory(root);
+    }
+
+    logger.LogWarning("Preview data erased.");
+}
+
+/// <summary>
 /// Applies migrations and seeds reference data before the application serves traffic.
 /// Migration on startup is opt-out, because a production deployment usually migrates
 /// as a separate step rather than from inside the web process.
@@ -248,6 +318,8 @@ static async Task InitialiseDatabaseAsync(WebApplication app)
     try
     {
         var db = services.GetRequiredService<ApplicationDbContext>();
+
+        await ResetPreviewDataIfRequestedAsync(app, services, db, logger);
 
         if (databaseOptions.MigrateOnStartup)
         {

@@ -86,8 +86,23 @@ so a preview built around a real model is not cluttered with fictional ones.
 #### Starting over
 
 Both seeders are skipped once **any** client exists, so changing these settings does
-nothing to a database that already has clients. To reset: **Settings** → delete the
-disk → **Manual Deploy**. That erases the database and every uploaded photograph.
+nothing on their own to a database that already has clients — the previous clients stay
+and the new ones are never created.
+
+To rebuild from scratch, in **Environment**:
+
+1. Set `Seed__ResetPreviewData` to `true`
+2. **Manual Deploy** → *Deploy latest commit*
+3. Once it looks right, set it back to `false`
+
+That erases the database and every stored photograph on start, then seeds again. **Leave
+it on and the next restart wipes the preview a second time**, including any photographs
+uploaded in between — which is why step 3 matters.
+
+It refuses to run outside Development, and refuses when media storage is anything other
+than local disk, since a shared object store may hold a real studio's work.
+
+Deleting the platform's disk by hand does the same thing, if you would rather.
 
 ## 3. Tell the application its own address
 

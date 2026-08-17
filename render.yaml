@@ -53,6 +53,14 @@ services:
       - key: Seed__SampleClients
         value: "false"
 
+      # Both seeders skip a database that already has clients, so changing what they
+      # create does nothing until the old data is gone. Setting this to "true" erases
+      # the database and every stored photograph on the next start, then seeds again.
+      # Destructive on purpose — turn it back to "false" once the preview looks right,
+      # or the following restart wipes it a second time.
+      - key: Seed__ResetPreviewData
+        value: "false"
+
       # Set this to the address the preview is actually served on, once known — every
       # shared link, preview card and guardian approval link is built from it.
       - key: Msm__PublicDomain
