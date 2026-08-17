@@ -69,15 +69,16 @@ public class DemoDataSeeder(
 
         var retoucherUserId = await EnsureDemoRetoucherAsync();
 
-        // ── The real model whose photographs MSM will upload ─────────────────────────
-        // Created empty and waiting in the retoucher queue: a member of staff claims her,
-        // drags the photographs in and publishes, which is both how the portfolio gets
-        // built and the most convincing thing to show MSM.
+        // ── The real models whose photographs MSM will upload ────────────────────────
+        // Created empty and waiting in the retoucher queue: a member of staff claims
+        // them, drags the photographs in and publishes, which is both how a portfolio
+        // gets built and the most convincing thing to show MSM.
         //
-        // Her details are MSM's, not invented. Bust and waist are deliberately absent —
-        // they were not supplied, and guessing a real person's measurements would put a
-        // wrong number on a published portfolio. Add them on the client record.
-        logger.LogWarning("Creating the Elizabeth Cousins client record for the preview.");
+        // These are MSM's own clients, not invented people. Where a figure was not
+        // supplied the field is left empty rather than guessed: a wrong measurement on a
+        // published portfolio is one an agency would book against. Missing fields are
+        // named in the log and can be added on the client record.
+        logger.LogWarning("Creating the real client records for the preview.");
 
         await BuildAsync(
             new DemoClient(
@@ -96,6 +97,26 @@ public class DemoDataSeeder(
                     ["Hips"] = "91",        // 36"
                     ["DressSize"] = "10",
                     ["ShoeSize"] = "6"
+                }),
+            retoucherUserId, Stage.Waiting, cancellationToken);
+
+        await BuildAsync(
+            new DemoClient(
+                "Joshua", "Dinning", "joshua.dinning@example.com",
+                DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-21)),
+                "Timperley", ModelProfileType.Male,
+                Biography: null,
+                Photographs: 0,
+                HairColour: "Brown",
+                EyeColour: "Blue",
+                Measurements: new Dictionary<string, string>
+                {
+                    ["Height"] = "180",     // 5'11"
+                    ["Waist"] = "86",       // 34"
+                    ["ShoeSize"] = "10"
+                    // Chest was not supplied, and the "S" clothing size is a shirt size
+                    // rather than the UK suit or jacket size this field records, so
+                    // neither is filled in here.
                 }),
             retoucherUserId, Stage.Waiting, cancellationToken);
 
