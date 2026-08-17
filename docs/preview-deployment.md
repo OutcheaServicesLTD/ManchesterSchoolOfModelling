@@ -54,24 +54,40 @@ Sign in at `/account/login` with the email and password from step 1.
 
 ### What is already in it
 
-Six invented clients are created on first start, one at each stage of the workflow, so
-every screen has something to look at rather than an empty list:
+One client — **Elizabeth Cousins** — sitting in the retoucher queue waiting to be
+claimed, with her details filled in and no photographs yet. Build her portfolio by
+uploading them, which is both how it gets done and the most convincing thing to show
+MSM. The Model Board stays empty until she is published.
 
-| Client | Stage | What it demonstrates |
-| ------ | ----- | -------------------- |
-| Amara Whitfield | Published | A live portfolio and a Model Board card |
-| Tobias Fenwick | Published | A second board card, and a male measurement template |
-| Priya Raval | Ready for review | An Admin's review queue |
-| Callum Reid | Retouching | A retoucher's workspace, part-way through |
-| Niamh O'Connell | Just onboarded | Unclaimed work waiting to be picked up |
-| Elsie Hartley | Retouching, under 18 | Guardian approval outstanding, and publication blocked because of it |
+**Bust and waist are deliberately blank.** They were not supplied, and a guessed figure
+would appear on a published portfolio as though MSM had measured her — an agency would
+book against it. Add them on her client record before publishing.
 
 There is also a second sign-in, `retoucher@msm.local`, using the **same password** you
 set for the owner. Use it to see the retoucher's view of the queue, which is narrower
 than an Admin's.
 
-These are invented people. Real client details do not belong here — see
-[What this preview is not](#what-this-preview-is-not).
+#### Building her portfolio
+
+1. Sign in → **Retoucher** → **Start work** on Elizabeth
+2. Drag the photographs into the upload box
+3. **Add to portfolio** on each, then **Make main** on the hero shot
+4. **Send for review**
+5. **Clients** → open her → **Mark ready for viewing** → **Publish**
+
+#### A fuller demonstration
+
+To show every screen with something in it, set `Seed__SampleClients` to `true`. That
+adds six invented clients at each stage of the workflow — two published, one waiting for
+review, one part-way through retouching, one just onboarded, and one under 18 whose
+guardian has not approved, which demonstrates publication being blocked. Off by default,
+so a preview built around a real model is not cluttered with fictional ones.
+
+#### Starting over
+
+Both seeders are skipped once **any** client exists, so changing these settings does
+nothing to a database that already has clients. To reset: **Settings** → delete the
+disk → **Manual Deploy**. That erases the database and every uploaded photograph.
 
 ## 3. Tell the application its own address
 

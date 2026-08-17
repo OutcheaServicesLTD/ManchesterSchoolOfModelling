@@ -67,13 +67,60 @@ public class DemoDataSeeder(
             return;
         }
 
-        logger.LogWarning(
-            "Creating demonstration clients. These are invented people for a preview and must "
-            + "never appear in a live deployment.");
-
         var retoucherUserId = await EnsureDemoRetoucherAsync();
 
-        // ── Published, on the Model Board ────────────────────────────────────────────
+        // ── The real model whose photographs MSM will upload ─────────────────────────
+        // Created empty and waiting in the retoucher queue: a member of staff claims her,
+        // drags the photographs in and publishes, which is both how the portfolio gets
+        // built and the most convincing thing to show MSM.
+        //
+        // Her details are MSM's, not invented. Bust and waist are deliberately absent —
+        // they were not supplied, and guessing a real person's measurements would put a
+        // wrong number on a published portfolio. Add them on the client record.
+        logger.LogWarning("Creating the Elizabeth Cousins client record for the preview.");
+
+        await BuildAsync(
+            new DemoClient(
+                "Elizabeth", "Cousins", "elizabeth.cousins@example.com",
+                // An age was supplied rather than a date of birth. Deriving it keeps her
+                // shown as 61 whenever this runs, instead of inventing a birthday.
+                DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-61)),
+                "Sheffield", ModelProfileType.Female,
+                Biography: null,
+                Photographs: 0,
+                HairColour: "Brown",
+                EyeColour: "Blue",
+                Measurements: new Dictionary<string, string>
+                {
+                    ["Height"] = "173",     // 5'8"
+                    ["Hips"] = "91",        // 36"
+                    ["DressSize"] = "10",
+                    ["ShoeSize"] = "6"
+                }),
+            retoucherUserId, Stage.Waiting, cancellationToken);
+
+        // ── Invented clients, off by default ─────────────────────────────────────────
+        // Six more at every stage of the workflow, for showing the whole system rather
+        // than one portfolio. Separate from the above so a preview built around a real
+        // model is not cluttered with fictional ones.
+        if (configuration.GetValue<bool>("Seed:SampleClients"))
+        {
+            await SeedSampleClientsAsync(retoucherUserId, cancellationToken);
+        }
+
+        logger.LogWarning("Preview data created.");
+    }
+
+    /// <summary>
+    /// Invented clients at each stage of the workflow, so every screen has something in
+    /// it. Enabled with Seed:SampleClients.
+    /// </summary>
+    private async Task SeedSampleClientsAsync(Guid retoucherUserId, CancellationToken cancellationToken)
+    {
+        logger.LogWarning(
+            "Creating sample clients. These are invented people and must never appear in a "
+            + "live deployment.");
+
         await BuildAsync(
             new DemoClient(
                 "Amara", "Whitfield", "amara.whitfield@example.com", new DateOnly(1999, 4, 18),
@@ -92,7 +139,6 @@ public class DemoDataSeeder(
                 Photographs: 6),
             retoucherUserId, Stage.Published, cancellationToken);
 
-        // ── Waiting for an Admin to review ───────────────────────────────────────────
         await BuildAsync(
             new DemoClient(
                 "Priya", "Raval", "priya.raval@example.com", new DateOnly(2001, 7, 9),
@@ -101,39 +147,28 @@ public class DemoDataSeeder(
                 Photographs: 5),
             retoucherUserId, Stage.ReadyForReview, cancellationToken);
 
-        // ── Part-way through retouching ──────────────────────────────────────────────
         await BuildAsync(
             new DemoClient(
                 "Callum", "Reid", "callum.reid@example.com", new DateOnly(1998, 2, 25),
-                "Stockport", ModelProfileType.Male,
-                null,
-                Photographs: 4),
+                "Stockport", ModelProfileType.Male, null, Photographs: 4),
             retoucherUserId, Stage.InRetouching, cancellationToken);
 
-        // ── Just onboarded, nothing done yet ─────────────────────────────────────────
         await BuildAsync(
             new DemoClient(
                 "Niamh", "O'Connell", "niamh.oconnell@example.com", new DateOnly(2000, 9, 14),
-                "Manchester", ModelProfileType.Female,
-                null,
-                Photographs: 0),
+                "Manchester", ModelProfileType.Female, null, Photographs: 0),
             retoucherUserId, Stage.Waiting, cancellationToken);
 
-        // ── Under 18, guardian approval outstanding ──────────────────────────────────
-        // Shows the safeguarding banner, and that purchase and publication are blocked
-        // until a guardian approves (specification section 11).
+        // Shows the safeguarding banner, and that publication is blocked until a
+        // guardian approves (specification section 11).
         await BuildAsync(
             new DemoClient(
                 "Elsie", "Hartley", "elsie.hartley@example.com",
                 DateOnly.FromDateTime(DateTime.UtcNow.AddYears(-16)),
-                "Rochdale", ModelProfileType.Female,
-                null,
-                Photographs: 3,
+                "Rochdale", ModelProfileType.Female, null, Photographs: 3,
                 GuardianName: "Rebecca Hartley",
                 GuardianEmail: "rebecca.hartley@example.com"),
             retoucherUserId, Stage.InRetouching, cancellationToken);
-
-        logger.LogWarning("Demonstration data created.");
     }
 
     private enum Stage { Waiting, InRetouching, ReadyForReview, Published }
@@ -148,7 +183,14 @@ public class DemoDataSeeder(
         string? Biography,
         int Photographs,
         string? GuardianName = null,
-        string? GuardianEmail = null);
+        string? GuardianEmail = null,
+        string? HairColour = null,
+        string? EyeColour = null,
+        /// <summary>
+        /// Real figures, by template key. Any key left out is simply not recorded —
+        /// which is the point for a real model whose full card was not supplied.
+        /// </summary>
+        IReadOnlyDictionary<string, string>? Measurements = null);
 
     private async Task BuildAsync(
         DemoClient demo, Guid retoucherUserId, Stage stage, CancellationToken cancellationToken)
@@ -163,13 +205,17 @@ public class DemoDataSeeder(
             DateOfBirth = demo.DateOfBirth,
             Location = demo.Location,
             ModelProfileType = demo.ProfileType,
+            HairColour = demo.HairColour,
+            EyeColour = demo.EyeColour,
             Biography = demo.Biography,
             GuardianRequired = demo.GuardianName is not null,
             GuardianName = demo.GuardianName,
             GuardianRelationship = demo.GuardianName is null ? null : "Parent",
             GuardianEmail = demo.GuardianEmail,
             GuardianPhone = demo.GuardianName is null ? null : "07700 900001",
-            Measurements = MeasurementsFor(demo.ProfileType)
+            Measurements = demo.Measurements is null
+                ? InventedMeasurementsFor(demo.ProfileType)
+                : SuppliedMeasurements(demo.ProfileType, demo.Measurements)
         };
 
         var result = await onboarding.SubmitAsync(model, cancellationToken);
@@ -301,7 +347,41 @@ public class DemoDataSeeder(
     /// Plausible figures per field, so the specification sheet on the portfolio reads
     /// like a real one instead of the same number repeated down the page.
     /// </remarks>
-    private List<MeasurementInputModel> MeasurementsFor(ModelProfileType profileType)
+    /// <summary>
+    /// Records only the figures actually supplied, in the template's own order.
+    /// </summary>
+    /// <remarks>
+    /// A field with no figure is left out rather than filled with a placeholder. This is
+    /// for a real model: a guessed bust or waist would appear on a published portfolio as
+    /// though MSM had measured her, and an agency would book against it.
+    /// </remarks>
+    private List<MeasurementInputModel> SuppliedMeasurements(
+        ModelProfileType profileType, IReadOnlyDictionary<string, string> supplied)
+    {
+        var missing = templates.GetTemplate(profileType)
+            .Where(field => !supplied.ContainsKey(field.Key))
+            .Select(field => field.Label)
+            .ToList();
+
+        if (missing.Count > 0)
+        {
+            logger.LogWarning(
+                "No figure supplied for {Fields}. Add them on the client record before publishing.",
+                string.Join(", ", missing));
+        }
+
+        return templates.GetTemplate(profileType)
+            .Where(field => supplied.ContainsKey(field.Key))
+            .Select(field => new MeasurementInputModel
+            {
+                Key = field.Key,
+                Unit = field.Unit,
+                Value = supplied[field.Key]
+            })
+            .ToList();
+    }
+
+    private List<MeasurementInputModel> InventedMeasurementsFor(ModelProfileType profileType)
     {
         var male = profileType == ModelProfileType.Male;
 

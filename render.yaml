@@ -42,13 +42,16 @@ services:
       - key: Msm__DiscourageSearchEngines
         value: "true"
 
-      # Creates six invented clients on first start, one at each stage of the workflow,
-      # so every screen has something in it: two published on the Model Board, one
-      # waiting for review, one part-way through retouching, one just onboarded, and one
-      # under 18 whose guardian has not approved. Ignored once any client exists, and
-      # refused outside Development.
+      # Creates the Elizabeth Cousins client record on first start, waiting in the
+      # retoucher queue for her photographs to be uploaded. Ignored once any client
+      # exists, and refused outside Development.
       - key: Seed__DemoData
         value: "true"
+
+      # Set to "true" as well to add six invented clients at every stage of the
+      # workflow, for demonstrating the whole system rather than one portfolio.
+      - key: Seed__SampleClients
+        value: "false"
 
       # Set this to the address the preview is actually served on, once known — every
       # shared link, preview card and guardian approval link is built from it.
