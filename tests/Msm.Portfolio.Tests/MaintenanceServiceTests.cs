@@ -46,7 +46,7 @@ public class MaintenanceServiceTests : IDisposable
 
         var portfolios = new PortfolioService(
             _db, new SlugService(_db), new InMemoryStorage(), audit, notifications,
-            NullLogger<PortfolioService>.Instance);
+            new SilentBiographyWriter(), NullLogger<PortfolioService>.Instance);
 
         _service = new MaintenanceService(
             _db, portfolios, audit, notifications,

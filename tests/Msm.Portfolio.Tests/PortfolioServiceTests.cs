@@ -30,6 +30,7 @@ public class PortfolioServiceTests : IDisposable
             _storage,
             new AuditService(_db),
             new NotificationService(_db),
+            new SilentBiographyWriter(),
             NullLogger<PortfolioService>.Instance);
     }
 

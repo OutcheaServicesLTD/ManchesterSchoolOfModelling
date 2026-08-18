@@ -1,5 +1,6 @@
 using Msm.Portfolio.Web.Integrations.GoCardless;
 using Msm.Portfolio.Web.Integrations.HighLevel;
+using Msm.Portfolio.Web.Integrations.Bio;
 
 namespace Msm.Portfolio.Web.Services;
 
@@ -131,6 +132,19 @@ public static class ProductionReadiness
                 "Database",
                 "Migrations run at startup. With more than one instance this races. Set "
                 + "Database:MigrateOnStartup to false and migrate as a deployment step.",
+                IsFatal: false));
+        }
+
+        // Not fatal: the feature is optional, and a studio that writes its own biographies
+        // wants exactly this. Said out loud so nobody is left wondering why approvals
+        // never suggest one.
+        if (string.IsNullOrWhiteSpace(configuration[$"{BiographyOptions.SectionName}:ApiKey"]))
+        {
+            problems.Add(new ReadinessProblem(
+                "Biographies",
+                "No biography provider is configured, so approving a portfolio will not suggest "
+                + "a biography and staff write every one by hand. Set Biography:ApiKey to turn "
+                + "it on.",
                 IsFatal: false));
         }
 

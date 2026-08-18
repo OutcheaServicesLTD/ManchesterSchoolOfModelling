@@ -8,6 +8,7 @@ using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.Services;
 using Msm.Portfolio.Web.Integrations.GoCardless;
+using Msm.Portfolio.Web.Integrations.Bio;
 using Msm.Portfolio.Web.Integrations.HighLevel;
 using Msm.Portfolio.Web.Storage;
 
@@ -96,6 +97,29 @@ builder.Services.AddScoped<ICrmSyncService, CrmSyncService>();
 // The CRM push runs on a worker, never inside the operation that caused it, so a CRM
 // that is down cannot delay the studio or roll back a purchase (specification section 45).
 builder.Services.AddHostedService<CrmSyncWorker>();
+
+// ── Suggested biographies ────────────────────────────────────────────────────────
+// Off unless a key is configured, and off means nothing is requested at all rather
+// than a queue of drafts that can only fail.
+builder.Services.Configure<BiographyOptions>(
+    builder.Configuration.GetSection(BiographyOptions.SectionName));
+
+var biographyKey = builder.Configuration[$"{BiographyOptions.SectionName}:ApiKey"];
+
+if (string.IsNullOrWhiteSpace(biographyKey))
+{
+    builder.Services.AddSingleton<IBiographyWriter, StubBiographyWriter>();
+}
+else
+{
+    builder.Services.AddSingleton<IBiographyWriter, AnthropicBiographyWriter>();
+}
+
+builder.Services.AddScoped<IBiographyDraftService, BiographyDraftService>();
+
+// Written on a worker for the same reason the CRM push is: approving a portfolio is
+// the administrator's action and must not wait on somebody else's API.
+builder.Services.AddHostedService<BiographyDraftWorker>();
 
 // As with GoCardless, the real client is only used when configured, and its HTTP calls
 // have not been verified against the provider.

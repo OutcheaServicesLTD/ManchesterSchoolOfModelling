@@ -37,7 +37,7 @@ public class CheckoutAndWebhookTests : IDisposable
 
         var portfolios = new PortfolioService(
             _db, new SlugService(_db), new InMemoryStorage(), audit, notifications,
-            NullLogger<PortfolioService>.Instance);
+            new SilentBiographyWriter(), NullLogger<PortfolioService>.Instance);
 
         var commerce = new OptionsWrapper<CommerceOptions>(new CommerceOptions());
 

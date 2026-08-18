@@ -94,7 +94,50 @@
             </dd>
         </dl>
 
-        @if (Model.PublishBlocker is not null && !Model.IsPublished)
+        @if (Model.Client.BiographyDraftStatus == BiographyDraftStatus.Ready
+     && !string.IsNullOrWhiteSpace(Model.Client.BiographyDraft))
+{
+    @* A suggestion, never the published biography. This text describes a real person and
+       is what an agency reads about them, so somebody reads it before it goes anywhere. *@
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">Suggested biography</h2>
+            <p class="text-muted">
+                Written from this client's measurements and details when the portfolio was
+                approved. Nothing has been published — read it, and use it only if it is
+                right. It cannot know anything the studio has not recorded, so check it
+                for anything that simply is not true.
+            </p>
+
+            <blockquote class="draft-quote">@Model.Client.BiographyDraft</blockquote>
+
+            <div class="d-flex gap-2 flex-wrap">
+                <form method="post" asp-action="AcceptBiography" asp-route-clientId="@Model.ClientId">
+                    <button type="submit" class="btn btn-primary">Use this biography</button>
+                </form>
+                <form method="post" asp-action="DiscardBiography" asp-route-clientId="@Model.ClientId"
+                      data-confirm="Throw this suggestion away? It will not be offered again.">
+                    <button type="submit" class="btn btn-outline-secondary">Throw it away</button>
+                </form>
+            </div>
+
+            <p class="form-text mb-0">
+                Using it copies the text into the biography below, where you can edit it
+                before the portfolio goes live.
+            </p>
+        </div>
+    </div>
+}
+else if (Model.Client.BiographyDraftStatus == BiographyDraftStatus.Failed)
+{
+    <div class="alert alert-warning" role="alert">
+        A biography could not be suggested for this client
+        @(Model.Client.BiographyDraftError is { } why ? $"({why})" : "") —
+        write one in the client details below.
+    </div>
+}
+
+@if (Model.PublishBlocker is not null && !Model.IsPublished)
         {
             @* Explains a disabled Publish button rather than only refusing the attempt. *@
             <div class="alert alert-secondary py-2" role="status">

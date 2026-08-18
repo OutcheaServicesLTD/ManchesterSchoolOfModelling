@@ -1744,6 +1744,19 @@ img.wordmark-paper { display: none; }
     box-shadow: inset -4px 0 0 var(--fg);
 }
 
+/* A suggested biography, set apart from the page so it reads as something proposed
+   rather than something already true. */
+
+.draft-quote {
+    border-left: 3px solid var(--fg);
+    background: var(--raised);
+    margin: 0 0 1.25rem;
+    padding: 1rem 1.25rem;
+    white-space: pre-wrap;
+    font-size: 15px;
+    line-height: 1.7;
+}
+
 /* ── Choosing the crop on the cover photograph ──────────────────────────────────
    The cover is the only image the site ever cuts into. This panel shows the whole
    photograph with the chosen point marked, and the two shapes it will be cut to

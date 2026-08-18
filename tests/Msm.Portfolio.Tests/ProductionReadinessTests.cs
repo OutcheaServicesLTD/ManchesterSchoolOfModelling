@@ -20,13 +20,15 @@ public class ProductionReadinessTests
     private static IConfiguration Configuration(
         string? webhookSecret = "a-secret",
         string? contactEmail = "hello@example.com",
-        string? publicDomain = LiveDomain)
+        string? publicDomain = LiveDomain,
+        string? biographyKey = "sk-ant-test")
     {
         var values = new Dictionary<string, string?>
         {
             ["Integrations:GoCardless:WebhookSecret"] = webhookSecret,
             ["Msm:ContactEmail"] = contactEmail,
-            ["Msm:PublicDomain"] = publicDomain
+            ["Msm:PublicDomain"] = publicDomain,
+            ["Biography:ApiKey"] = biographyKey
         };
 
         return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
@@ -40,9 +42,10 @@ public class ProductionReadinessTests
         bool migrateOnStartup = false,
         string? webhookSecret = "a-secret",
         string? contactEmail = "hello@example.com",
-        string? publicDomain = LiveDomain) =>
+        string? publicDomain = LiveDomain,
+        string? biographyKey = "sk-ant-test") =>
         ProductionReadiness.Check(
-            Configuration(webhookSecret, contactEmail, publicDomain),
+            Configuration(webhookSecret, contactEmail, publicDomain, biographyKey),
             new FakePayments(paymentsLive),
             new FakeCrm(crmLive),
             emailSenderIsStub,
@@ -53,6 +56,17 @@ public class ProductionReadinessTests
     public void A_fully_configured_deployment_reports_nothing()
     {
         Assert.Empty(Check());
+    }
+
+    [Fact]
+    public void No_biography_provider_is_reported_but_not_fatal()
+    {
+        // Optional by design: a studio that writes its own biographies wants exactly
+        // this. Reported so nobody is left wondering why approvals never suggest one.
+        var problem = Assert.Single(Check(biographyKey: null));
+
+        Assert.Equal("Biographies", problem.Area);
+        Assert.False(problem.IsFatal);
     }
 
     [Fact]

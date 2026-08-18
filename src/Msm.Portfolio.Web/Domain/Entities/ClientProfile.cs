@@ -127,4 +127,51 @@ public class ClientProfile
     /// </remarks>
     public bool IsBlockedPendingGuardianConsent(DateOnly today) =>
         RequiresGuardianConsent(today) && GuardianConsent?.IsApproved != true;
+
+    // ── A suggested biography ────────────────────────────────────────────────────
+    //
+    // Asked for once, when an administrator approves the portfolio, and only ever
+    // offered as a draft. Writing straight into Biography would put text nobody had
+    // read onto the public page of a real person.
+
+    public BiographyDraftStatus BiographyDraftStatus { get; set; } = BiographyDraftStatus.NotRequested;
+
+    /// <summary>The suggestion itself, until it is accepted or thrown away.</summary>
+    public string? BiographyDraft { get; set; }
+
+    public DateTimeOffset? BiographyDraftGeneratedAt { get; set; }
+
+    /// <summary>Why it could not be written, shown rather than swallowed.</summary>
+    public string? BiographyDraftError { get; set; }
+
+    public int BiographyDraftAttempts { get; set; }
+
+    public DateTimeOffset? BiographyDraftNextAttemptAt { get; set; }
+
+    public bool NeedsBiographyDraft(DateTimeOffset now) =>
+        BiographyDraftStatus is BiographyDraftStatus.Pending
+        && (BiographyDraftNextAttemptAt is null || BiographyDraftNextAttemptAt <= now);
+
+    /// <summary>
+    /// Asks for a draft, once and once only.
+    /// </summary>
+    /// <remarks>
+    /// Refused when a biography already exists: that text was written or approved by a
+    /// person, and quietly queueing a replacement for it is not what anyone asked for.
+    /// Refused in every state but the first, so approving a portfolio a second time — or
+    /// an administrator who has already thrown one draft away — does not produce another.
+    /// </remarks>
+    public bool RequestBiographyDraft()
+    {
+        if (BiographyDraftStatus is not BiographyDraftStatus.NotRequested
+            || !string.IsNullOrWhiteSpace(Biography))
+        {
+            return false;
+        }
+
+        BiographyDraftStatus = BiographyDraftStatus.Pending;
+        BiographyDraftNextAttemptAt = null;
+
+        return true;
+    }
 }

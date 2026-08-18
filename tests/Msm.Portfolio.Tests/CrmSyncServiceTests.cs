@@ -34,7 +34,7 @@ public class CrmSyncServiceTests : IDisposable
 
         _portfolios = new PortfolioService(
             _db, new SlugService(_db), new InMemoryStorage(), audit, notifications,
-            NullLogger<PortfolioService>.Instance);
+            new SilentBiographyWriter(), NullLogger<PortfolioService>.Instance);
 
         _sync = new CrmSyncService(
             _db, _crm, notifications, brand, NullLogger<CrmSyncService>.Instance);

@@ -31,6 +31,7 @@ public class ClientsController(
     IRetoucherService retouchers,
     IMaintenanceService maintenance,
     IMeasurementTemplateProvider templates,
+    IBiographyDraftService biographies,
     IAuditService audit,
     UserManager<ApplicationUser> userManager,
     IOptions<MediaOptions> mediaOptions,
@@ -117,6 +118,38 @@ public class ClientsController(
     /// decision, and being able to change the crop without being able to change the
     /// photograph would be an odd half of the job.
     /// </remarks>
+    /// <summary>Uses the suggested biography, or throws it away.</summary>
+    /// <remarks>
+    /// Behind the same permission as editing the client, because that is exactly what
+    /// accepting one is: it copies the suggestion into the biography, where it can still
+    /// be edited before anything is published.
+    /// </remarks>
+    [HttpPost("biography/accept")]
+    [Authorize(Policy = Permissions.Clients.Edit)]
+    public async Task<IActionResult> AcceptBiography(
+        Guid clientId, CancellationToken cancellationToken = default)
+    {
+        if (await biographies.ResolveAsync(clientId, accept: true, CurrentUserId(), cancellationToken))
+        {
+            TempData["Saved"] = "The suggested biography is now this client's biography.";
+        }
+
+        return RedirectToAction(nameof(Index), new { clientId });
+    }
+
+    [HttpPost("biography/discard")]
+    [Authorize(Policy = Permissions.Clients.Edit)]
+    public async Task<IActionResult> DiscardBiography(
+        Guid clientId, CancellationToken cancellationToken = default)
+    {
+        if (await biographies.ResolveAsync(clientId, accept: false, CurrentUserId(), cancellationToken))
+        {
+            TempData["Saved"] = "The suggestion was thrown away.";
+        }
+
+        return RedirectToAction(nameof(Index), new { clientId });
+    }
+
     [HttpPost("media/{assetId:guid}/focal")]
     [Authorize(Policy = Permissions.Media.SetFeatured)]
     public async Task<IActionResult> Focal(
