@@ -212,6 +212,61 @@ public class WorkspaceController(
         return RedirectToAction(nameof(Index), new { clientId });
     }
 
+    /// <summary>
+    /// Saves a whole new order at once, as produced by dragging a photograph.
+    /// </summary>
+    /// <remarks>
+    /// The order is rebuilt from the identifiers posted rather than trusted outright:
+    /// anything not currently on the portfolio is ignored, and anything the browser left
+    /// out keeps its place at the end. A stale page therefore cannot drop a photograph
+    /// from the portfolio by omitting it.
+    /// </remarks>
+    [HttpPost("reorder")]
+    public async Task<IActionResult> Reorder(
+        Guid clientId,
+        [FromForm(Name = "order")] Guid[]? order,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await IsAllowedAsync(clientId, cancellationToken))
+        {
+            return Forbid();
+        }
+
+        if (order is null || order.Length == 0)
+        {
+            return RedirectToAction(nameof(Index), new { clientId });
+        }
+
+        var pool = await media.GetPoolAsync(clientId, cancellationToken);
+        var selected = pool.Where(a => a.IsSelectedForPortfolio).Select(a => a.Id).ToList();
+        var rest = pool.Where(a => !a.IsSelectedForPortfolio).Select(a => a.Id);
+
+        var reordered = RebuildOrder(order, selected);
+
+        await media.ReorderAsync(clientId, [.. reordered, .. rest], CurrentUserId(), cancellationToken);
+
+        return RedirectToAction(nameof(Index), new { clientId });
+    }
+
+    /// <summary>
+    /// Works out the new portfolio order from the identifiers a browser posted.
+    /// </summary>
+    /// <remarks>
+    /// Deliberately not a straight assignment. The posted list comes from a page that may
+    /// be minutes old and is trivially editable, so it is treated as a preference rather
+    /// than an instruction: identifiers that are not on the portfolio are ignored, and any
+    /// photograph the browser failed to mention keeps its place at the end instead of
+    /// silently dropping off the portfolio.
+    /// </remarks>
+    internal static List<Guid> RebuildOrder(IEnumerable<Guid> posted, IReadOnlyCollection<Guid> selected)
+    {
+        var reordered = posted.Where(selected.Contains).Distinct().ToList();
+
+        reordered.AddRange(selected.Where(id => !reordered.Contains(id)));
+
+        return reordered;
+    }
+
     [HttpPost("submit")]
     public async Task<IActionResult> Submit(Guid clientId, CancellationToken cancellationToken = default)
     {

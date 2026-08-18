@@ -1685,6 +1685,62 @@ img.wordmark-paper { display: none; }
     gap: 0.5rem;
 }
 
+/* ── Dropping photographs in ────────────────────────────────────────────────────
+   The zone has to answer the moment a file is dragged over it. Without this the
+   retoucher is hovering over a page that looks inert and cannot tell whether
+   letting go will do anything. */
+
+#drop-zone {
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+#drop-zone.is-dropping {
+    border-color: var(--fg);
+    border-style: solid;
+    background: var(--raised);
+}
+
+#drop-zone.is-dropping p {
+    color: var(--fg);
+}
+
+/* ── Dragging a photograph into a new place ─────────────────────────────────────
+   Only the thumbnail carries the drag, not the whole tile: the buttons beneath it
+   must stay clickable. */
+
+.drag-handle {
+    cursor: grab;
+}
+
+.drag-handle:active {
+    cursor: grabbing;
+}
+
+[data-reorder-item] {
+    transition: opacity 0.15s ease;
+}
+
+[data-reorder-item].is-dragging {
+    opacity: 0.4;
+}
+
+[data-reorder-item].is-dragging .card {
+    outline: 2px dashed var(--fg);
+    outline-offset: -2px;
+}
+
+/* Where the photograph will land, shown as a bar down the side of the tile it would
+   sit before or after. Nothing is rearranged until the drop, so this line is the only
+   thing that moves while dragging. */
+
+[data-reorder-item].drop-before .card {
+    box-shadow: inset 4px 0 0 var(--fg);
+}
+
+[data-reorder-item].drop-after .card {
+    box-shadow: inset -4px 0 0 var(--fg);
+}
+
 /* ── Choosing photographs in bulk ───────────────────────────────────────────────
    The whole thumbnail is the target, not just a small box beside it: a retoucher
    works through a shoot quickly and should be able to hit the picture. */

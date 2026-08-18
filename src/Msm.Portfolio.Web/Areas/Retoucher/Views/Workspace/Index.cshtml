@@ -82,6 +82,8 @@
                 <p id="upload-summary" class="visually-hidden" aria-live="polite"></p>
                 <ul id="upload-list" class="list-group"></ul>
 
+                @* Only offered when a file failed: a clean batch reloads on its own.
+                   Reloading with failures showing would discard their Retry buttons. *@
                 <div id="refresh-after-upload" class="mt-3 d-none">
                     <a class="btn btn-outline-primary" href="/retoucher/client/@Model.ClientId">
                         Refresh to see the uploaded photographs
@@ -99,13 +101,26 @@
 }
 else
 {
-    <ol class="row row-cols-2 row-cols-md-4 g-3 list-unstyled mb-4">
+    @* Dragging is an addition, not a replacement: the arrows below stay, because
+       specification section 41 requires the order to be changeable from a keyboard and
+       a drag-only control cannot be. The new order posts to Reorder. *@
+    @* The reorder form is deliberately outside the list: each tile already contains
+       forms for the arrows, "Make main" and removal, and HTML forbids nesting one form
+       inside another — the browser would silently drop the inner ones. Script fills this
+       in with the new order and submits it. *@
+    <form method="post" asp-action="Reorder" asp-route-clientId="@Model.ClientId"
+          id="reorder-form" class="d-none"></form>
+
+    <p class="eyebrow mb-2" data-reorder-hint>Drag a photograph to change its place</p>
+
+    <ol class="row row-cols-2 row-cols-md-4 g-3 list-unstyled mb-4" data-reorder-list>
         @for (var i = 0; i < Model.Selected.Count; i++)
         {
             var asset = Model.Selected[i];
-            <li class="col">
+            <li class="col" data-reorder-item data-asset-id="@asset.Id">
                 <div class="card h-100 @(asset.IsFeatured ? "border-primary" : "")">
-                    <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
+                    <img src="/media/@asset.Id/thumbnail" class="card-img-top drag-handle" loading="lazy"
+                         draggable="true"
                          style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
                          alt="@asset.Filename" />
                     <div class="card-body p-2">

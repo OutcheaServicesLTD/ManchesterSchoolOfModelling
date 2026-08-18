@@ -176,13 +176,30 @@
     }
 
     function finishIfIdle() {
-        if (inFlight === 0 && uploaded > 0) {
-            // Reload so the grid reflects what was stored, rather than guessing at it.
-            const reload = document.getElementById('refresh-after-upload');
-            if (reload) {
-                reload.classList.remove('d-none');
-            }
+        if (inFlight !== 0 || pending.length > 0 || uploaded === 0) {
+            return;
         }
+
+        // Reloads itself rather than revealing a button and asking for a click. The
+        // page is re-rendered from what was actually stored, so the grid can never
+        // drift from the library it claims to show.
+        //
+        // Briefly delayed so the last "Uploaded" badge is visible, and so a failed file
+        // still shows its Retry button rather than vanishing on reload.
+        const failures = list.querySelectorAll('.retry').length;
+
+        if (failures > 0) {
+            // Something needs attention, so the page is left alone and the manual link
+            // offered instead — reloading would discard the Retry buttons.
+            const manual = document.getElementById('refresh-after-upload');
+            if (manual) {
+                manual.classList.remove('d-none');
+            }
+            return;
+        }
+
+        announce(uploaded + ' uploaded. Refreshing.');
+        window.setTimeout(function () { window.location.reload(); }, 700);
     }
 
     // Files wait here rather than all being sent at once.
@@ -258,14 +275,14 @@
     ['dragenter', 'dragover'].forEach(function (name) {
         dropZone.addEventListener(name, function (event) {
             event.preventDefault();
-            dropZone.classList.add('border-primary');
+            dropZone.classList.add('is-dropping');
         });
     });
 
     ['dragleave', 'drop'].forEach(function (name) {
         dropZone.addEventListener(name, function (event) {
             event.preventDefault();
-            dropZone.classList.remove('border-primary');
+            dropZone.classList.remove('is-dropping');
         });
     });
 
