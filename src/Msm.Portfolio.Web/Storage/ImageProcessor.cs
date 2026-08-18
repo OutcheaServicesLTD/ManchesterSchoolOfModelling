@@ -26,21 +26,26 @@ public record GeneratedVariant(MediaVariant Variant, byte[] Content, int Width, 
     public string ContentType => "image/jpeg";
 }
 
+/// <summary>Everything produced from one pass over an uploaded photograph.</summary>
+public record ProcessedImage(IReadOnlyList<GeneratedVariant> Variants, ImageQuality? Quality);
+
 public interface IImageProcessor
 {
     /// <summary>Reads dimensions and orientation without altering the image.</summary>
     ImageDetails? Inspect(Stream content);
 
     /// <summary>
-    /// Produces the web renditions from specification section 13. The original is not
-    /// among them: it is archived exactly as uploaded.
+    /// Produces the web renditions from specification section 13, and measures the
+    /// photograph, from a single decode. The original is not among the renditions: it is
+    /// archived exactly as uploaded.
     /// </summary>
-    IReadOnlyList<GeneratedVariant> GenerateVariants(Stream content);
-
-    /// <summary>
-    /// Measures the technical qualities of a photograph, or null if it cannot be read.
-    /// </summary>
-    ImageQuality? Measure(Stream content);
+    /// <remarks>
+    /// Deliberately one call rather than two. Decoding is by far the most expensive thing
+    /// this class does, and a second decode purely to measure the image is what exhausted
+    /// a small server's memory and dropped uploads partway through a batch. Anything read
+    /// from an uploaded photograph belongs here, on the decode that already happened.
+    /// </remarks>
+    ProcessedImage Process(Stream content);
 }
 
 /// <summary>
@@ -94,13 +99,13 @@ public class ImageProcessor(ILogger<ImageProcessor> logger) : IImageProcessor
         }
     }
 
-    public IReadOnlyList<GeneratedVariant> GenerateVariants(Stream content)
+    public ProcessedImage Process(Stream content)
     {
         using var source = DecodeForVariants(content, out var originalWidth, out var originalHeight);
 
         if (source is null)
         {
-            return [];
+            return new ProcessedImage([], null);
         }
 
         var generated = new List<GeneratedVariant>(Targets.Length);
@@ -134,7 +139,7 @@ public class ImageProcessor(ILogger<ImageProcessor> logger) : IImageProcessor
             generated.Add(new GeneratedVariant(variant, data.ToArray(), width, height));
         }
 
-        return generated;
+        return new ProcessedImage(generated, Measure(source));
     }
 
     /// <summary>
@@ -142,9 +147,16 @@ public class ImageProcessor(ILogger<ImageProcessor> logger) : IImageProcessor
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Measured on a small decode. Blur, exposure and clipping are all properties of the
-    /// whole frame and survive being scaled down, so there is nothing to gain from
-    /// reading sixty megapixels to learn four numbers.
+    /// Takes the bitmap the renditions were made from rather than the uploaded file, so
+    /// nothing is decoded twice. That is not a micro-optimisation: JPEG can be decoded
+    /// small almost for free, but PNG cannot be decoded small at all, so a second decode
+    /// of a twenty-four megapixel PNG costs another ninety megabytes — with two uploads in
+    /// flight, enough to have the process killed and the batch reported as a dropped
+    /// connection.
+    /// </para>
+    /// <para>
+    /// Measured on a small copy. Blur, exposure and clipping are all properties of the
+    /// whole frame and survive being scaled down.
     /// </para>
     /// <para>
     /// Sharpness is the average difference between each pixel and its neighbours: a
@@ -153,11 +165,11 @@ public class ImageProcessor(ILogger<ImageProcessor> logger) : IImageProcessor
     /// which is exactly why what this produces is a suggestion for a person to check.
     /// </para>
     /// </remarks>
-    public ImageQuality? Measure(Stream content)
+    internal ImageQuality? Measure(SKBitmap source)
     {
         try
         {
-            using var grey = DecodeSmallGrey(content);
+            using var grey = ToSmallGrey(source);
 
             if (grey is null)
             {
@@ -240,40 +252,28 @@ public class ImageProcessor(ILogger<ImageProcessor> logger) : IImageProcessor
     /// <summary>The longest edge the measurements are taken at.</summary>
     private const int MeasureEdge = 320;
 
-    private SKBitmap? DecodeSmallGrey(Stream content)
+    /// <summary>
+    /// A small single-channel copy of an already-decoded photograph.
+    /// </summary>
+    /// <remarks>
+    /// One byte per pixel: every measurement here is about light, so the colour channels
+    /// have nothing left to say. Rotation is deliberately not applied — these are all
+    /// whole-frame figures, and turning the pixels round would not change any of them.
+    /// </remarks>
+    private static SKBitmap? ToSmallGrey(SKBitmap source)
     {
-        using var codec = SKCodec.Create(new SKManagedStream(content));
+        var (width, height) = ScaleToFit(source.Width, source.Height, MeasureEdge);
 
-        if (codec is null)
+        // Never upwards: a small photograph is measured at the size it actually is.
+        if (width >= source.Width || height >= source.Height)
         {
-            return null;
+            return source.Copy(SKColorType.Gray8);
         }
 
-        var storedLongest = Math.Max(codec.Info.Width, codec.Info.Height);
-        var desired = storedLongest > MeasureEdge ? (float)MeasureEdge / storedLongest : 1f;
-        var scaled = codec.GetScaledDimensions(desired);
+        using var small = source.Resize(
+            new SKImageInfo(width, height), new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
 
-        // Decoded in colour and converted afterwards. Asking the JPEG codec for a single
-        // grey channel directly is refused outright — it answers InvalidConversion — and
-        // the resulting null would have quietly left every photograph unmeasured.
-        var info = codec.Info.WithSize(scaled.Width, scaled.Height)
-                             .WithColorType(SKColorType.Rgba8888)
-                             .WithAlphaType(SKAlphaType.Premul);
-
-        using var colour = new SKBitmap(info);
-        var result = codec.GetPixels(info, colour.GetPixels());
-
-        if (result is not (SKCodecResult.Success or SKCodecResult.IncompleteInput))
-        {
-            return null;
-        }
-
-        // One byte per pixel from here on: every measurement is about light, so the
-        // colour channels have nothing left to say.
-        //
-        // Rotation is deliberately not applied. These are all whole-frame figures, and
-        // turning the pixels round would not change any of them.
-        return colour.Copy(SKColorType.Gray8);
+        return small?.Copy(SKColorType.Gray8);
     }
 
     /// <summary>

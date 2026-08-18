@@ -38,6 +38,26 @@ public class PhotographRankingTests
         return stream;
     }
 
+    /// <summary>The same, encoded as PNG — the format that cannot be decoded small.</summary>
+    private static MemoryStream Png(Action<SKCanvas, int, int> draw, int width = 800, int height = 600)
+    {
+        using var bitmap = new SKBitmap(width, height);
+
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            draw(canvas, width, height);
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Png, 100);
+
+        var stream = new MemoryStream();
+        data.SaveTo(stream);
+        stream.Position = 0;
+
+        return stream;
+    }
+
     private static void Detailed(SKCanvas canvas, int width, int height)
     {
         // Hard-edged stripes: plenty of detail for the edge measurement to find.
@@ -57,8 +77,8 @@ public class PhotographRankingTests
         using var detailed = Jpeg(Detailed);
         using var flat = Jpeg((canvas, _, _) => canvas.Clear(SKColors.Gray));
 
-        var withDetail = Processor.Measure(detailed);
-        var withoutDetail = Processor.Measure(flat);
+        var withDetail = Processor.Process(detailed).Quality;
+        var withoutDetail = Processor.Process(flat).Quality;
 
         Assert.NotNull(withDetail);
         Assert.NotNull(withoutDetail);
@@ -71,8 +91,8 @@ public class PhotographRankingTests
         using var dark = Jpeg((canvas, _, _) => canvas.Clear(new SKColor(20, 20, 20)));
         using var bright = Jpeg((canvas, _, _) => canvas.Clear(new SKColor(230, 230, 230)));
 
-        var measuredDark = Processor.Measure(dark);
-        var measuredBright = Processor.Measure(bright);
+        var measuredDark = Processor.Process(dark).Quality;
+        var measuredBright = Processor.Process(bright).Quality;
 
         Assert.True(measuredDark!.Exposure < 20);
         Assert.True(measuredBright!.Exposure > 80);
@@ -88,10 +108,68 @@ public class PhotographRankingTests
             canvas.DrawRect(0, 0, width, height / 2f, paint);
         });
 
-        var measured = Processor.Measure(clipped);
+        var measured = Processor.Process(clipped).Quality;
 
         Assert.NotNull(measured);
         Assert.True(measured.Clipping > 80);
+    }
+
+    [Fact]
+    public void A_photograph_is_read_once_however_much_is_learned_from_it()
+    {
+        // The reason this is a test and not a comment: measuring used to be a second
+        // decode of the uploaded file. JPEG can be decoded small almost for free, so it
+        // looked harmless — but PNG cannot be decoded small at all, so a large PNG paid
+        // for a whole extra decode. Two uploads in flight was enough to have the process
+        // killed, which reached the retoucher as "the connection dropped" and no
+        // explanation.
+        //
+        // Counted in bytes rather than in calls, because that is what the memory and the
+        // time actually track. One pass over the file reads it about once; a second decode
+        // reads all of it again.
+        using var png = Png(Detailed);
+        var length = png.Length;
+
+        var reads = new CountingStream(png);
+        var processed = Processor.Process(reads);
+
+        Assert.NotEmpty(processed.Variants);
+        Assert.NotNull(processed.Quality);
+        Assert.True(
+            reads.BytesRead < length * 1.5,
+            $"read {reads.BytesRead} bytes of a {length} byte photograph, which is more than one pass over it");
+    }
+
+    /// <summary>Counts how much of the photograph was actually read.</summary>
+    private sealed class CountingStream(Stream inner) : Stream
+    {
+        public long BytesRead { get; private set; }
+
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            var read = inner.Read(buffer, offset, count);
+            BytesRead += read;
+
+            return read;
+        }
+
+        public override int Read(Span<byte> buffer)
+        {
+            var read = inner.Read(buffer);
+            BytesRead += read;
+
+            return read;
+        }
+
+        public override long Position { get => inner.Position; set => inner.Position = value; }
+        public override long Seek(long offset, SeekOrigin origin) => inner.Seek(offset, origin);
+        public override bool CanRead => inner.CanRead;
+        public override bool CanSeek => inner.CanSeek;
+        public override bool CanWrite => false;
+        public override long Length => inner.Length;
+        public override void Flush() => inner.Flush();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
     [Fact]
@@ -99,7 +177,7 @@ public class PhotographRankingTests
     {
         using var nonsense = new MemoryStream("not a photograph"u8.ToArray());
 
-        Assert.Null(Processor.Measure(nonsense));
+        Assert.Null(Processor.Process(nonsense).Quality);
     }
 
     [Fact]

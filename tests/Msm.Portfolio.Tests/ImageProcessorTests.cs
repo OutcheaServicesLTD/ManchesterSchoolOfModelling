@@ -59,7 +59,7 @@ public class ImageProcessorTests
     {
         using var jpeg = MakeJpeg(3000, 2000);
 
-        var variants = Processor.GenerateVariants(jpeg);
+        var variants = Processor.Process(jpeg).Variants;
 
         Assert.Equal(3, variants.Count);
         Assert.Contains(variants, v => v.Variant == MediaVariant.Large);
@@ -84,7 +84,7 @@ public class ImageProcessorTests
         using var jpeg = MakeJpeg(width, height);
         var sourceRatio = (double)width / height;
 
-        foreach (var variant in Processor.GenerateVariants(jpeg))
+        foreach (var variant in Processor.Process(jpeg).Variants)
         {
             var ratio = (double)variant.Width / variant.Height;
 
@@ -100,7 +100,7 @@ public class ImageProcessorTests
     {
         using var jpeg = MakeJpeg(1000, 4000);
 
-        var thumbnail = Processor.GenerateVariants(jpeg).Single(v => v.Variant == MediaVariant.Thumbnail);
+        var thumbnail = Processor.Process(jpeg).Variants.Single(v => v.Variant == MediaVariant.Thumbnail);
 
         Assert.Equal(400, thumbnail.Height);
         Assert.Equal(100, thumbnail.Width);
@@ -115,7 +115,7 @@ public class ImageProcessorTests
     {
         using var jpeg = MakeJpeg(300, 200);
 
-        foreach (var variant in Processor.GenerateVariants(jpeg))
+        foreach (var variant in Processor.Process(jpeg).Variants)
         {
             Assert.True(variant.Width <= 300, $"{variant.Variant} was enlarged to {variant.Width}px wide.");
             Assert.True(variant.Height <= 200, $"{variant.Variant} was enlarged to {variant.Height}px tall.");

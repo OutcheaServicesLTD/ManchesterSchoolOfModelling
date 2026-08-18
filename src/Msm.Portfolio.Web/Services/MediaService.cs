@@ -183,8 +183,13 @@ public class MediaService(
         buffer.Position = 0;
         var stored = await storage.UploadAsync(buffer, originalKey, file.ContentType, cancellationToken);
 
+        // One pass over one decode: the renditions and the measurements together. Reading
+        // the file a second time simply to measure it is what exhausted memory and dropped
+        // uploads partway through a batch.
         buffer.Position = 0;
-        foreach (var variant in imageProcessor.GenerateVariants(buffer))
+        var processed = imageProcessor.Process(buffer);
+
+        foreach (var variant in processed.Variants)
         {
             using var variantStream = new MemoryStream(variant.Content);
             await storage.UploadAsync(
@@ -194,11 +199,10 @@ public class MediaService(
                 cancellationToken);
         }
 
-        // Measured while the file is still in hand. A photograph that cannot be measured
-        // is stored all the same: the figures only feed a suggested starting selection,
-        // and an unmeasured photograph is ranked as ordinary rather than buried.
-        buffer.Position = 0;
-        var quality = imageProcessor.Measure(buffer);
+        // A photograph that could not be measured is stored all the same: the figures only
+        // feed a suggested starting selection, and an unmeasured photograph is ranked as
+        // ordinary rather than buried.
+        var quality = processed.Quality;
 
         var asset = new MediaAsset
         {
