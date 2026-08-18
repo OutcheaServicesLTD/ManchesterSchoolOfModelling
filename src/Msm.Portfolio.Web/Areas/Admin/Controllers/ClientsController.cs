@@ -8,6 +8,7 @@ using Msm.Portfolio.Web.Configuration;
 using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.Domain.Enums;
+using Msm.Portfolio.Web.Integrations.Bio;
 using Msm.Portfolio.Web.Services;
 using Msm.Portfolio.Web.ViewModels;
 
@@ -32,6 +33,7 @@ public class ClientsController(
     IMaintenanceService maintenance,
     IMeasurementTemplateProvider templates,
     IBiographyDraftService biographies,
+    IBiographyWriter biographyWriter,
     IAuditService audit,
     UserManager<ApplicationUser> userManager,
     IOptions<MediaOptions> mediaOptions,
@@ -73,6 +75,11 @@ public class ClientsController(
         client.Location = model.Location?.Trim();
         client.ModelProfileType = model.ModelProfileType;
         client.Biography = model.Biography?.Trim();
+
+        // Saving is how a suggestion gets accepted, since it is offered in the box rather
+        // than applied behind the scenes.
+        client.CloseBiographyDraftIfSaved();
+
         client.HairColour = model.HairColour?.Trim();
         client.EyeColour = model.EyeColour?.Trim();
         client.UpdatedAt = DateTimeOffset.UtcNow;
@@ -338,6 +345,18 @@ public class ClientsController(
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var brand = brandOptions.Value;
 
+        // A client with no biography is asked about the moment somebody opens their page,
+        // rather than waiting for an approval that may be weeks away — which is what makes
+        // this feel automatic instead of like a button somebody has to know to press.
+        //
+        // Safe to do on a page view: the request is refused unless this is the first time
+        // and the biography is still empty, so opening the same page a hundred times asks
+        // once. The writing itself happens on the worker, so the page does not wait.
+        if (biographyWriter.IsEnabled && client.RequestBiographyDraft())
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
         return new AdminClientDetailViewModel
         {
             ClientId = clientId,
@@ -368,6 +387,7 @@ public class ClientsController(
             GuardianApprovalPending = client.IsBlockedPendingGuardianConsent(today),
             MaintenanceWarning = await maintenance.GetWarningAsync(clientId, cancellationToken),
             PublishBlocker = await portfolios.DescribePublishBlockerAsync(clientId, cancellationToken),
+            BiographyFeatureIsOn = biographyWriter.IsEnabled,
             PublicUrlBase = brand.PublicDomain.TrimEnd('/'),
             HasPaid = await db.Orders.AnyAsync(
                 o => o.ClientId == clientId && o.Status == OrderStatus.Confirmed, cancellationToken),

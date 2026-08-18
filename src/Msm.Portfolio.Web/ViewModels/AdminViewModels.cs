@@ -52,6 +52,16 @@ public class AdminClientDetailViewModel
     /// <summary>Why publishing is not currently possible, or null when it is.</summary>
     public string? PublishBlocker { get; set; }
 
+    /// <summary>
+    /// False when no biography provider is configured.
+    /// </summary>
+    /// <remarks>
+    /// Shown rather than assumed, so the page can say the feature needs setting up
+    /// instead of offering a button that can only ever answer with an error. A control
+    /// that does nothing when pressed reads as broken software, not as a missing setting.
+    /// </remarks>
+    public bool BiographyFeatureIsOn { get; set; }
+
     public string PublicUrlBase { get; set; } = string.Empty;
 
     public List<MediaAssetViewModel> Selected => [.. Assets.Where(a => a.IsSelected)];

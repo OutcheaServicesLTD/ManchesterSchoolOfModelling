@@ -1,18 +1,25 @@
 # Suggested biographies
 
-Two ways in, both ending with a person deciding.
+**It happens by itself.** Open a client who has no biography and one is written for them
+in the background; it appears in the **About me** box, ready to read. Change anything that
+is wrong and press "Save client details" — that is what accepts it, and nothing is
+published until you do.
 
-**The button.** On a client's page, under the **About me** box, "Write one for me" writes
-a biography and puts it in the box. Nothing is stored — it is text in a form until "Save
-client details" is pressed. Press it as many times as you like. If the box already has
-something in it, it asks before replacing it.
+There are two other ways in, for when you want one on demand:
 
-**At approval.** When an administrator approves a portfolio — "Mark ready for viewing" —
-one is written in the background and offered on the client page as a draft, once, to be
-accepted or thrown away.
+- **"Write a different one"**, under the About me box, replaces what is there. Use it as
+  often as you like. If you have typed something yourself it asks before overwriting.
+- **At approval** — "Mark ready for viewing" also asks for one, for any client who somehow
+  has not had one written yet.
 
-Both send the same facts and follow the same rule: a person reads it before it goes
+All three send the same facts and follow the same rule: a person reads it before it goes
 anywhere.
+
+## Nothing happens at all?
+
+The most likely reason by far is that **no API key is configured**. Without one the whole
+feature is off: no biography is written, automatically or otherwise. The About me box says
+so in place of the button. See *Turning it on* below.
 
 ## Why it is a draft and not the biography
 
@@ -44,15 +51,16 @@ it by accident.
 
 ## The rules
 
-These govern the automatic draft at approval. The button is an explicit press, so it has
+These govern the biography written for you. The button is an explicit press, so it has
 none of them except the last: it can be used any time, on anyone, as often as you like.
 
-- **Once.** Requested only on the first approval. Approving again, or sending a portfolio
+- **Once.** Written once per client — on the first visit to their page, or on approval,
+  whichever comes first. Visiting again does not write another. Approving again, or sending a portfolio
   back to the retoucher and approving it a second time, does not produce another.
 - **Never over the top of a person.** A client who already has a biography is skipped
   entirely — that text was written or approved by somebody.
-- **Never automatic.** A draft becomes the biography when an administrator presses "Use
-  this biography", and is still editable afterwards.
+- **Never published by itself.** It arrives in the About me box and becomes the
+  biography when somebody presses Save, having had the chance to change it.
 - **Thrown away means finished.** Discarding a draft closes it; another is not offered.
 - **Off by default.** With no API key, no draft is ever requested — not queued, not
   failed, not anything.

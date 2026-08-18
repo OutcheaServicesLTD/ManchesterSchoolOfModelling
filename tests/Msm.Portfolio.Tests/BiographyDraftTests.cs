@@ -219,6 +219,40 @@ public class BiographyDraftTests : IDisposable
         Assert.DoesNotContain("2000-01-01", sent);
     }
 
+    [Fact]
+    public void Saving_the_biography_finishes_with_the_suggestion()
+    {
+        // The suggestion is offered in the About me box, so pressing Save is what accepts
+        // it. Left open, the box would refill itself on the next visit and offer the
+        // suggestion again over text somebody had already written.
+        var client = Client();
+        client.BiographyDraftStatus = BiographyDraftStatus.Ready;
+        client.BiographyDraft = "A suggestion.";
+        client.Biography = "A suggestion, lightly edited.";
+
+        client.CloseBiographyDraftIfSaved();
+
+        Assert.Equal(BiographyDraftStatus.Closed, client.BiographyDraftStatus);
+        Assert.Null(client.BiographyDraft);
+        Assert.Equal("A suggestion, lightly edited.", client.Biography);
+    }
+
+    [Fact]
+    public void Saving_an_empty_biography_leaves_the_suggestion_waiting()
+    {
+        // Somebody who cleared the box and saved has not accepted anything, so the
+        // suggestion is still there next time.
+        var client = Client();
+        client.BiographyDraftStatus = BiographyDraftStatus.Ready;
+        client.BiographyDraft = "A suggestion.";
+        client.Biography = "   ";
+
+        client.CloseBiographyDraftIfSaved();
+
+        Assert.Equal(BiographyDraftStatus.Ready, client.BiographyDraftStatus);
+        Assert.Equal("A suggestion.", client.BiographyDraft);
+    }
+
     // ── The button on the form ───────────────────────────────────────────────────
 
     [Fact]

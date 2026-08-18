@@ -96,8 +96,12 @@
             </dd>
         </dl>
 
-        @if (Model.Client.BiographyDraftStatus == BiographyDraftStatus.Ready
-     && !string.IsNullOrWhiteSpace(Model.Client.BiographyDraft))
+        @* Only when the About me box is already occupied. When it is empty the suggestion goes
+   straight into the box further down, and showing it twice would be two of the same
+   thing with two different sets of buttons. *@
+@if (Model.Client.BiographyDraftStatus == BiographyDraftStatus.Ready
+     && !string.IsNullOrWhiteSpace(Model.Client.BiographyDraft)
+     && !string.IsNullOrWhiteSpace(Model.Client.Biography))
 {
     @* A suggestion, never the published biography. This text describes a real person and
        is what an agency reads about them, so somebody reads it before it goes anywhere. *@
@@ -432,29 +436,80 @@ else
                         <input asp-for="@edit.EyeColour" name="EyeColour" class="form-control" />
                     </div>
                 </div>
+                @{
+                    // A biography that has been written and not yet used fills the box on
+                    // its own. That is the whole point of it being automatic: open the
+                    // client and it is already there, waiting to be read and saved.
+                    //
+                    // Put into the edit model rather than into the element's content,
+                    // because asp-for on a textarea writes the model value over whatever is
+                    // between the tags — the content is ignored and the box renders empty.
+                    var suggested = Model.Client.BiographyDraftStatus == BiographyDraftStatus.Ready
+                        && !string.IsNullOrWhiteSpace(Model.Client.BiographyDraft)
+                        && string.IsNullOrWhiteSpace(edit.Biography);
+
+                    if (suggested)
+                    {
+                        edit.Biography = Model.Client.BiographyDraft;
+                    }
+                }
+
                 <div class="mb-3">
                     <label asp-for="@edit.Biography" class="form-label"></label>
                     <textarea asp-for="@edit.Biography" name="Biography" class="form-control" rows="4"
                               id="biography-box"></textarea>
 
-                    @* Hidden until script reveals it: without script it could not do
-                       anything, and the box is perfectly usable by typing. *@
-                    <div class="d-flex align-items-center gap-2 flex-wrap mt-2">
-                        <button type="button" class="btn btn-outline-secondary btn-sm d-none"
-                                data-suggest-bio
-                                data-suggest-url="/admin/clients/@Model.ClientId/biography/suggest"
-                                data-suggest-token="@token"
-                                data-suggest-target="biography-box">
-                            Write one for me
-                        </button>
-                        <span class="form-text mb-0" data-suggest-status aria-live="polite"></span>
-                    </div>
+                    @if (suggested)
+                    {
+                        <p class="form-text mb-0">
+                            <strong>This was written for you.</strong> Read it, change
+                            anything that is wrong, then press Save client details. It is
+                            not saved and nothing is published until you do.
+                        </p>
+                    }
 
-                    <p class="form-text mb-0">
-                        Written from this client's details and measurements. It cannot know
-                        anything the studio has not recorded, so read it and change whatever
-                        is wrong — nothing is saved until you press Save client details.
-                    </p>
+                    @if (Model.BiographyFeatureIsOn)
+                    {
+                        @* Hidden until script reveals it: without script it could not do
+                           anything, and the box is perfectly usable by typing. *@
+                        <div class="d-flex align-items-center gap-2 flex-wrap mt-2">
+                            <button type="button" class="btn btn-outline-secondary btn-sm d-none"
+                                    data-suggest-bio
+                                    data-suggest-url="/admin/clients/@Model.ClientId/biography/suggest"
+                                    data-suggest-token="@token"
+                                    data-suggest-target="biography-box">
+                                @(suggested ? "Write a different one" : "Write one for me")
+                            </button>
+                            <span class="form-text mb-0" data-suggest-status aria-live="polite"></span>
+                        </div>
+
+                        @if (!suggested
+                             && Model.Client.BiographyDraftStatus == BiographyDraftStatus.Pending)
+                        {
+                            <p class="form-text mb-0">
+                                A biography is being written for this client and will appear
+                                here within a minute or so. Refresh the page to see it.
+                            </p>
+                        }
+                        else if (!suggested)
+                        {
+                            <p class="form-text mb-0">
+                                Written from this client's details and measurements. It cannot
+                                know anything the studio has not recorded, so read it and change
+                                whatever is wrong — nothing is saved until you press Save client
+                                details.
+                            </p>
+                        }
+                    }
+                    else
+                    {
+                        @* No provider, so no button. Offering one that can only ever answer
+                           "not configured" makes working software look broken. *@
+                        <p class="form-text mb-0">
+                            Biographies are not being written automatically yet — this needs an
+                            API key setting up before it can. Until then, type one here.
+                        </p>
+                    }
                 </div>
                 <button type="submit" class="btn btn-primary">Save client details</button>
             </form>

@@ -161,6 +161,27 @@ public class ClientProfile
     /// Refused in every state but the first, so approving a portfolio a second time — or
     /// an administrator who has already thrown one draft away — does not produce another.
     /// </remarks>
+    /// <summary>
+    /// Finishes with a suggestion once the biography has been saved.
+    /// </summary>
+    /// <remarks>
+    /// Saving a biography is how a suggestion gets accepted, because the suggestion is
+    /// put into the box for editing rather than applied behind the scenes. Without this
+    /// the box would keep refilling itself on every visit, and the suggestion would be
+    /// offered again over text somebody had already written.
+    /// </remarks>
+    public void CloseBiographyDraftIfSaved()
+    {
+        if (BiographyDraftStatus is not BiographyDraftStatus.Ready
+            || string.IsNullOrWhiteSpace(Biography))
+        {
+            return;
+        }
+
+        BiographyDraft = null;
+        BiographyDraftStatus = BiographyDraftStatus.Closed;
+    }
+
     public bool RequestBiographyDraft()
     {
         if (BiographyDraftStatus is not BiographyDraftStatus.NotRequested
