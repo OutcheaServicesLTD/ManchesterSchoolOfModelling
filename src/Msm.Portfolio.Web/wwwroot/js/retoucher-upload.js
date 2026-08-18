@@ -267,28 +267,99 @@
         });
     }
 
-    input.addEventListener('change', function () {
-        handle(input.files);
-        input.value = '';
-    });
-
-    ['dragenter', 'dragover'].forEach(function (name) {
-        dropZone.addEventListener(name, function (event) {
-            event.preventDefault();
-            dropZone.classList.add('is-dropping');
+    // Absent when the library is full: there is a notice where the button was. The
+    // drop handlers below still run, so photographs dropped on a full library are
+    // answered with a reason rather than with silence.
+    if (input) {
+        input.addEventListener('change', function () {
+            handle(input.files);
+            input.value = '';
         });
+    }
+
+    // ── Dropping photographs in ─────────────────────────────────────────────────
+    //
+    // The whole page is the target, not just the dashed box. Aiming a dragged handful
+    // of files at one rectangle is a needless piece of precision, and a drop that lands
+    // an inch outside it does not fail — the browser navigates away to the photograph
+    // instead, or nothing happens at all and there is no way to tell which. Either way
+    // the retoucher is left looking at a page that appears to have ignored them.
+    //
+    // The dashed box still lights up, so it stays obvious where the photographs are
+    // going; it is the aiming that is no longer required.
+
+    // Only drags carrying files. A portfolio tile being dragged into a new place is
+    // also a drag, and hijacking it here would break reordering.
+    function carriesFiles(event) {
+        const transfer = event.dataTransfer;
+
+        if (!transfer) {
+            return false;
+        }
+
+        return transfer.types
+            ? Array.prototype.indexOf.call(transfer.types, 'Files') !== -1
+            : true;
+    }
+
+    let overCount = 0;
+
+    function showDropping(active) {
+        dropZone.classList.toggle('is-dropping', active);
+    }
+
+    // Counted rather than set and cleared: moving the pointer between two elements
+    // fires dragleave on the one being left after dragenter on the one being entered,
+    // so a plain flag flickers off over every boundary the pointer crosses.
+    window.addEventListener('dragenter', function (event) {
+        if (!carriesFiles(event)) {
+            return;
+        }
+
+        event.preventDefault();
+        overCount += 1;
+        showDropping(true);
     });
 
-    ['dragleave', 'drop'].forEach(function (name) {
-        dropZone.addEventListener(name, function (event) {
-            event.preventDefault();
-            dropZone.classList.remove('is-dropping');
-        });
+    window.addEventListener('dragover', function (event) {
+        if (!carriesFiles(event)) {
+            return;
+        }
+
+        // Without this the browser refuses the drop and opens the photograph instead,
+        // replacing the workspace with a picture and losing everything queued.
+        event.preventDefault();
+        showDropping(true);
     });
 
-    dropZone.addEventListener('drop', function (event) {
-        if (event.dataTransfer && event.dataTransfer.files) {
+    window.addEventListener('dragleave', function (event) {
+        if (!carriesFiles(event)) {
+            return;
+        }
+
+        overCount = Math.max(0, overCount - 1);
+
+        if (overCount === 0) {
+            showDropping(false);
+        }
+    });
+
+    window.addEventListener('drop', function (event) {
+        if (!carriesFiles(event)) {
+            return;
+        }
+
+        event.preventDefault();
+        overCount = 0;
+        showDropping(false);
+
+        if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
             handle(event.dataTransfer.files);
+
+            // The list of what is happening lives further down the page on a long
+            // library, and a drop that scrolls nothing looks like a drop that did
+            // nothing.
+            dropZone.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     });
 })();
