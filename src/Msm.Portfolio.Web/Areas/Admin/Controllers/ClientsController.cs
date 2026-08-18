@@ -124,6 +124,33 @@ public class ClientsController(
     /// accepting one is: it copies the suggestion into the biography, where it can still
     /// be edited before anything is published.
     /// </remarks>
+    /// <summary>
+    /// Writes a biography for the About me box, on request.
+    /// </summary>
+    /// <remarks>
+    /// Answers in JSON and stores nothing. The text lands in the box on the form, where
+    /// the person who asked for it reads it, changes what is wrong and saves — so the
+    /// biography is still theirs, not something that appeared on a public page by itself.
+    /// <para>
+    /// Runs inside the request, unlike the draft offered at approval, because somebody is
+    /// sitting there waiting for it. That is the whole difference between the two.
+    /// </para>
+    /// </remarks>
+    [HttpPost("biography/suggest")]
+    [Authorize(Policy = Permissions.Clients.Edit)]
+    public async Task<IActionResult> SuggestBiography(
+        Guid clientId, CancellationToken cancellationToken = default)
+    {
+        var result = await biographies.SuggestNowAsync(clientId, cancellationToken);
+
+        return Json(new
+        {
+            succeeded = result.Succeeded,
+            text = result.Text,
+            error = result.Error
+        });
+    }
+
     [HttpPost("biography/accept")]
     [Authorize(Policy = Permissions.Clients.Edit)]
     public async Task<IActionResult> AcceptBiography(

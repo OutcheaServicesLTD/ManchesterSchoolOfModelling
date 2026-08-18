@@ -219,6 +219,79 @@ public class BiographyDraftTests : IDisposable
         Assert.DoesNotContain("2000-01-01", sent);
     }
 
+    // ── The button on the form ───────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Writing_one_on_request_stores_nothing()
+    {
+        // The text goes into the box on the form. Saving is a separate press, made by the
+        // person who read it.
+        var writer = new FakeBiographyWriter(text: "Emma is based in Manchester.");
+
+        var result = await Service(writer).SuggestNowAsync(_clientId);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal("Emma is based in Manchester.", result.Text);
+
+        var client = Client();
+        Assert.Null(client.Biography);
+        Assert.Null(client.BiographyDraft);
+        Assert.Equal(BiographyDraftStatus.NotRequested, client.BiographyDraftStatus);
+    }
+
+    [Fact]
+    public async Task Writing_one_on_request_can_be_done_more_than_once()
+    {
+        // Unlike the draft offered at approval, this is somebody pressing a button. If
+        // they do not like what came back, pressing it again is the obvious thing to try.
+        var writer = new FakeBiographyWriter();
+
+        await Service(writer).SuggestNowAsync(_clientId);
+        await Service(writer).SuggestNowAsync(_clientId);
+
+        Assert.Equal(2, writer.Calls);
+    }
+
+    [Fact]
+    public async Task Writing_one_on_request_says_so_when_the_feature_is_off()
+    {
+        var result = await Service(new FakeBiographyWriter(enabled: false)).SuggestNowAsync(_clientId);
+
+        Assert.False(result.Succeeded);
+        Assert.Contains("configured", result.Error);
+    }
+
+    [Fact]
+    public async Task Writing_one_for_a_client_that_does_not_exist_says_so()
+    {
+        var writer = new FakeBiographyWriter();
+
+        var result = await Service(writer).SuggestNowAsync(Guid.CreateVersion7());
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(0, writer.Calls);
+    }
+
+    [Fact]
+    public async Task Both_routes_send_exactly_the_same_facts()
+    {
+        // One assembly of the facts, used by both, so what leaves the building cannot
+        // differ depending on which button somebody pressed.
+        var onRequest = new FakeBiographyWriter();
+        await Service(onRequest).SuggestNowAsync(_clientId);
+
+        var client = Client();
+        client.RequestBiographyDraft();
+        await _db.SaveChangesAsync();
+
+        var atApproval = new FakeBiographyWriter();
+        await Service(atApproval).WritePendingAsync();
+
+        Assert.Equal(
+            System.Text.Json.JsonSerializer.Serialize(onRequest.LastFacts),
+            System.Text.Json.JsonSerializer.Serialize(atApproval.LastFacts));
+    }
+
     // ── When it goes wrong ───────────────────────────────────────────────────────
 
     [Fact]

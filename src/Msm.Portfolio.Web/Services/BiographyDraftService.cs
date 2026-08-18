@@ -15,6 +15,17 @@ public interface IBiographyDraftService
     Task<BiographyDraftSummary> WritePendingAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
+    /// Writes a biography on demand, for a member of staff who pressed the button and is
+    /// waiting for it. Returns the text without storing anything.
+    /// </summary>
+    /// <remarks>
+    /// Nothing is saved here. The text goes into the box on the form for the person who
+    /// asked to read, change and then save themselves — which is the same rule as the
+    /// draft offered at approval, arrived at from the other direction.
+    /// </remarks>
+    Task<BiographyDraftResult> SuggestNowAsync(Guid clientId, CancellationToken cancellationToken = default);
+
+    /// <summary>
     /// Puts an accepted draft into the biography itself, and closes it either way.
     /// </summary>
     Task<bool> ResolveAsync(
@@ -58,39 +69,8 @@ public class BiographyDraftService(
 
         foreach (var client in due)
         {
-            var photographs = await db.MediaAssets.CountAsync(
-                m => m.ClientId == client.Id && !m.IsDeleted
-                     && m.MediaType == MediaType.Image && m.IsSelectedForPortfolio,
-                cancellationToken);
-
-            var hasSelfTape = await db.MediaAssets.AnyAsync(
-                m => m.ClientId == client.Id && !m.IsDeleted && m.MediaType == MediaType.SelfTape,
-                cancellationToken);
-
-            var template = templates.GetTemplate(client.ModelProfileType);
-
-            var facts = new BiographyFacts(
-                client.PublicName,
-                client.Location,
-                client.AgeOn(DateOnly.FromDateTime(DateTime.UtcNow)),
-                client.ModelProfileType.ToString(),
-                [
-                    .. client.Measurements
-                        .OrderBy(m => m.DisplayOrder)
-                        .Select(m => new BiographyMeasurement(
-                            template.FirstOrDefault(f => f.Key == m.MeasurementType)?.Label ?? m.MeasurementType,
-                            m.Value,
-                            m.Unit switch
-                            {
-                                MeasurementUnit.Centimetres => "cm",
-                                MeasurementUnit.Inches => "in",
-                                _ => null
-                            }))
-                ],
-                hasSelfTape,
-                photographs);
-
-            var result = await writer.WriteAsync(facts, cancellationToken);
+            var result = await writer.WriteAsync(
+                await BuildFactsAsync(client, cancellationToken), cancellationToken);
 
             client.BiographyDraftAttempts++;
 
@@ -133,6 +113,77 @@ public class BiographyDraftService(
         await db.SaveChangesAsync(cancellationToken);
 
         return new BiographyDraftSummary(succeeded, failed, due.Count);
+    }
+
+    public async Task<BiographyDraftResult> SuggestNowAsync(
+        Guid clientId, CancellationToken cancellationToken = default)
+    {
+        if (!writer.IsEnabled)
+        {
+            return new BiographyDraftResult(false, null, "No biography provider is configured.");
+        }
+
+        var client = await db.ClientProfiles
+            .Include(c => c.Measurements)
+            .FirstOrDefaultAsync(c => c.Id == clientId, cancellationToken);
+
+        if (client is null)
+        {
+            return new BiographyDraftResult(false, null, "That client could not be found.");
+        }
+
+        var result = await writer.WriteAsync(
+            await BuildFactsAsync(client, cancellationToken), cancellationToken);
+
+        // Recorded because it happened and it cost something, but the text itself is not
+        // stored: it is going into a box on a form that nobody has saved yet.
+        audit.Record(nameof(ClientProfile), clientId.ToString(), "BiographySuggested");
+        await db.SaveChangesAsync(cancellationToken);
+
+        return result;
+    }
+
+    /// <summary>
+    /// The facts, and only the facts, that the writer is given.
+    /// </summary>
+    /// <remarks>
+    /// One place, used by both the draft offered at approval and the button on the form,
+    /// so what leaves the building cannot differ between them.
+    /// </remarks>
+    private async Task<BiographyFacts> BuildFactsAsync(
+        ClientProfile client, CancellationToken cancellationToken)
+    {
+        var photographs = await db.MediaAssets.CountAsync(
+            m => m.ClientId == client.Id && !m.IsDeleted
+                 && m.MediaType == MediaType.Image && m.IsSelectedForPortfolio,
+            cancellationToken);
+
+        var hasSelfTape = await db.MediaAssets.AnyAsync(
+            m => m.ClientId == client.Id && !m.IsDeleted && m.MediaType == MediaType.SelfTape,
+            cancellationToken);
+
+        var template = templates.GetTemplate(client.ModelProfileType);
+
+        return new BiographyFacts(
+            client.PublicName,
+            client.Location,
+            client.AgeOn(DateOnly.FromDateTime(DateTime.UtcNow)),
+            client.ModelProfileType.ToString(),
+            [
+                .. client.Measurements
+                    .OrderBy(m => m.DisplayOrder)
+                    .Select(m => new BiographyMeasurement(
+                        template.FirstOrDefault(f => f.Key == m.MeasurementType)?.Label ?? m.MeasurementType,
+                        m.Value,
+                        m.Unit switch
+                        {
+                            MeasurementUnit.Centimetres => "cm",
+                            MeasurementUnit.Inches => "in",
+                            _ => null
+                        }))
+            ],
+            hasSelfTape,
+            photographs);
     }
 
     public async Task<bool> ResolveAsync(

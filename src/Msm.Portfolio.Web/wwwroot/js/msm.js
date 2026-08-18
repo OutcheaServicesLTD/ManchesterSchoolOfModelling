@@ -321,6 +321,94 @@
             show();
         })();
 
+        // ── Writing a biography into the About me box ────────────────────────────
+        // The text lands in the box and stops there. Saving is a separate press, made by
+        // the person who read it — which is what keeps the biography theirs rather than
+        // something that appeared on a public page by itself.
+        (function () {
+            var button = document.querySelector('[data-suggest-bio]');
+
+            if (!button) {
+                return;
+            }
+
+            var box = document.getElementById(button.getAttribute('data-suggest-target'));
+            var status = document.querySelector('[data-suggest-status]');
+
+            if (!box) {
+                return;
+            }
+
+            button.classList.remove('d-none');
+
+            function say(message) {
+                if (status) {
+                    status.textContent = message;
+                }
+            }
+
+            button.addEventListener('click', function () {
+                // Losing something already typed to a button press is not a fair trade,
+                // so the box being occupied is a question rather than an overwrite.
+                if (box.value.trim().length > 0
+                    && !window.confirm('Replace what is already in the About me box?')) {
+                    return;
+                }
+
+                var restore = button.textContent;
+
+                button.disabled = true;
+                button.textContent = 'Writing…';
+                say('Writing a biography. This takes a few seconds.');
+
+                var request = new XMLHttpRequest();
+                request.open('POST', button.getAttribute('data-suggest-url'));
+                request.setRequestHeader('RequestVerificationToken',
+                    button.getAttribute('data-suggest-token'));
+
+                function done(message) {
+                    button.disabled = false;
+                    button.textContent = restore;
+                    say(message);
+                }
+
+                request.addEventListener('load', function () {
+                    var payload = null;
+
+                    try {
+                        payload = JSON.parse(request.responseText);
+                    } catch (e) {
+                        payload = null;
+                    }
+
+                    if (request.status !== 200 || payload === null) {
+                        // A signed-out session answers with a sign-in page rather than
+                        // JSON, so say that instead of "try again".
+                        done(payload === null
+                            ? 'Your session may have expired. Reload the page and sign in again.'
+                            : 'That did not work.');
+
+                        return;
+                    }
+
+                    if (!payload.succeeded) {
+                        done(payload.error || 'A biography could not be written.');
+                        return;
+                    }
+
+                    box.value = payload.text;
+                    box.focus();
+                    done('Written. Read it, change anything wrong, then press Save client details.');
+                });
+
+                request.addEventListener('error', function () {
+                    done('Could not reach the server. Try again.');
+                });
+
+                request.send();
+            });
+        })();
+
         // ── Copy a value to the clipboard ────────────────────────────────────────
         // The model's own portfolio address, so they can paste it into a message.
         document.querySelectorAll('[data-copy-target]').forEach(function (button) {

@@ -1,8 +1,18 @@
 # Suggested biographies
 
-When an administrator approves a portfolio — "Mark ready for viewing" — the system can
-suggest a biography for that model. It is written once, offered as a draft, and published
-only if somebody accepts it.
+Two ways in, both ending with a person deciding.
+
+**The button.** On a client's page, under the **About me** box, "Write one for me" writes
+a biography and puts it in the box. Nothing is stored — it is text in a form until "Save
+client details" is pressed. Press it as many times as you like. If the box already has
+something in it, it asks before replacing it.
+
+**At approval.** When an administrator approves a portfolio — "Mark ready for viewing" —
+one is written in the background and offered on the client page as a draft, once, to be
+accepted or thrown away.
+
+Both send the same facts and follow the same rule: a person reads it before it goes
+anywhere.
 
 ## Why it is a draft and not the biography
 
@@ -33,6 +43,9 @@ small explicit record rather than the client row, so a field added later cannot 
 it by accident.
 
 ## The rules
+
+These govern the automatic draft at approval. The button is an explicit press, so it has
+none of them except the last: it can be used any time, on anyone, as often as you like.
 
 - **Once.** Requested only on the first approval. Approving again, or sending a portfolio
   back to the retoucher and approving it a second time, does not produce another.
@@ -77,8 +90,9 @@ stays available throughout.
 ## What is not verified
 
 The request shape is exercised against the live API — an incorrect key is rejected with a
-401, which is the API answering — but **no biography has been generated end to end from
-this repository**, because no API key was available when the feature was built. Before
+401, which is the API answering, and that rejection is what the button reports on screen —
+but **no biography has been generated end to end from this repository**, because no API
+key was available when the feature was built. Before
 relying on it, turn it on for one client and read what comes back. Check in particular
 that nothing in the text is invented: a credit, an agency, a brand, an ambition, or any
 claim about experience.

@@ -3,8 +3,10 @@
 @using Msm.Portfolio.Web.Authorization
 @using Msm.Portfolio.Web.Domain.Enums
 @inject IAuthorizationService Auth
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
     ViewData["Title"] = Model.Client.PublicName;
+    var token = Antiforgery.GetAndStoreTokens(Context).RequestToken;
     var saved = TempData["Saved"] as string;
     var error = TempData["Error"] as string;
     var edit = Model.ToEditModel();
@@ -432,7 +434,27 @@ else
                 </div>
                 <div class="mb-3">
                     <label asp-for="@edit.Biography" class="form-label"></label>
-                    <textarea asp-for="@edit.Biography" name="Biography" class="form-control" rows="4"></textarea>
+                    <textarea asp-for="@edit.Biography" name="Biography" class="form-control" rows="4"
+                              id="biography-box"></textarea>
+
+                    @* Hidden until script reveals it: without script it could not do
+                       anything, and the box is perfectly usable by typing. *@
+                    <div class="d-flex align-items-center gap-2 flex-wrap mt-2">
+                        <button type="button" class="btn btn-outline-secondary btn-sm d-none"
+                                data-suggest-bio
+                                data-suggest-url="/admin/clients/@Model.ClientId/biography/suggest"
+                                data-suggest-token="@token"
+                                data-suggest-target="biography-box">
+                            Write one for me
+                        </button>
+                        <span class="form-text mb-0" data-suggest-status aria-live="polite"></span>
+                    </div>
+
+                    <p class="form-text mb-0">
+                        Written from this client's details and measurements. It cannot know
+                        anything the studio has not recorded, so read it and change whatever
+                        is wrong — nothing is saved until you press Save client details.
+                    </p>
                 </div>
                 <button type="submit" class="btn btn-primary">Save client details</button>
             </form>
