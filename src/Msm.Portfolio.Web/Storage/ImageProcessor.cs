@@ -6,6 +6,20 @@ namespace Msm.Portfolio.Web.Storage;
 /// <summary>What was learned about an image while processing it.</summary>
 public record ImageDetails(int Width, int Height, MediaOrientation Orientation);
 
+/// <summary>
+/// What can be measured about a photograph without judging what is in it.
+/// </summary>
+/// <remarks>
+/// Every figure here describes the picture as a picture: how much fine detail it holds,
+/// how bright it is, how much tonal range it uses, and how much of it has been pushed to
+/// pure black or pure white. Nothing here is about the person in the frame, and nothing
+/// here should be — sorting people by appearance is not a thing this software does.
+/// <para>
+/// Each is a percentage, so a stored value is readable on its own.
+/// </para>
+/// </remarks>
+public record ImageQuality(int Sharpness, int Exposure, int Contrast, int Clipping);
+
 /// <summary>A generated web rendition, ready to be written to storage.</summary>
 public record GeneratedVariant(MediaVariant Variant, byte[] Content, int Width, int Height)
 {
@@ -22,6 +36,11 @@ public interface IImageProcessor
     /// among them: it is archived exactly as uploaded.
     /// </summary>
     IReadOnlyList<GeneratedVariant> GenerateVariants(Stream content);
+
+    /// <summary>
+    /// Measures the technical qualities of a photograph, or null if it cannot be read.
+    /// </summary>
+    ImageQuality? Measure(Stream content);
 }
 
 /// <summary>
@@ -116,6 +135,145 @@ public class ImageProcessor(ILogger<ImageProcessor> logger) : IImageProcessor
         }
 
         return generated;
+    }
+
+    /// <summary>
+    /// Measures how sharp, how bright and how contrasty a photograph is.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Measured on a small decode. Blur, exposure and clipping are all properties of the
+    /// whole frame and survive being scaled down, so there is nothing to gain from
+    /// reading sixty megapixels to learn four numbers.
+    /// </para>
+    /// <para>
+    /// Sharpness is the average difference between each pixel and its neighbours: a
+    /// photograph in focus has hard edges and a blurred one does not. It is a measure of
+    /// detail, not of subject — a sharp photograph of the wrong thing still scores well,
+    /// which is exactly why what this produces is a suggestion for a person to check.
+    /// </para>
+    /// </remarks>
+    public ImageQuality? Measure(Stream content)
+    {
+        try
+        {
+            using var grey = DecodeSmallGrey(content);
+
+            if (grey is null)
+            {
+                return null;
+            }
+
+            var width = grey.Width;
+            var height = grey.Height;
+            var pixels = grey.GetPixelSpan();
+
+            if (width < 3 || height < 3 || pixels.Length < width * height)
+            {
+                return null;
+            }
+
+            double total = 0;
+            double totalSquared = 0;
+            var clipped = 0;
+            var count = width * height;
+
+            for (var i = 0; i < count; i++)
+            {
+                double value = pixels[i];
+
+                total += value;
+                totalSquared += value * value;
+
+                // Pure black and pure white hold no detail at all: whatever was there has
+                // been lost and cannot be brought back in retouching.
+                if (value <= 3 || value >= 252)
+                {
+                    clipped++;
+                }
+            }
+
+            var mean = total / count;
+            var variance = Math.Max(0, (totalSquared / count) - (mean * mean));
+
+            // The Laplacian: how much each pixel differs from the four around it. Edges
+            // are large, flat areas are near zero, so a blurred frame averages low.
+            double edges = 0;
+            var edgeCount = 0;
+
+            for (var y = 1; y < height - 1; y++)
+            {
+                var row = y * width;
+
+                for (var x = 1; x < width - 1; x++)
+                {
+                    var here = pixels[row + x] * 4;
+                    var around = pixels[row + x - 1] + pixels[row + x + 1]
+                        + pixels[row - width + x] + pixels[row + width + x];
+
+                    edges += Math.Abs(here - around);
+                    edgeCount++;
+                }
+            }
+
+            var sharpness = edgeCount == 0 ? 0 : edges / edgeCount;
+
+            return new ImageQuality(
+                // Scaled so an ordinary in-focus photograph lands in the middle of the
+                // range rather than at one end, where nothing could be told apart.
+                Sharpness: Percent(sharpness / 40.0 * 100.0),
+                Exposure: Percent(mean / 255.0 * 100.0),
+                Contrast: Percent(Math.Sqrt(variance) / 80.0 * 100.0),
+                Clipping: Percent((double)clipped / count * 100.0));
+        }
+        catch (Exception ex)
+        {
+            // A photograph that cannot be measured is still a perfectly good photograph;
+            // it simply goes unranked.
+            logger.LogWarning(ex, "Could not measure an uploaded image.");
+            return null;
+        }
+    }
+
+    private static int Percent(double value) => (int)Math.Round(Math.Clamp(value, 0, 100));
+
+    /// <summary>The longest edge the measurements are taken at.</summary>
+    private const int MeasureEdge = 320;
+
+    private SKBitmap? DecodeSmallGrey(Stream content)
+    {
+        using var codec = SKCodec.Create(new SKManagedStream(content));
+
+        if (codec is null)
+        {
+            return null;
+        }
+
+        var storedLongest = Math.Max(codec.Info.Width, codec.Info.Height);
+        var desired = storedLongest > MeasureEdge ? (float)MeasureEdge / storedLongest : 1f;
+        var scaled = codec.GetScaledDimensions(desired);
+
+        // Decoded in colour and converted afterwards. Asking the JPEG codec for a single
+        // grey channel directly is refused outright — it answers InvalidConversion — and
+        // the resulting null would have quietly left every photograph unmeasured.
+        var info = codec.Info.WithSize(scaled.Width, scaled.Height)
+                             .WithColorType(SKColorType.Rgba8888)
+                             .WithAlphaType(SKAlphaType.Premul);
+
+        using var colour = new SKBitmap(info);
+        var result = codec.GetPixels(info, colour.GetPixels());
+
+        if (result is not (SKCodecResult.Success or SKCodecResult.IncompleteInput))
+        {
+            return null;
+        }
+
+        // One byte per pixel from here on: every measurement is about light, so the
+        // colour channels have nothing left to say.
+        //
+        // Rotation is deliberately not applied. These are all whole-frame figures, and
+        // turning the pixels round would not change any of them.
+        return colour.Copy(SKColorType.Gray8);
     }
 
     /// <summary>

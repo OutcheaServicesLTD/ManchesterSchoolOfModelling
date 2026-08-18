@@ -352,6 +352,11 @@ public class WorkspaceController(
 
         var options = mediaOptions.Value;
         var pool = await media.GetPoolAsync(clientId, cancellationToken);
+
+        // Worked out here rather than in the page: the rule is one thing, in one place,
+        // and the page only ticks what it chose.
+        var room = options.PortfolioImageLimit - pool.Count(a => a.IsSelectedForPortfolio);
+        var suggested = PhotographRanking.Suggest(pool, room).ToHashSet();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var assignment = await retouchers.GetAssignmentAsync(clientId, cancellationToken);
 
@@ -373,7 +378,8 @@ public class WorkspaceController(
                     Width = a.Width,
                     Height = a.Height,
                     FocalPointX = a.FocalPointX,
-                    FocalPointY = a.FocalPointY
+                    FocalPointY = a.FocalPointY,
+                    IsSuggested = suggested.Contains(a.Id)
                 })
             ],
             PoolLimit = options.MediaPoolImageLimit,

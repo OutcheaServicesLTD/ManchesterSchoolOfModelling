@@ -201,6 +201,16 @@ else
                 <label class="form-check-label" for="pick-all">Select all</label>
             </div>
 
+            @* Ticks a suggested set rather than adding it. Nothing is saved until the
+               retoucher looks at the choice and presses the button themselves. *@
+            @* Hidden until script reveals it: without script it could not do anything,
+               and an inert button is worse than no button. The picker itself works
+               either way. *@
+            <button type="button" class="btn btn-outline-secondary d-none" data-pick-suggest
+                    @(Model.PortfolioIsFull ? "disabled" : "")>
+                Suggest a selection
+            </button>
+
             <span class="eyebrow" data-pick-count aria-live="polite">None chosen</span>
 
             <button type="submit" class="btn btn-primary" data-pick-submit disabled
@@ -208,6 +218,13 @@ else
                 Add to portfolio
             </button>
         </div>
+
+        <p class="form-text mt-2">
+            <strong>Suggest a selection</strong> ticks the photographs that hold up next
+            to the best of what you uploaded — sharp, well exposed, and with nothing lost
+            to pure black or pure white. It judges the picture, never the person in it,
+            so look through the choice and change whatever you like before adding.
+        </p>
 
         <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
             @foreach (var asset in Model.Unselected)
@@ -219,6 +236,7 @@ else
                         <label class="pick-tile">
                             <input class="form-check-input pick" type="checkbox"
                                    name="assetIds" value="@asset.Id" data-pick
+                                   @(asset.IsSuggested ? "data-pick-suggested" : "")
                                    @(Model.PortfolioIsFull ? "disabled" : "") />
                             <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
                                  style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"

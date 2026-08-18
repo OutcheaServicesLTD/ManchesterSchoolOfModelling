@@ -32,6 +32,12 @@ public class MediaAssetViewModel
         Width is > 0 && Height is > 0 ? $"{Width} / {Height}" : "3 / 4";
 
     public bool HasFocalPoint => FocalPointX is not null && FocalPointY is not null;
+
+    /// <summary>
+    /// True when this photograph is part of the suggested starting selection. Nothing is
+    /// selected by it: the page ticks the box and a person decides.
+    /// </summary>
+    public bool IsSuggested { get; set; }
 }
 
 /// <summary>

@@ -86,6 +86,29 @@ public class MediaAsset
     public int? FocalPointY { get; set; }
 
     /// <summary>
+    /// What could be measured about the photograph at upload, as percentages; null for
+    /// anything uploaded before measuring existed, or that could not be read.
+    /// </summary>
+    /// <remarks>
+    /// These exist for one purpose: offering a retoucher a starting selection out of a
+    /// pool of sixty, so the obviously soft and the obviously blown frames are not the
+    /// ones they have to find by hand. They describe the picture only — how much fine
+    /// detail it holds, how bright it is, how much tonal range it uses, and how much of
+    /// it has been lost to pure black or pure white. Nothing here describes the person in
+    /// the frame, and nothing here should: the suggestion is a suggestion, and a person
+    /// decides.
+    /// </remarks>
+    public int? Sharpness { get; set; }
+
+    public int? Exposure { get; set; }
+
+    public int? Contrast { get; set; }
+
+    public int? Clipping { get; set; }
+
+    public bool HasBeenMeasured => Sharpness is not null;
+
+    /// <summary>
     /// Soft delete. Removal is reversible and leaves the audit trail intact;
     /// only a Super Admin may destroy media permanently.
     /// </summary>

@@ -194,6 +194,12 @@ public class MediaService(
                 cancellationToken);
         }
 
+        // Measured while the file is still in hand. A photograph that cannot be measured
+        // is stored all the same: the figures only feed a suggested starting selection,
+        // and an unmeasured photograph is ranked as ordinary rather than buried.
+        buffer.Position = 0;
+        var quality = imageProcessor.Measure(buffer);
+
         var asset = new MediaAsset
         {
             Id = assetId,
@@ -207,7 +213,11 @@ public class MediaService(
             Orientation = details.Orientation,
             MediaType = MediaType.Image,
             UploadedByUserId = uploadedByUserId,
-            DisplayOrder = displayOrder
+            DisplayOrder = displayOrder,
+            Sharpness = quality?.Sharpness,
+            Exposure = quality?.Exposure,
+            Contrast = quality?.Contrast,
+            Clipping = quality?.Clipping
         };
 
         db.MediaAssets.Add(asset);

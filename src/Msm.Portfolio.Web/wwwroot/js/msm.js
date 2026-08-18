@@ -89,6 +89,29 @@
                 });
             }
 
+            // ── A suggested starting selection ───────────────────────────────────
+            // Ticks boxes and stops. Nothing reaches the portfolio until the retoucher
+            // has looked at the choice and pressed the button themselves, which is the
+            // whole point: the ranking knows whether a photograph is sharp, and nothing
+            // whatever about whether it is the right photograph.
+            var suggest = document.querySelector('[data-pick-suggest]');
+
+            if (suggest) {
+                suggest.classList.remove('d-none');
+
+                suggest.addEventListener('click', function () {
+                    // Set rather than add, so pressing it twice gives the same answer
+                    // rather than quietly growing the selection.
+                    boxes.forEach(function (box) {
+                        if (!box.disabled) {
+                            box.checked = box.hasAttribute('data-pick-suggested');
+                        }
+                    });
+
+                    refresh();
+                });
+            }
+
             refresh();
         })();
 
