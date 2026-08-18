@@ -665,7 +665,10 @@ legend {
     width: 18px;
     height: 18px;
     margin: 0.2rem 0 0;
-    border: 1px solid var(--border);
+    /* Not --border. That is a hairline for separating panels, and at around 1.4:1 against
+       the page it is far below the 3:1 that WCAG 1.4.11 asks of a control's boundary — an
+       empty checkbox drawn in it is barely there. */
+    border: 1px solid var(--fg-md);
     border-radius: 0;
     background: var(--field);
     cursor: pointer;
@@ -1869,12 +1872,26 @@ img.wordmark-paper { display: none; }
     top: 10px;
     left: 10px;
     z-index: 2;
-    width: 26px;
-    height: 26px;
-    /* Readable over a photograph of any brightness. */
-    background-color: color-mix(in srgb, var(--bg) 80%, transparent);
+    width: 28px;
+    height: 28px;
+    /* This box sits over a photograph, which can be any colour at all, so it carries its
+       own contrast rather than borrowing the page's: an opaque fill instead of a tint, a
+       border thick enough to survive a busy background, and a dark hairline outside that
+       border so the border itself stays visible against a pale photograph. */
+    background-color: var(--bg);
+    border: 2px solid var(--fg);
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+
+/* Deliberately more specific than the rule above, which was overriding the filled
+   background a checked box gets from .form-check-input:checked. The tick is drawn in the
+   page background colour, so on a box left filled with that same colour it was a
+   near-black tick on a near-black panel — invisible, on the one control whose entire job
+   is to show whether a photograph is chosen. */
+.pick-tile input.pick:checked {
+    background-color: var(--fg);
     border-color: var(--fg);
-    backdrop-filter: blur(4px);
+    background-size: 16px 16px;
 }
 
 .pick-tile img {

@@ -6,6 +6,7 @@ using Msm.Portfolio.Web.Authorization;
 using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.Domain.Enums;
+using Msm.Portfolio.Web.Services;
 using Msm.Portfolio.Web.Storage;
 
 namespace Msm.Portfolio.Web.Controllers;
@@ -24,6 +25,7 @@ namespace Msm.Portfolio.Web.Controllers;
 public class MediaController(
     ApplicationDbContext db,
     IMediaStorageService storage,
+    IMediaService media,
     UserManager<ApplicationUser> userManager) : Controller
 {
     [HttpGet("{assetId:guid}/{variant?}")]
@@ -51,9 +53,17 @@ public class MediaController(
 
         var requested = ParseVariant(variant);
 
-        // Originals are archived at full quality and are not for browsers to fetch.
-        // Requests for one are served the large rendition instead.
-        var served = requested == MediaVariant.Original && asset.MediaType == MediaType.Image
+        // Staff may fetch the archived original; everyone else is served the large
+        // rendition instead.
+        //
+        // A retoucher judging whether a frame is sharp enough to publish cannot do it
+        // from a re-encoded copy at 88% quality — the very thing they are looking for is
+        // what the compression removed. The public gets the rendition: it is a fraction
+        // of the bytes, and a full-resolution camera file is the studio's asset, not
+        // something to hand out with the web page.
+        var served = requested == MediaVariant.Original
+                     && asset.MediaType == MediaType.Image
+                     && !IsStaff()
             ? MediaVariant.Large
             : requested;
 
@@ -62,6 +72,22 @@ public class MediaController(
             : MediaStorageKeys.ForVariant(asset.StorageKey, served);
 
         var stream = await storage.GetAsync(key, cancellationToken);
+
+        // A missing rendition is not a missing photograph. The original is archived
+        // exactly as uploaded, so anything that interrupted the renditions being made —
+        // a decode that ran out of memory, a deploy that landed mid-batch — leaves a
+        // library that can be rebuilt rather than one that has to be uploaded again.
+        //
+        // Done here, on the first request for the image, so a library of broken tiles
+        // repairs itself the next time somebody opens the page. Rebuilding is bounded to
+        // two at a time inside the service, so a grid of sixty cannot start sixty decodes.
+        if (stream is null && asset.MediaType == MediaType.Image)
+        {
+            if (await media.RebuildVariantsAsync(asset.Id, cancellationToken))
+            {
+                stream = await storage.GetAsync(key, cancellationToken);
+            }
+        }
 
         if (stream is null)
         {
@@ -74,7 +100,11 @@ public class MediaController(
 
         // Immutable: an asset id always refers to the same photograph, and replacing an
         // image creates a new asset rather than overwriting one.
-        Response.Headers.CacheControl = asset.IsSelectedForPortfolio
+        //
+        // An original is never cached publicly, even on a published portfolio. It is only
+        // ever served to staff, and a shared cache holding the full-resolution file could
+        // hand it to someone the check above would have refused.
+        Response.Headers.CacheControl = asset.IsSelectedForPortfolio && served != MediaVariant.Original
             ? "public, max-age=31536000, immutable"
             : "private, max-age=3600";
 
@@ -86,11 +116,15 @@ public class MediaController(
     /// Who may see this file. Staff see everything, a client sees their own library,
     /// and the public sees only images the client has put on a published portfolio.
     /// </summary>
+    private bool IsStaff() =>
+        User.Identity?.IsAuthenticated == true
+        && (User.IsInRole(Roles.SuperAdmin) || User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Retoucher));
+
     private async Task<bool> IsAllowedAsync(MediaAsset asset)
     {
         if (User.Identity?.IsAuthenticated == true)
         {
-            if (User.IsInRole(Roles.SuperAdmin) || User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Retoucher))
+            if (IsStaff())
             {
                 return true;
             }

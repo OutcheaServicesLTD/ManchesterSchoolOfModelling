@@ -181,6 +181,14 @@ else
                             </form>
                         }
 
+                        @* The archived original, exactly as it came off the camera. A
+                           rendition is re-encoded, and re-encoding is precisely what
+                           removes the detail a retoucher is judging. *@
+                        <a class="btn btn-sm btn-outline-secondary w-100 mb-1"
+                           href="/media/@asset.Id/original" target="_blank" rel="noopener">
+                            View full size
+                        </a>
+
                         <form method="post" asp-action="Select" asp-route-clientId="@Model.ClientId"
                               asp-route-assetId="@asset.Id" class="d-grid">
                             <input type="hidden" name="selected" value="false" />
@@ -253,6 +261,13 @@ else
 
                         <div class="card-body p-2">
                             <p class="small text-muted mb-1">@asset.Orientation</p>
+
+                            @* Opens in its own tab so the tab this is in keeps whatever
+                               has been ticked so far. *@
+                            <a class="btn btn-sm btn-outline-secondary w-100 mb-1"
+                               href="/media/@asset.Id/original" target="_blank" rel="noopener">
+                                View full size
+                            </a>
 
                             @* Deliberately not in the picker form: removal is destructive
                                and should never ride along with a bulk add. *@

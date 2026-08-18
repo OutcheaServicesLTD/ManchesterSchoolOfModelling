@@ -73,6 +73,18 @@ public interface IMediaService
     Task<bool> SoftDeleteAsync(
         Guid clientId, Guid assetId, Guid? actingUserId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Regenerates the web renditions for one photograph from the archived original.
+    /// Returns false when there is nothing to rebuild from, or the original will not
+    /// decode.
+    /// </summary>
+    /// <remarks>
+    /// The originals are kept exactly as uploaded, so a photograph whose renditions are
+    /// missing is not a lost photograph — only an unfinished one. Rebuilding is therefore
+    /// always preferable to asking a retoucher to upload a shoot a second time.
+    /// </remarks>
+    Task<bool> RebuildVariantsAsync(Guid assetId, CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<MediaAsset>> GetPoolAsync(Guid clientId, CancellationToken cancellationToken = default);
 
     Task<MediaAsset?> GetSelfTapeAsync(Guid clientId, CancellationToken cancellationToken = default);
@@ -189,15 +201,25 @@ public class MediaService(
         buffer.Position = 0;
         var processed = imageProcessor.Process(buffer);
 
-        foreach (var variant in processed.Variants)
+        // No renditions means no photograph anyone can look at. Recording the asset
+        // anyway is worse than refusing it: the row exists, the grid shows a tile, and
+        // every request for its thumbnail answers 404 for ever, with nothing on screen to
+        // say why or anything the retoucher can do about it. Refused here, the file gets
+        // a plain message and a Retry button.
+        if (processed.Variants.Count == 0)
         {
-            using var variantStream = new MemoryStream(variant.Content);
-            await storage.UploadAsync(
-                variantStream,
-                MediaStorageKeys.ForVariant(originalKey, variant.Variant),
-                variant.ContentType,
-                cancellationToken);
+            logger.LogWarning(
+                "No renditions could be produced for {Filename}; the upload was refused.",
+                file.FileName);
+
+            // The original is already stored, so remove it rather than leave a file on
+            // disk that nothing in the database refers to.
+            await storage.DeleteAsync(originalKey, cancellationToken);
+
+            return null;
         }
+
+        await WriteVariantsAsync(originalKey, processed.Variants, cancellationToken);
 
         // A photograph that could not be measured is stored all the same: the figures only
         // feed a suggested starting selection, and an unmeasured photograph is ranked as
@@ -520,6 +542,111 @@ public class MediaService(
         await db.SaveChangesAsync(cancellationToken);
 
         return true;
+    }
+
+    /// <summary>
+    /// At most this many photographs are rebuilt at once.
+    /// </summary>
+    /// <remarks>
+    /// A grid of sixty thumbnails asks for sixty images at once. If every missing one
+    /// started its own decode, a single page load would try to decode sixty photographs
+    /// simultaneously and exhaust memory — turning a page that showed broken images into
+    /// a server that fell over. Two at a time, for the same reason the uploader sends two
+    /// at a time.
+    /// </remarks>
+    private static readonly SemaphoreSlim RebuildGate = new(2, 2);
+
+    public async Task<bool> RebuildVariantsAsync(
+        Guid assetId, CancellationToken cancellationToken = default)
+    {
+        var asset = await db.MediaAssets
+            .FirstOrDefaultAsync(m => m.Id == assetId && !m.IsDeleted, cancellationToken);
+
+        if (asset is null || asset.MediaType != MediaType.Image)
+        {
+            return false;
+        }
+
+        await RebuildGate.WaitAsync(cancellationToken);
+
+        try
+        {
+            // Checked again inside the gate: sixty tiles asking at once means most of
+            // them queue here, and by the time they are let through the first one
+            // through has usually done the work already.
+            if (await storage.ExistsAsync(
+                    MediaStorageKeys.ForVariant(asset.StorageKey, MediaVariant.Thumbnail),
+                    cancellationToken))
+            {
+                return true;
+            }
+
+            await using var original = await storage.GetAsync(asset.StorageKey, cancellationToken);
+
+            if (original is null)
+            {
+                // Nothing to rebuild from. The photograph really is gone.
+                logger.LogWarning(
+                    "Cannot rebuild renditions for {AssetId}: the original is missing.", assetId);
+
+                return false;
+            }
+
+            using var buffer = new MemoryStream();
+            await original.CopyToAsync(buffer, cancellationToken);
+            buffer.Position = 0;
+
+            var processed = imageProcessor.Process(buffer);
+
+            if (processed.Variants.Count == 0)
+            {
+                logger.LogWarning(
+                    "Cannot rebuild renditions for {AssetId}: the original will not decode.", assetId);
+
+                return false;
+            }
+
+            await WriteVariantsAsync(asset.StorageKey, processed.Variants, cancellationToken);
+
+            // Measurements are filled in at the same time when they were never taken,
+            // so a library uploaded before measuring existed starts ranking properly the
+            // first time its photographs are looked at.
+            if (!asset.HasBeenMeasured && processed.Quality is { } quality)
+            {
+                asset.Sharpness = quality.Sharpness;
+                asset.Exposure = quality.Exposure;
+                asset.Contrast = quality.Contrast;
+                asset.Clipping = quality.Clipping;
+            }
+
+            audit.Record(nameof(MediaAsset), assetId.ToString(), "MediaVariantsRebuilt");
+            await db.SaveChangesAsync(cancellationToken);
+
+            logger.LogInformation("Rebuilt the renditions for {AssetId}.", assetId);
+
+            return true;
+        }
+        finally
+        {
+            RebuildGate.Release();
+        }
+    }
+
+    private async Task WriteVariantsAsync(
+        string originalKey,
+        IReadOnlyList<GeneratedVariant> variants,
+        CancellationToken cancellationToken)
+    {
+        foreach (var variant in variants)
+        {
+            using var variantStream = new MemoryStream(variant.Content);
+
+            await storage.UploadAsync(
+                variantStream,
+                MediaStorageKeys.ForVariant(originalKey, variant.Variant),
+                variant.ContentType,
+                cancellationToken);
+        }
     }
 
     public async Task<IReadOnlyList<MediaAsset>> GetPoolAsync(

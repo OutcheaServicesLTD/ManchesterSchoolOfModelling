@@ -200,6 +200,103 @@ public class MediaServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Renditions_missing_from_storage_are_rebuilt_from_the_original()
+    {
+        // What this is for: a library of photographs whose renditions were never written
+        // — a decode that ran out of memory, a deploy that landed mid-batch. The
+        // originals are archived exactly as uploaded, so the photographs are not lost,
+        // only unfinished, and asking for a shoot to be uploaded again would be asking
+        // for work nobody needs to do.
+        var ids = await UploadAsync(2);
+        var assets = await _db.MediaAssets.Where(m => ids.Contains(m.Id)).ToListAsync();
+
+        foreach (var asset in assets)
+        {
+            foreach (var variant in new[] { MediaVariant.Thumbnail, MediaVariant.Medium, MediaVariant.Large })
+            {
+                await _storage.DeleteAsync(MediaStorageKeys.ForVariant(asset.StorageKey, variant));
+            }
+        }
+
+        Assert.False(_storage.Contains(
+            MediaStorageKeys.ForVariant(assets[0].StorageKey, MediaVariant.Thumbnail)));
+
+        Assert.True(await _service.RebuildVariantsAsync(ids[0]));
+
+        Assert.True(_storage.Contains(
+            MediaStorageKeys.ForVariant(assets[0].StorageKey, MediaVariant.Thumbnail)));
+        Assert.True(_storage.Contains(
+            MediaStorageKeys.ForVariant(assets[0].StorageKey, MediaVariant.Large)));
+
+        // Only the one asked for: rebuilding is driven by what is actually requested.
+        Assert.False(_storage.Contains(
+            MediaStorageKeys.ForVariant(assets[1].StorageKey, MediaVariant.Thumbnail)));
+    }
+
+    [Fact]
+    public async Task Rebuilding_says_no_when_the_original_is_gone_too()
+    {
+        var ids = await UploadAsync(1);
+        var asset = await _db.MediaAssets.SingleAsync(m => m.Id == ids[0]);
+
+        await _storage.DeleteAsync(asset.StorageKey);
+        await _storage.DeleteAsync(MediaStorageKeys.ForVariant(asset.StorageKey, MediaVariant.Thumbnail));
+
+        Assert.False(await _service.RebuildVariantsAsync(ids[0]));
+    }
+
+    [Fact]
+    public async Task Rebuilding_an_unknown_photograph_says_no_rather_than_throwing()
+    {
+        Assert.False(await _service.RebuildVariantsAsync(Guid.CreateVersion7()));
+    }
+
+    [Fact]
+    public async Task Rebuilding_fills_in_measurements_that_were_never_taken()
+    {
+        // A library uploaded before measuring existed starts ranking properly the first
+        // time its photographs are looked at, rather than staying unranked for ever.
+        var ids = await UploadAsync(1);
+        var asset = await _db.MediaAssets.SingleAsync(m => m.Id == ids[0]);
+
+        asset.Sharpness = null;
+        asset.Exposure = null;
+        asset.Contrast = null;
+        asset.Clipping = null;
+        await _db.SaveChangesAsync();
+
+        await _storage.DeleteAsync(MediaStorageKeys.ForVariant(asset.StorageKey, MediaVariant.Thumbnail));
+        await _service.RebuildVariantsAsync(ids[0]);
+
+        var measured = await _db.MediaAssets.SingleAsync(m => m.Id == ids[0]);
+        Assert.NotNull(measured.Sharpness);
+        Assert.NotNull(measured.Exposure);
+    }
+
+    [Fact]
+    public async Task A_photograph_whose_renditions_cannot_be_made_is_refused_rather_than_stored()
+    {
+        // Storing it would create a row with no image behind it: a tile in the grid whose
+        // thumbnail answers 404 for ever, with nothing on screen to say why. Refused, the
+        // file gets a plain message and a Retry button.
+        var service = new MediaService(
+            _db,
+            _storage,
+            new RefusesToDecode(),
+            new AuditService(_db),
+            new OptionsWrapper<MediaOptions>(Options),
+            NullLogger<MediaService>.Instance);
+
+        var outcomes = await service.UploadImagesAsync(_clientId, [Jpeg("shot.jpg")], null);
+
+        Assert.False(outcomes.Single().Succeeded);
+        Assert.Equal(0, await _db.MediaAssets.CountAsync());
+
+        // And nothing is left behind on disk that the database no longer refers to.
+        Assert.Empty(_storage.Keys);
+    }
+
+    [Fact]
     public async Task Several_images_can_be_added_to_the_portfolio_at_once()
     {
         // Choosing a shoot's worth one at a time is the slowest part of the job.
@@ -525,11 +622,24 @@ public class MediaServiceTests : IDisposable
 }
 
 /// <summary>Storage backed by a dictionary, so tests never touch the filesystem.</summary>
+/// <summary>Reads headers like any image, then refuses to decode — as a truncated or
+/// out-of-memory decode does.</summary>
+internal class RefusesToDecode : IImageProcessor
+{
+    private readonly ImageProcessor _real = new(NullLogger<ImageProcessor>.Instance);
+
+    public ImageDetails? Inspect(Stream content) => _real.Inspect(content);
+
+    public ProcessedImage Process(Stream content) => new([], null);
+}
+
 internal class InMemoryStorage : IMediaStorageService
 {
     private readonly Dictionary<string, byte[]> _files = new(StringComparer.Ordinal);
 
     public bool Contains(string key) => _files.ContainsKey(key);
+
+    public IReadOnlyCollection<string> Keys => _files.Keys;
 
     public async Task<StoredMedia> UploadAsync(
         Stream content, string storageKey, string contentType, CancellationToken cancellationToken = default)
