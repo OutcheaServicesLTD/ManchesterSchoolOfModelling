@@ -245,6 +245,59 @@
             }
         })();
 
+        // ── Choosing the crop on the cover photograph ────────────────────────────
+        // The two sliders are the control and work without any of this. What is added
+        // here is pointing straight at the face, and seeing the result before saving.
+        (function () {
+            var panel = document.querySelector('[data-focal]');
+
+            if (!panel) {
+                return;
+            }
+
+            var photo = panel.querySelector('[data-focal-photo]');
+            var marker = panel.querySelector('[data-focal-marker]');
+            var acrossField = panel.querySelector('[data-focal-x]');
+            var downField = panel.querySelector('[data-focal-y]');
+            var previews = panel.querySelectorAll('[data-focal-preview]');
+
+            if (!photo || !acrossField || !downField) {
+                return;
+            }
+
+            function clamp(value) {
+                return Math.max(0, Math.min(100, Math.round(value)));
+            }
+
+            function show() {
+                var across = clamp(parseInt(acrossField.value, 10) || 0);
+                var down = clamp(parseInt(downField.value, 10) || 0);
+
+                if (marker) {
+                    marker.style.left = across + '%';
+                    marker.style.top = down + '%';
+                }
+
+                Array.prototype.forEach.call(previews, function (preview) {
+                    preview.style.objectPosition = across + '% ' + down + '%';
+                });
+            }
+
+            photo.addEventListener('click', function (event) {
+                var box = photo.getBoundingClientRect();
+
+                acrossField.value = clamp(((event.clientX - box.left) / box.width) * 100);
+                downField.value = clamp(((event.clientY - box.top) / box.height) * 100);
+
+                show();
+            });
+
+            acrossField.addEventListener('input', show);
+            downField.addEventListener('input', show);
+
+            show();
+        })();
+
         // ── Copy a value to the clipboard ────────────────────────────────────────
         // The model's own portfolio address, so they can paste it into a message.
         document.querySelectorAll('[data-copy-target]').forEach(function (button) {

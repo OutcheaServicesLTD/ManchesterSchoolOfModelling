@@ -19,12 +19,53 @@ public class MediaAssetViewModel
 
     public int? Height { get; set; }
 
+    /// <summary>Where the important part of the picture is, if anyone has said.</summary>
+    public int? FocalPointX { get; set; }
+
+    public int? FocalPointY { get; set; }
+
     /// <summary>
     /// Aspect ratio for the grid tile, so the browser reserves the right space before
     /// the image loads and the page does not jump as thumbnails arrive.
     /// </summary>
     public string AspectRatio =>
         Width is > 0 && Height is > 0 ? $"{Width} / {Height}" : "3 / 4";
+
+    public bool HasFocalPoint => FocalPointX is not null && FocalPointY is not null;
+}
+
+/// <summary>
+/// The cover photograph and the crop staff have chosen for it.
+/// </summary>
+/// <remarks>
+/// The cover is the only photograph that is ever cropped: it fills the band across the
+/// top of the portfolio and the card on the Model Board, both fixed shapes. Everything
+/// else in the gallery is shown whole. Centred by default, that crop takes the head off
+/// a full-length shot, so staff can say which part has to survive.
+/// </remarks>
+public class CoverFocusViewModel
+{
+    public Guid AssetId { get; set; }
+
+    public string Filename { get; set; } = string.Empty;
+
+    /// <summary>Where the form posts to, which differs between the staff areas.</summary>
+    public string PostUrl { get; set; } = string.Empty;
+
+    public int? X { get; set; }
+
+    public int? Y { get; set; }
+
+    public bool IsSet => X is not null && Y is not null;
+
+    /// <summary>
+    /// What the sliders start on. Not centred down the image: the stylesheet's own
+    /// default sits above the middle, because a face usually does, and starting anywhere
+    /// else would move the crop the moment the panel is opened.
+    /// </summary>
+    public int StartX => X ?? 50;
+
+    public int StartY => Y ?? 22;
 }
 
 public class MediaLibraryViewModel

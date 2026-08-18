@@ -1741,6 +1741,100 @@ img.wordmark-paper { display: none; }
     box-shadow: inset -4px 0 0 var(--fg);
 }
 
+/* ── Choosing the crop on the cover photograph ──────────────────────────────────
+   The cover is the only image the site ever cuts into. This panel shows the whole
+   photograph with the chosen point marked, and the two shapes it will be cut to
+   beside it, so the decision is made against what the visitor actually sees. */
+
+.focal {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.25rem;
+}
+
+@media (min-width: 768px) {
+    .focal { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+
+.focal-stage {
+    position: relative;
+    background: var(--raised);
+    align-self: start;
+}
+
+.focal-photo {
+    display: block;
+    width: 100%;
+    height: auto;
+    /* A crosshair says the photograph is a target, not just an illustration. */
+    cursor: crosshair;
+}
+
+.focal-marker {
+    position: absolute;
+    left: 50%;
+    top: 22%;
+    width: 26px;
+    height: 26px;
+    margin: -13px 0 0 -13px;
+    border: 2px solid #fff;
+    border-radius: 50%;
+    /* Two rings, light over dark, so the marker is visible on a pale dress and on a
+       dark background alike. */
+    box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.55), inset 0 0 0 2px rgba(0, 0, 0, 0.55);
+    pointer-events: none;
+}
+
+.focal-previews {
+    display: flex;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.focal-preview {
+    margin: 0;
+    flex: 1 1 130px;
+}
+
+.focal-preview figcaption {
+    font-size: 0.75rem;
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    color: var(--fg-lo);
+    margin-top: 0.4rem;
+}
+
+.focal-preview-frame {
+    overflow: hidden;
+    background: var(--raised);
+}
+
+.focal-preview-frame img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 22%;
+    display: block;
+}
+
+.focal-preview-wide { aspect-ratio: 16 / 9; }
+.focal-preview-card { aspect-ratio: 3 / 4; }
+
+.focal-controls {
+    margin-top: 1.25rem;
+}
+
+.focal-controls .form-label {
+    display: block;
+    margin-bottom: 0.25rem;
+}
+
+.form-range {
+    width: 100%;
+    margin-bottom: 0.9rem;
+    accent-color: var(--fg);
+}
+
 /* ── Choosing photographs in bulk ───────────────────────────────────────────────
    The whole thumbnail is the target, not just a small box beside it: a retoucher
    works through a shoot quickly and should be able to hit the picture. */

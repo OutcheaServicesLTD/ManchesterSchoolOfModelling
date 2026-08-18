@@ -26,8 +26,10 @@
                         @* The whole card is one link, so the name and image are a single
                            target rather than two adjacent ones (specification section 41). *@
                         <a class="board-card" href="/@card.Slug">
+                            @* Cropped to a portrait card, so the same focal point applies. *@
                             <img src="/media/@card.FeaturedAssetId/medium"
                                  loading="lazy"
+                                 style="@(card.CoverFocus is null ? null : $"object-position: {card.CoverFocus.AsCss}")"
                                  alt="@card.Name" />
                             <p class="board-name">@card.Name</p>
                             @if (!string.IsNullOrWhiteSpace(card.Location))

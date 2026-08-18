@@ -158,6 +158,39 @@ public class WorkspaceController(
         return RedirectToAction(nameof(Index), new { clientId });
     }
 
+    /// <summary>
+    /// Records which part of the cover photograph must survive being cropped.
+    /// </summary>
+    /// <remarks>
+    /// The cover fills a wide band at the top of the portfolio and a portrait card on the
+    /// Model Board, neither of which is the shape of the photograph. Centred by default,
+    /// that crop takes the head off a full-length shot.
+    /// </remarks>
+    [HttpPost("focal/{assetId:guid}")]
+    public async Task<IActionResult> Focal(
+        Guid clientId,
+        Guid assetId,
+        int? x,
+        int? y,
+        bool clear = false,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await IsAllowedAsync(clientId, cancellationToken))
+        {
+            return Forbid();
+        }
+
+        var (succeeded, error) = await media.SetFocalPointAsync(
+            clientId, assetId, clear ? null : x, clear ? null : y, CurrentUserId(), cancellationToken);
+
+        if (!succeeded)
+        {
+            TempData["Error"] = error;
+        }
+
+        return RedirectToAction(nameof(Index), new { clientId });
+    }
+
     [HttpPost("remove/{assetId:guid}")]
     public async Task<IActionResult> Remove(
         Guid clientId, Guid assetId, CancellationToken cancellationToken = default)
@@ -338,7 +371,9 @@ public class WorkspaceController(
                     IsSelected = a.IsSelectedForPortfolio,
                     IsFeatured = a.IsFeatured,
                     Width = a.Width,
-                    Height = a.Height
+                    Height = a.Height,
+                    FocalPointX = a.FocalPointX,
+                    FocalPointY = a.FocalPointY
                 })
             ],
             PoolLimit = options.MediaPoolImageLimit,

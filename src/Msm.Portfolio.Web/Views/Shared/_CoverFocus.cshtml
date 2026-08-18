@@ -1,0 +1,79 @@
+@model Msm.Portfolio.Web.ViewModels.CoverFocusViewModel
+@*
+    Choosing which part of the cover photograph survives being cropped.
+
+    The sliders are the control, not an accessible afterthought: they work from a
+    keyboard, are announced properly, and post on their own if script never runs.
+    Clicking the photograph is an enhancement layered on top, because pointing at the
+    face is the obvious thing to try.
+*@
+<div class="card mb-4">
+    <div class="card-body">
+        <h2 class="h5 card-title">The cover photograph</h2>
+        <p class="text-muted">
+            This one photograph is cut to fit the top of the portfolio and the card on
+            the Model Board. Choose the part that must always stay in view — usually the
+            face. Every other photograph is shown whole.
+        </p>
+
+        <div class="focal" data-focal>
+            <div class="focal-stage">
+                @* Click anywhere on the photograph to place the point. *@
+                <img src="/media/@Model.AssetId/medium" class="focal-photo" data-focal-photo
+                     alt="@Model.Filename" />
+                <span class="focal-marker" data-focal-marker aria-hidden="true"></span>
+            </div>
+
+            <div class="focal-side">
+                <p class="eyebrow mb-2">How it will look</p>
+
+                <div class="focal-previews">
+                    <figure class="focal-preview">
+                        <div class="focal-preview-frame focal-preview-wide">
+                            <img src="/media/@Model.AssetId/medium" data-focal-preview alt="" />
+                        </div>
+                        <figcaption>Top of the portfolio</figcaption>
+                    </figure>
+                    <figure class="focal-preview">
+                        <div class="focal-preview-frame focal-preview-card">
+                            <img src="/media/@Model.AssetId/medium" data-focal-preview alt="" />
+                        </div>
+                        <figcaption>Model Board card</figcaption>
+                    </figure>
+                </div>
+
+                @* asp-antiforgery is explicit because the address is passed in rather
+                   than generated from a controller and action: without it the tag helper
+                   leaves the token out and every save is refused with a bare 400. The
+                   address differs per area, which is why it is a parameter at all. *@
+                <form method="post" action="@Model.PostUrl" class="focal-controls" asp-antiforgery="true">
+                    <label class="form-label" for="focal-x">Left and right</label>
+                    <input class="form-range" type="range" id="focal-x" name="x"
+                           min="0" max="100" step="1" value="@Model.StartX" data-focal-x />
+
+                    <label class="form-label" for="focal-y">Up and down</label>
+                    <input class="form-range" type="range" id="focal-y" name="y"
+                           min="0" max="100" step="1" value="@Model.StartY" data-focal-y />
+
+                    <div class="d-flex gap-2 flex-wrap mt-2">
+                        <button type="submit" class="btn btn-primary">Save the crop</button>
+
+                        @if (Model.IsSet)
+                        {
+                            @* Back to the framing the design chooses, which is not the
+                               same as the middle of the photograph. *@
+                            <button type="submit" class="btn btn-outline-secondary"
+                                    name="clear" value="true">Back to automatic</button>
+                        }
+                    </div>
+
+                    <p class="form-text mb-0">
+                        @(Model.IsSet
+                            ? "A crop has been chosen for this photograph."
+                            : "No crop chosen yet, so the usual framing is used.")
+                    </p>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

@@ -8,6 +8,21 @@ namespace Msm.Portfolio.Web.Services;
 /// <summary>One photograph on a public portfolio.</summary>
 public record PublicImage(Guid AssetId, MediaOrientation Orientation, int? Width, int? Height, bool IsFeatured);
 
+/// <summary>
+/// Which part of the cover photograph must survive being cropped.
+/// </summary>
+/// <remarks>
+/// Carried through to the page as a CSS object-position, formatted here rather than in a
+/// view so it cannot come out as "38,5%" on a machine with a comma for a decimal point.
+/// </remarks>
+public record FocalPoint(int X, int Y)
+{
+    public string AsCss => FormattableString.Invariant($"{X}% {Y}%");
+
+    public static FocalPoint? From(int? x, int? y) =>
+        x is null || y is null ? null : new FocalPoint(x.Value, y.Value);
+}
+
 /// <summary>One measurement shown in the public stats section.</summary>
 public record PublicMeasurement(string Label, string Value, string? Unit);
 
@@ -28,6 +43,7 @@ public record PublicPortfolio(
     int? Age,
     string? Biography,
     Guid? FeaturedAssetId,
+    FocalPoint? CoverFocus,
     IReadOnlyList<PublicImage> Images,
     IReadOnlyList<PublicMeasurement> Measurements,
     Guid? SelfTapeAssetId,
@@ -45,7 +61,8 @@ public record ModelBoardCard(
     string Slug,
     string Name,
     string? Location,
-    Guid? FeaturedAssetId);
+    Guid? FeaturedAssetId,
+    FocalPoint? CoverFocus);
 
 public interface IPublicPortfolioService
 {
@@ -100,6 +117,7 @@ public class PublicPortfolioService(
             .ToList();
 
         var selfTape = assets.FirstOrDefault(m => m.MediaType == MediaType.SelfTape);
+        var cover = assets.FirstOrDefault(m => m.Id == portfolio.FeaturedMediaId);
 
         var template = templates.GetTemplate(client.ModelProfileType);
         var measurements = client.Measurements
@@ -128,6 +146,7 @@ public class PublicPortfolioService(
             client.AgeOn(DateOnly.FromDateTime(DateTime.UtcNow)),
             client.Biography,
             portfolio.FeaturedMediaId,
+            FocalPoint.From(cover?.FocalPointX, cover?.FocalPointY),
             images,
             measurements,
             selfTape?.Id,
@@ -158,6 +177,10 @@ public class PublicPortfolioService(
                 p.Client.DisplayName,
                 p.Client.Location,
                 p.PublishedAt,
+                Focal = db.MediaAssets
+                    .Where(m => m.Id == p.FeaturedMediaId)
+                    .Select(m => new { m.FocalPointX, m.FocalPointY })
+                    .FirstOrDefault(),
                 Subscription = db.MaintenanceSubscriptions
                     .Where(s => s.ClientId == p.ClientId)
                     .OrderByDescending(s => s.CreatedAt)
@@ -182,7 +205,8 @@ public class PublicPortfolioService(
                         ? $"{r.FirstName} {r.LastName}".Trim()
                         : r.DisplayName,
                     r.Location,
-                    r.FeaturedMediaId))
+                    r.FeaturedMediaId,
+                    FocalPoint.From(r.Focal?.FocalPointX, r.Focal?.FocalPointY)))
         ];
     }
 

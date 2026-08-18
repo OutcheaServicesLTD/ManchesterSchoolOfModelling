@@ -46,7 +46,11 @@
 <section class="hero" aria-labelledby="model-name">
     @if (p.FeaturedAssetId is not null)
     {
+        @* The hero is a crop by nature, so it obeys the focal point staff set on the
+           cover photograph. Left unset it keeps the stylesheet's default framing, which
+           sits above centre because faces usually do. *@
         <img class="hero-image" src="/media/@p.FeaturedAssetId/large"
+             style="@(p.CoverFocus is null ? null : $"object-position: {p.CoverFocus.AsCss}")"
              alt="Portrait of @p.Name" />
     }
     <div class="hero-content">

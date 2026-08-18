@@ -196,6 +196,54 @@ public class PublicPortfolioServiceTests : IDisposable
     /// details. None of them belong on a public page (specification sections 10 and 46).
     /// </summary>
     [Fact]
+    public async Task The_cover_crop_reaches_the_portfolio_page_and_the_board()
+    {
+        // The hero band and the board card are the only places a photograph is cut, and
+        // both have to cut it in the same place.
+        var clientId = AddModel();
+        var cover = await _db.MediaAssets.SingleAsync(m => m.ClientId == clientId && m.IsFeatured);
+        cover.FocalPointX = 30;
+        cover.FocalPointY = 9;
+        await _db.SaveChangesAsync();
+
+        var portfolio = await _service.GetBySlugAsync("emma-johnson");
+        var board = await _service.GetModelBoardAsync();
+
+        Assert.Equal("30% 9%", portfolio!.CoverFocus!.AsCss);
+        Assert.Equal("30% 9%", board.Single().CoverFocus!.AsCss);
+    }
+
+    [Fact]
+    public async Task No_cover_crop_leaves_each_place_to_its_own_default()
+    {
+        // Null rather than 50/50 on purpose: the hero frames above centre because a face
+        // usually is, and reporting a middle here would quietly override that.
+        AddModel();
+
+        var portfolio = await _service.GetBySlugAsync("emma-johnson");
+        var board = await _service.GetModelBoardAsync();
+
+        Assert.Null(portfolio!.CoverFocus);
+        Assert.Null(board.Single().CoverFocus);
+    }
+
+    [Fact]
+    public async Task A_crop_on_a_photograph_that_is_not_the_cover_is_not_used()
+    {
+        // The crop belongs to the photograph, but only the cover is ever cropped.
+        var clientId = AddModel();
+        var other = await _db.MediaAssets
+            .FirstAsync(m => m.ClientId == clientId && !m.IsFeatured && m.IsSelectedForPortfolio);
+        other.FocalPointX = 10;
+        other.FocalPointY = 90;
+        await _db.SaveChangesAsync();
+
+        var portfolio = await _service.GetBySlugAsync("emma-johnson");
+
+        Assert.Null(portfolio!.CoverFocus);
+    }
+
+    [Fact]
     public async Task The_public_projection_carries_no_private_contact_details()
     {
         AddModel();

@@ -208,6 +208,23 @@
     </div>
 }
 
+@{
+    var cover = Model.Selected.FirstOrDefault(a => a.IsFeatured);
+}
+
+@if (cover is not null && await Allowed(Permissions.Media.SetFeatured))
+{
+    @* Only the main image: it is the only photograph the site crops. *@
+    <partial name="_CoverFocus" model="@(new Msm.Portfolio.Web.ViewModels.CoverFocusViewModel
+    {
+        AssetId = cover.Id,
+        Filename = cover.Filename,
+        PostUrl = $"/admin/clients/{Model.ClientId}/media/{cover.Id}/focal",
+        X = cover.FocalPointX,
+        Y = cover.FocalPointY
+    })" />
+}
+
 <h2 class="h5">Portfolio photographs (@Model.Selected.Count of @Model.PortfolioLimit)</h2>
 @if (Model.Selected.Count == 0)
 {

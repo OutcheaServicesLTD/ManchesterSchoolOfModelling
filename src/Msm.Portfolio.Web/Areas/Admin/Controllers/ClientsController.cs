@@ -109,6 +109,32 @@ public class ClientsController(
         return RedirectToAction(nameof(Index), new { clientId });
     }
 
+    /// <summary>
+    /// Records which part of the cover photograph must survive being cropped.
+    /// </summary>
+    /// <remarks>
+    /// Behind the same permission as choosing the cover: the two decisions are one
+    /// decision, and being able to change the crop without being able to change the
+    /// photograph would be an odd half of the job.
+    /// </remarks>
+    [HttpPost("media/{assetId:guid}/focal")]
+    [Authorize(Policy = Permissions.Media.SetFeatured)]
+    public async Task<IActionResult> Focal(
+        Guid clientId,
+        Guid assetId,
+        int? x,
+        int? y,
+        bool clear = false,
+        CancellationToken cancellationToken = default)
+    {
+        var (_, error) = await media.SetFocalPointAsync(
+            clientId, assetId, clear ? null : x, clear ? null : y, CurrentUserId(), cancellationToken);
+
+        TempData["Error"] = error;
+
+        return RedirectToAction(nameof(Index), new { clientId });
+    }
+
     [HttpPost("media/{assetId:guid}/move")]
     [Authorize(Policy = Permissions.Media.Select)]
     public async Task<IActionResult> Move(
@@ -267,7 +293,9 @@ public class ClientsController(
                     IsSelected = a.IsSelectedForPortfolio,
                     IsFeatured = a.IsFeatured,
                     Width = a.Width,
-                    Height = a.Height
+                    Height = a.Height,
+                    FocalPointX = a.FocalPointX,
+                    FocalPointY = a.FocalPointY
                 })
             ],
             SelfTapeId = selfTape?.Id,

@@ -52,6 +52,21 @@ public interface IMediaService
     Task<(bool Succeeded, string? Error)> SetFeaturedAsync(
         Guid clientId, Guid assetId, Guid? actingUserId, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Records which part of an image must survive being cropped, or clears it.
+    /// </summary>
+    /// <remarks>
+    /// Percentages across and down, as a browser's object-position takes them. Pass null
+    /// for both to go back to the default framing.
+    /// </remarks>
+    Task<(bool Succeeded, string? Error)> SetFocalPointAsync(
+        Guid clientId,
+        Guid assetId,
+        int? x,
+        int? y,
+        Guid? actingUserId,
+        CancellationToken cancellationToken = default);
+
     Task ReorderAsync(
         Guid clientId, IReadOnlyList<Guid> orderedAssetIds, Guid? actingUserId, CancellationToken cancellationToken = default);
 
@@ -399,6 +414,45 @@ public class MediaService(
         }
 
         await ApplyFeaturedAsync(clientId, images, asset, actingUserId, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return (true, null);
+    }
+
+    public async Task<(bool Succeeded, string? Error)> SetFocalPointAsync(
+        Guid clientId,
+        Guid assetId,
+        int? x,
+        int? y,
+        Guid? actingUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var images = await LoadImagesAsync(clientId, cancellationToken);
+        var asset = images.FirstOrDefault(m => m.Id == assetId);
+
+        if (asset is null)
+        {
+            return (false, "That image could not be found.");
+        }
+
+        // Both or neither. One coordinate on its own describes nothing, and storing it
+        // would leave the other axis silently reading as centre.
+        if (x is null != y is null)
+        {
+            return (false, "A focal point needs both a position across and a position down.");
+        }
+
+        if (x is not null && (x is < 0 or > 100 || y is < 0 or > 100))
+        {
+            return (false, "A focal point is a percentage between 0 and 100.");
+        }
+
+        asset.FocalPointX = x;
+        asset.FocalPointY = y;
+
+        audit.Record(nameof(MediaAsset), asset.Id.ToString(),
+            x is null ? "MediaFocalPointCleared" : "MediaFocalPointSet", userId: actingUserId);
+
         await db.SaveChangesAsync(cancellationToken);
 
         return (true, null);

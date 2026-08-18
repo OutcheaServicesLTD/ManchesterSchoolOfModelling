@@ -241,6 +241,78 @@ public class MediaServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task A_focal_point_is_recorded_on_the_image()
+    {
+        // The cover is the only photograph the site crops, and centred by default that
+        // crop takes the head off a full-length shot.
+        var ids = await UploadAsync(1);
+
+        var (succeeded, error) = await _service.SetFocalPointAsync(_clientId, ids[0], 38, 18, null);
+
+        Assert.True(succeeded);
+        Assert.Null(error);
+
+        var asset = await _db.MediaAssets.SingleAsync(m => m.Id == ids[0]);
+        Assert.Equal(38, asset.FocalPointX);
+        Assert.Equal(18, asset.FocalPointY);
+    }
+
+    [Fact]
+    public async Task A_focal_point_can_be_cleared_back_to_the_default_framing()
+    {
+        // Null is not the same as 50/50: cleared, each place goes back to the framing
+        // that suits it rather than to the middle of the photograph.
+        var ids = await UploadAsync(1);
+        await _service.SetFocalPointAsync(_clientId, ids[0], 38, 18, null);
+
+        var (succeeded, _) = await _service.SetFocalPointAsync(_clientId, ids[0], null, null, null);
+
+        Assert.True(succeeded);
+
+        var asset = await _db.MediaAssets.SingleAsync(m => m.Id == ids[0]);
+        Assert.Null(asset.FocalPointX);
+        Assert.Null(asset.FocalPointY);
+    }
+
+    [Theory]
+    [InlineData(-1, 50)]
+    [InlineData(101, 50)]
+    [InlineData(50, -1)]
+    [InlineData(50, 101)]
+    public async Task A_focal_point_outside_the_photograph_is_refused(int x, int y)
+    {
+        var ids = await UploadAsync(1);
+
+        var (succeeded, error) = await _service.SetFocalPointAsync(_clientId, ids[0], x, y, null);
+
+        Assert.False(succeeded);
+        Assert.Contains("between 0 and 100", error);
+    }
+
+    [Fact]
+    public async Task One_coordinate_on_its_own_is_refused()
+    {
+        // Storing half a focal point would leave the other axis silently reading as
+        // centre, which is a crop nobody chose.
+        var ids = await UploadAsync(1);
+
+        var (succeeded, error) = await _service.SetFocalPointAsync(_clientId, ids[0], 40, null, null);
+
+        Assert.False(succeeded);
+        Assert.Contains("both", error);
+    }
+
+    [Fact]
+    public async Task A_focal_point_on_an_unknown_image_is_refused()
+    {
+        var (succeeded, error) = await _service.SetFocalPointAsync(
+            _clientId, Guid.CreateVersion7(), 50, 50, null);
+
+        Assert.False(succeeded);
+        Assert.Contains("could not be found", error);
+    }
+
+    [Fact]
     public async Task A_batch_sets_the_main_image_once()
     {
         // The first of the batch becomes the main image, and the rest do not each

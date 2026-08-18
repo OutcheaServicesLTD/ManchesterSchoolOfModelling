@@ -94,6 +94,23 @@
     </div>
 </div>
 
+@{
+    var cover = Model.Selected.FirstOrDefault(a => a.IsFeatured);
+}
+
+@if (cover is not null)
+{
+    @* Only ever the main image: it is the only photograph the site crops. *@
+    <partial name="_CoverFocus" model="@(new Msm.Portfolio.Web.ViewModels.CoverFocusViewModel
+    {
+        AssetId = cover.Id,
+        Filename = cover.Filename,
+        PostUrl = $"/retoucher/client/{Model.ClientId}/focal/{cover.Id}",
+        X = cover.FocalPointX,
+        Y = cover.FocalPointY
+    })" />
+}
+
 <h2 class="h5">Portfolio (@Model.Selected.Count)</h2>
 @if (Model.Selected.Count == 0)
 {
