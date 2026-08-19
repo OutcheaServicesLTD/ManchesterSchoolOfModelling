@@ -237,29 +237,29 @@ public class PhotographRankingTests
     };
 
     [Fact]
-    public void A_suggestion_leaves_out_what_does_not_stand_up_next_to_the_best()
+    public void A_suggestion_fills_the_portfolio_best_first()
     {
-        // Ticking everything is not a suggestion. The soft frames are precisely what this
-        // is meant to save a person from finding by hand.
+        // A retoucher with more photographs than places wants the places filled, in the
+        // order worth working through — not a shortlist. An earlier version applied a
+        // quality threshold and cut a portfolio of thirty down to five on a real shoot,
+        // because fifty frames of one well-lit set-up are genuinely all of a piece.
         var best = Asset(90, 0);
-        var alsoGood = Asset(84, 1);
+        var good = Asset(84, 1);
         var soft = Asset(10, 2);
 
-        var suggested = PhotographRanking.Suggest([best, alsoGood, soft], room: 30);
+        var suggested = PhotographRanking.Suggest([soft, good, best], room: 30);
 
-        Assert.Equal([best.Id, alsoGood.Id], suggested);
+        Assert.Equal([best.Id, good.Id, soft.Id], suggested);
     }
 
     [Fact]
-    public void The_best_photograph_is_suggested_even_when_it_scores_nothing()
+    public void A_suggestion_stops_at_the_number_of_places_left()
     {
-        // Offering nothing at all would leave a retoucher pressing a button that appears
-        // broken, so the best of a bad batch still comes through.
-        var poor = Asset(0, 0);
-        poor.Clipping = 100;
+        var pool = new[] { Asset(90, 0), Asset(80, 1), Asset(70, 2), Asset(60, 3) };
 
-        Assert.Equal(0, PhotographRanking.Score(poor));
-        Assert.Equal([poor.Id], PhotographRanking.Suggest([poor], room: 30));
+        var suggested = PhotographRanking.Suggest(pool, room: 2);
+
+        Assert.Equal([pool[0].Id, pool[1].Id], suggested);
     }
 
     [Fact]

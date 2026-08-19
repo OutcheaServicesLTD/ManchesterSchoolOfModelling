@@ -99,15 +99,33 @@
             if (suggest) {
                 suggest.classList.remove('d-none');
 
+                // A switch, not a one-way action. Press it and the suggestion is on and
+                // the button goes green; press it again and everything is cleared —
+                // including anything ticked by hand, which is the point: it is the way
+                // back to an empty sheet after changing your mind halfway through.
+                var suggesting = false;
+
+                function setSuggesting(on) {
+                    suggesting = on;
+
+                    suggest.classList.toggle('btn-success', on);
+                    suggest.classList.toggle('btn-outline-secondary', !on);
+                    suggest.setAttribute('aria-pressed', on ? 'true' : 'false');
+                    suggest.textContent = on ? 'Clear the selection' : 'Suggest a selection';
+                }
+
+                suggest.setAttribute('aria-pressed', 'false');
+
                 suggest.addEventListener('click', function () {
-                    // Set rather than add, so pressing it twice gives the same answer
-                    // rather than quietly growing the selection.
                     boxes.forEach(function (box) {
                         if (!box.disabled) {
-                            box.checked = box.hasAttribute('data-pick-suggested');
+                            // Set rather than add, so the answer is the same every time
+                            // rather than the selection quietly growing.
+                            box.checked = !suggesting && box.hasAttribute('data-pick-suggested');
                         }
                     });
 
+                    setSuggesting(!suggesting);
                     refresh();
                 });
             }

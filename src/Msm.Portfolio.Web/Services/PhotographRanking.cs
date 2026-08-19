@@ -66,29 +66,21 @@ public static class PhotographRanking
     }
 
     /// <summary>
-    /// How close to the best of the batch a photograph has to be to be suggested.
-    /// </summary>
-    /// <remarks>
-    /// Judged against the rest of the shoot rather than against a number invented here.
-    /// An absolute pass mark either lets everything through on a good shoot or nothing
-    /// through on a difficult one, and "difficult" includes plenty of deliberate
-    /// choices — a low-key editorial set is not a set of bad photographs.
-    /// </remarks>
-    private const double CloseEnough = 0.7;
-
-    /// <summary>
     /// The photographs to offer as a starting selection, best first.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Only what is not already on the portfolio, never more than there is room for, and
-    /// only what stands up next to the best of what was uploaded — a suggestion that
-    /// ticks everything is not a suggestion, and the soft and blown frames are exactly
-    /// the ones this is meant to save a person from finding by hand.
+    /// Fills the portfolio: the best of what is not already on it, up to the number of
+    /// places left. A retoucher with fifty photographs and thirty places wants those
+    /// thirty chosen and then to prune, not a shortlist of five — the ranking decides the
+    /// order to work through, and the person decides what actually goes.
     /// </para>
     /// <para>
-    /// The best photograph is always included, even in a poor batch. Offering nothing at
-    /// all would leave a retoucher pressing a button that does not appear to work.
+    /// No quality threshold. One was tried, and on a real shoot — fifty frames of the same
+    /// set-up, all properly lit — it cut a portfolio of thirty down to five, because the
+    /// photographs genuinely were of a piece and the ones just behind the best were fine.
+    /// Sorting by quality is worth doing; refusing to offer the twenty-ninth best
+    /// photograph for a portfolio with thirty places is not.
     /// </para>
     /// <para>
     /// Ties are broken by the order the photographs are already in, so the same library
@@ -102,23 +94,12 @@ public static class PhotographRanking
             return [];
         }
 
-        var candidates = pool
-            .Where(a => a.MediaType == MediaType.Image && !a.IsDeleted && !a.IsSelectedForPortfolio)
-            .OrderByDescending(Score)
-            .ThenBy(a => a.DisplayOrder)
-            .ToList();
-
-        if (candidates.Count == 0)
-        {
-            return [];
-        }
-
-        var floor = Score(candidates[0]) * CloseEnough;
-
         return
         [
-            .. candidates
-                .Where((asset, index) => index == 0 || Score(asset) >= floor)
+            .. pool
+                .Where(a => a.MediaType == MediaType.Image && !a.IsDeleted && !a.IsSelectedForPortfolio)
+                .OrderByDescending(Score)
+                .ThenBy(a => a.DisplayOrder)
                 .Take(room)
                 .Select(a => a.Id)
         ];

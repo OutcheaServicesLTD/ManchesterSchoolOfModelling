@@ -236,10 +236,12 @@ else
         </div>
 
         <p class="form-text mt-2">
-            <strong>Suggest a selection</strong> ticks the photographs that hold up next
-            to the best of what you uploaded — sharp, well exposed, and with nothing lost
-            to pure black or pure white. It judges the picture, never the person in it,
-            so look through the choice and change whatever you like before adding.
+            <strong>Suggest a selection</strong> ticks the best
+            @(Model.PortfolioLimit - Model.Selected.Count) photographs to fill the
+            portfolio — sharpest first, well exposed, with nothing lost to pure black or
+            pure white. It judges the picture, never the person in it, so look through the
+            choice and untick whatever you do not want. Press the button again to clear
+            everything and start over.
         </p>
 
         <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
