@@ -47,7 +47,22 @@ The first build takes around five minutes.
 
 ## 2. Check it works
 
-Render gives the service an address like `https://msm-portfolio-preview.onrender.com`.
+**The preview lives at https://msm-portfolio-preview.onrender.com**
+
+Render assigns that from the service name in `render.yaml`. Recorded here so nobody has
+to go digging through the Render dashboard for it again.
+
+The pages worth having to hand:
+
+| | |
+|---|---|
+| Model Board | `/models` |
+| Sign in | `/account/login` |
+| Admin | `/admin` |
+| Which integrations are on | `/admin/integrations` |
+| Retoucher queue | `/retoucher` |
+| One model's public page | `/` plus their slug, e.g. `/amara-whitfield` |
+
 Open it and you should land on the Model Board with two models on it.
 
 Sign in at `/account/login` with the email and password from step 1.
