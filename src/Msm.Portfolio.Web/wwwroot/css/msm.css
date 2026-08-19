@@ -1157,6 +1157,24 @@ img.wordmark-paper { display: none; }
 :root[data-theme="light"] .theme-toggle .icon-dark { display: none; }
 :root[data-theme="light"] .theme-toggle .icon-light { display: block; }
 
+/* ── Landing below the bar that is covering the page ────────────────────────────
+   Both shells have a sticky header, so a link to #about scrolls the section to the
+   top of the window and the header sits on top of it — the heading arrives four
+   pixels clear of the bar, which reads as a mistake because it is one.
+
+   scroll-padding-top stops the scroll short by the height of that header, so the
+   section's top edge lands just underneath it and the section's own generous padding
+   becomes the breathing room the design already intended. One property on the
+   scrolling element covers every in-page link on the site, including any added later.
+
+   Sized to the taller of the two headers: the staff bar at 77px rather than the
+   public one at 69px. Overshooting by eight pixels on the public site costs nothing;
+   undershooting puts a heading back under the bar. */
+
+html {
+    scroll-padding-top: 84px;
+}
+
 /* ══════════════════════════════════════════════════════════════════════════════════
    THE PUBLIC SITE
    What an agency sees. No sign-in, no chrome, nothing but the model's work.
