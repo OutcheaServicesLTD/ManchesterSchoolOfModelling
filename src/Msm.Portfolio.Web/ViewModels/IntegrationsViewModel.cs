@@ -16,6 +16,14 @@ public class IntegrationsViewModel
 
     public bool PaymentsIsLive { get; set; }
 
+    /// <summary>Whether a biography provider is configured, so the page can say.</summary>
+    public bool BiographiesAreOn { get; set; }
+
+    /// <summary>How many biographies are waiting to be written, and how many gave up.</summary>
+    public int BiographiesPending { get; set; }
+
+    public int BiographiesFailed { get; set; }
+
     public IReadOnlyDictionary<CrmSyncStatus, int> CrmStates { get; set; } =
         new Dictionary<CrmSyncStatus, int>();
 

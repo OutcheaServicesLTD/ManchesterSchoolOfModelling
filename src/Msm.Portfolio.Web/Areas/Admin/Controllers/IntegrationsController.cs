@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Msm.Portfolio.Web.Authorization;
 using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Enums;
+using Msm.Portfolio.Web.Integrations.Bio;
 using Msm.Portfolio.Web.Integrations.GoCardless;
 using Msm.Portfolio.Web.Integrations.HighLevel;
 using Msm.Portfolio.Web.Services;
@@ -21,7 +22,8 @@ public class IntegrationsController(
     ApplicationDbContext db,
     ICrmSyncService crmSync,
     IHighLevelService crm,
-    IGoCardlessService payments) : Controller
+    IGoCardlessService payments,
+    IBiographyWriter biographies) : Controller
 {
     [HttpGet("")]
     public async Task<IActionResult> Index(CancellationToken cancellationToken = default)
@@ -45,6 +47,11 @@ public class IntegrationsController(
         {
             CrmIsLive = crm.IsLive,
             PaymentsIsLive = payments.IsLive,
+            BiographiesAreOn = biographies.IsEnabled,
+            BiographiesPending = await db.ClientProfiles.CountAsync(
+                c => c.BiographyDraftStatus == BiographyDraftStatus.Pending, cancellationToken),
+            BiographiesFailed = await db.ClientProfiles.CountAsync(
+                c => c.BiographyDraftStatus == BiographyDraftStatus.Failed, cancellationToken),
             CrmStates = states,
             RecentCrmFailures = failing,
             WebhookEventsReceived = await db.PaymentWebhookEvents.CountAsync(cancellationToken),

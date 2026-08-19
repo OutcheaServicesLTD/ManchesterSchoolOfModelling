@@ -57,6 +57,33 @@
             </div>
         </div>
     </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 class="h6 card-title">Biographies</h2>
+                @if (Model.BiographiesAreOn)
+                {
+                    <span class="badge text-bg-success">Switched on</span>
+                    <p class="small text-muted mt-2 mb-0">
+                        A biography is written for any client who has none, and appears in
+                        their About me box to be read and saved.
+                    </p>
+                    <p class="small mb-0 mt-2">
+                        @Model.BiographiesPending waiting to be written,
+                        @Model.BiographiesFailed gave up.
+                    </p>
+                }
+                else
+                {
+                    <span class="badge text-bg-warning">Off — none are being written</span>
+                    <p class="small text-muted mt-2 mb-0">
+                        Set <code>Biography:ApiKey</code> to switch this on. Until then the
+                        About me box has to be typed by hand.
+                    </p>
+                }
+            </div>
+        </div>
+    </div>
 </div>
 
 <div class="card mb-4">
