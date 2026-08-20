@@ -234,6 +234,45 @@ public class MediaServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Renditions_made_under_older_targets_are_rebuilt()
+    {
+        // The case that matters: every file is present, so nothing looks broken, but they
+        // were made at the old smaller sizes. A raised target that only applied to the
+        // next upload would leave every portfolio already in the system as it was.
+        var ids = await UploadAsync(1);
+        var asset = await _db.MediaAssets.SingleAsync(m => m.Id == ids[0]);
+
+        Assert.Equal(ImageProcessor.RenditionVersion, asset.RenditionVersion);
+
+        asset.RenditionVersion = 0;
+        await _db.SaveChangesAsync();
+
+        Assert.True(await _service.RebuildVariantsAsync(ids[0]));
+
+        var rebuilt = await _db.MediaAssets.SingleAsync(m => m.Id == ids[0]);
+        Assert.Equal(ImageProcessor.RenditionVersion, rebuilt.RenditionVersion);
+    }
+
+    [Fact]
+    public async Task Renditions_already_at_the_current_version_are_left_alone()
+    {
+        var ids = await UploadAsync(1);
+        var asset = await _db.MediaAssets.SingleAsync(m => m.Id == ids[0]);
+        var key = MediaStorageKeys.ForVariant(asset.StorageKey, MediaVariant.Large);
+
+        // Stand-in content, so a rebuild that should not happen is detectable.
+        await _storage.UploadAsync(new MemoryStream([1, 2, 3]), key, "image/jpeg");
+
+        Assert.True(await _service.RebuildVariantsAsync(ids[0]));
+
+        await using var stream = await _storage.GetAsync(key);
+        using var buffer = new MemoryStream();
+        await stream!.CopyToAsync(buffer);
+
+        Assert.Equal(3, buffer.Length);
+    }
+
+    [Fact]
     public async Task Rebuilding_says_no_when_the_original_is_gone_too()
     {
         var ids = await UploadAsync(1);

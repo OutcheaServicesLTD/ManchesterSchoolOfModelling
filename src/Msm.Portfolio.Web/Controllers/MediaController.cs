@@ -81,12 +81,31 @@ public class MediaController(
         // Done here, on the first request for the image, so a library of broken tiles
         // repairs itself the next time somebody opens the page. Rebuilding is bounded to
         // two at a time inside the service, so a grid of sixty cannot start sixty decodes.
-        if (stream is null && asset.MediaType == MediaType.Image)
+        // Rebuilt when the file is missing, and also when it was made under older, smaller
+        // targets. A raised target that only applied to the next upload would leave every
+        // portfolio already in the system looking exactly as it did — which is the case
+        // the complaint came from.
+        var stale = asset.RenditionVersion < ImageProcessor.RenditionVersion;
+
+        if ((stream is null || stale) && asset.MediaType == MediaType.Image)
         {
+            // Closed before the rebuild, not after: this handle is on the very file about
+            // to be overwritten, and leaving it open both leaks it and risks the write
+            // failing on a platform that locks open files.
+            if (stream is not null)
+            {
+                await stream.DisposeAsync();
+                stream = null;
+            }
+
             if (await media.RebuildVariantsAsync(asset.Id, cancellationToken))
             {
                 stream = await storage.GetAsync(key, cancellationToken);
             }
+
+            // A rebuild that could not run leaves the original file in place, so the
+            // older rendition is still worth serving — better a soft photograph than none.
+            stream ??= await storage.GetAsync(key, cancellationToken);
         }
 
         if (stream is null)

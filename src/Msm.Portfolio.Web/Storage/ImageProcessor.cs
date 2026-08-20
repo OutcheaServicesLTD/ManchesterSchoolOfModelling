@@ -63,12 +63,59 @@ public class ImageProcessor(ILogger<ImageProcessor> logger) : IImageProcessor
     /// portrait and a landscape photograph are reduced by a comparable amount
     /// (specification section 13 requires both to be supported).
     /// </summary>
+    public const int LargeEdge = 4000;
+    public const int MediumEdge = 1200;
+    public const int ThumbnailEdge = 400;
+
     private static readonly (MediaVariant Variant, int LongestEdge, int Quality)[] Targets =
     [
-        (MediaVariant.Large, 2000, 88),
-        (MediaVariant.Medium, 1200, 85),
-        (MediaVariant.Thumbnail, 400, 80)
+        (MediaVariant.Large, LargeEdge, 90),
+        (MediaVariant.Medium, MediumEdge, 85),
+        (MediaVariant.Thumbnail, ThumbnailEdge, 80)
     ];
+
+    /// <summary>
+    /// How wide a rendition of this photograph comes out, without generating it.
+    /// </summary>
+    /// <remarks>
+    /// The page needs this to tell a browser which rendition to fetch. The targets apply
+    /// to the longest edge, so a portrait photograph's width is a fraction of the number
+    /// in the target — the thing that made the hero soft in the first place — and a
+    /// srcset written with the target itself would be a lie the browser acts on.
+    /// </remarks>
+    public static int RenditionWidth(int width, int height, int longestEdge)
+    {
+        if (width <= 0 || height <= 0)
+        {
+            return longestEdge;
+        }
+
+        var longest = Math.Max(width, height);
+
+        // Never scaled up, so a small original stays its own size.
+        return longest <= longestEdge
+            ? width
+            : (int)Math.Round(width * (double)longestEdge / longest);
+    }
+
+    /// <summary>
+    /// Bumped whenever the targets above change, so photographs rendered under the old
+    /// sizes are rebuilt rather than left as they are.
+    /// </summary>
+    /// <remarks>
+    /// Without this, changing a target only affects photographs uploaded afterwards, and
+    /// every portfolio already in the system keeps the renditions it was given — which is
+    /// exactly the case that matters, because the complaint always comes from looking at
+    /// work already done.
+    /// <para>
+    /// Version 2 raised Large from 2000px to 4000px on the longest edge. A portrait
+    /// photograph at 2000px on its longest edge is only 1500px wide, and the hero is a
+    /// full-width band: on a 1920px display that was a 1.6× enlargement, and 3.2× on a
+    /// high-density screen. Both are visible as softness, and no amount of quality setting
+    /// fixes an enlargement.
+    /// </para>
+    /// </remarks>
+    public const int RenditionVersion = 2;
 
     /// <summary>
     /// Reads the header only. A modern camera file is around 6000 by 4000 pixels, which

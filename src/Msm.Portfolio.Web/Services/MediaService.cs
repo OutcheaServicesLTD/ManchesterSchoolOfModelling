@@ -243,7 +243,8 @@ public class MediaService(
             Sharpness = quality?.Sharpness,
             Exposure = quality?.Exposure,
             Contrast = quality?.Contrast,
-            Clipping = quality?.Clipping
+            Clipping = quality?.Clipping,
+            RenditionVersion = ImageProcessor.RenditionVersion
         };
 
         db.MediaAssets.Add(asset);
@@ -574,7 +575,12 @@ public class MediaService(
             // Checked again inside the gate: sixty tiles asking at once means most of
             // them queue here, and by the time they are let through the first one
             // through has usually done the work already.
-            if (await storage.ExistsAsync(
+            //
+            // The version has to agree as well as the file existing. A photograph rendered
+            // under older, smaller targets has all its files present and is exactly the
+            // one that needs redoing.
+            if (asset.RenditionVersion >= ImageProcessor.RenditionVersion
+                && await storage.ExistsAsync(
                     MediaStorageKeys.ForVariant(asset.StorageKey, MediaVariant.Thumbnail),
                     cancellationToken))
             {
@@ -607,6 +613,8 @@ public class MediaService(
             }
 
             await WriteVariantsAsync(asset.StorageKey, processed.Variants, cancellationToken);
+
+            asset.RenditionVersion = ImageProcessor.RenditionVersion;
 
             // Measurements are filled in at the same time when they were never taken,
             // so a library uploaded before measuring existed starts ranking properly the

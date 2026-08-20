@@ -1,4 +1,5 @@
 @model Msm.Portfolio.Web.ViewModels.PublicPortfolioViewModel
+@using Msm.Portfolio.Web.Storage
 @using Msm.Portfolio.Web.Domain.Enums
 @{
     Layout = "_PublicLayout";
@@ -12,6 +13,22 @@
     var nameParts = p.Name.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
     var forename = nameParts.Length > 0 ? nameParts[0] : p.Name;
     var surname = nameParts.Length > 1 ? nameParts[1] : null;
+
+    // The widths the hero's renditions actually come out at, so the browser can pick one.
+    // Stated rather than assumed: the targets apply to the longest edge, so a portrait
+    // photograph is far narrower than the target number — the very thing that made the
+    // hero soft — and a srcset written with the target itself is a lie the browser acts on.
+    var largeW = ImageProcessor.RenditionWidth(p.CoverWidth ?? 0, p.CoverHeight ?? 0, ImageProcessor.LargeEdge);
+    var mediumW = ImageProcessor.RenditionWidth(p.CoverWidth ?? 0, p.CoverHeight ?? 0, ImageProcessor.MediumEdge);
+
+    // Null when there is nothing to choose between, and Razor drops a null attribute
+    // rather than writing an empty one. Built as a value rather than as a string holding
+    // its own attribute name: interpolating "srcset=..." into the tag is encoded as text,
+    // which the browser reads as an attribute whose value is one bare URL with no width —
+    // so it picks that one every time, and the largest rendition is never fetched.
+    var heroSrcset = largeW > mediumW
+        ? $"/media/{p.FeaturedAssetId}/medium {mediumW}w, /media/{p.FeaturedAssetId}/large {largeW}w"
+        : null;
 }
 
 @section Meta {
@@ -48,8 +65,16 @@
     {
         @* The hero is a crop by nature, so it obeys the focal point staff set on the
            cover photograph. Left unset it keeps the stylesheet's default framing, which
-           sits above centre because faces usually do. *@
+           sits above centre because faces usually do.
+
+           Two sizes offered: a phone takes the smaller one rather than a multi-megabyte
+           file it has no pixels for, and a desktop takes the large one because this is
+           the photograph the whole page is built around. Loaded eagerly and at high
+           priority — it is the first thing anybody sees, so nothing is gained by being
+           polite about it. *@
         <img class="hero-image" src="/media/@p.FeaturedAssetId/large"
+             srcset="@heroSrcset" sizes="100vw"
+             fetchpriority="high" decoding="async"
              style="@(p.CoverFocus is null ? null : $"object-position: {p.CoverFocus.AsCss}")"
              alt="Portrait of @p.Name" />
     }

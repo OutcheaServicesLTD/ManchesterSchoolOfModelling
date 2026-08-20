@@ -109,6 +109,17 @@ public class MediaAsset
     public bool HasBeenMeasured => Sharpness is not null;
 
     /// <summary>
+    /// Which generation of rendition sizes this photograph's web copies were made with.
+    /// </summary>
+    /// <remarks>
+    /// Zero for anything rendered before this was recorded. Compared against
+    /// ImageProcessor.RenditionVersion when a rendition is requested, so raising a target
+    /// size rebuilds the photographs already in the system instead of only applying to
+    /// the next upload.
+    /// </remarks>
+    public int RenditionVersion { get; set; }
+
+    /// <summary>
     /// Soft delete. Removal is reversible and leaves the audit trail intact;
     /// only a Super Admin may destroy media permanently.
     /// </summary>

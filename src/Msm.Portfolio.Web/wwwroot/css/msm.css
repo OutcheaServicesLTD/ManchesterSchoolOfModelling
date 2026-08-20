@@ -1264,7 +1264,17 @@ html {
 
 .hero {
     position: relative;
-    min-height: min(88vh, 900px);
+    /* Edge to edge, floor to ceiling. It was capped at 900px, which on anything taller
+       than that left a band of page showing beneath the photograph — the one thing a
+       full-bleed hero is for is not doing that.
+
+       svh rather than vh: on a phone, vh is the height with the browser's address bar
+       hidden, so a hero sized in vh is taller than the window until you scroll and the
+       bottom of it is cut off. svh is the height with the bar showing, which is what
+       somebody actually sees when the page loads. vh first for anything too old to know
+       svh. */
+    min-height: 100vh;
+    min-height: 100svh;
     display: flex;
     align-items: flex-end;
     overflow: hidden;
