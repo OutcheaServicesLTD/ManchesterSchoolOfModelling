@@ -26,6 +26,12 @@
     // its own attribute name: interpolating "srcset=..." into the tag is encoded as text,
     // which the browser reads as an attribute whose value is one bare URL with no width —
     // so it picks that one every time, and the largest rendition is never fetched.
+    // The photograph shown beside the biography. Anything but the cover where there is a
+    // choice: the cover already fills the screen above, and meeting it again a moment
+    // later reads as a page with one photograph rather than a portfolio.
+    var aboutImage = p.Images.FirstOrDefault(i => i.AssetId != p.FeaturedAssetId)
+                     ?? p.Images.FirstOrDefault();
+
     var heroSrcset = largeW > mediumW
         ? $"/media/{p.FeaturedAssetId}/medium {mediumW}w, /media/{p.FeaturedAssetId}/large {largeW}w"
         : null;
@@ -124,9 +130,23 @@
                 {<em>@surname</em>}
             </p>
 
-            @* Plain text: rendering client-supplied HTML here would be a stored XSS
-               route into every agency's browser. Razor encodes it. *@
-            <p class="lead" style="white-space: pre-line;">@p.Biography</p>
+            <div class="about-body">
+                @* Plain text: rendering client-supplied HTML here would be a stored XSS
+                   route into every agency's browser. Razor encodes it. *@
+                <p class="lead" style="white-space: pre-line;">@p.Biography</p>
+
+                @if (aboutImage is not null)
+                {
+                    <figure class="about-figure">
+                        @* Medium, not large: it is shown at a third of the column at most,
+                           and the gallery below is where a full-size photograph is reached.
+                           Lazy, because the hero above it is the page's priority. *@
+                        <img src="/media/@aboutImage.AssetId/medium"
+                             loading="lazy"
+                             alt="Photograph of @p.Name" />
+                    </figure>
+                }
+            </div>
         </section>
     }
 

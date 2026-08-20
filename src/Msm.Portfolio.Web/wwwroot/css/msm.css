@@ -1172,12 +1172,21 @@ img.wordmark-paper { display: none; }
    becomes the breathing room the design already intended. One property on the
    scrolling element covers every in-page link on the site, including any added later.
 
-   Sized to the taller of the two headers: the staff bar at 77px rather than the
-   public one at 69px. Overshooting by eight pixels on the public site costs nothing;
-   undershooting puts a heading back under the bar. */
+   Sized to the taller of the two headers: the staff bar at 77px. Undershooting puts a
+   heading back under the bar. */
 
 html {
     scroll-padding-top: 84px;
+}
+
+/* The public site gets its own header's exact height instead. Overshooting there does
+   cost something: the scroll stops fifteen pixels early, and what fills those fifteen
+   pixels is the bottom of whatever section is above — clicking About left a dark strip
+   of the hero photograph wedged under the bar. Stopping exactly at the foot of the
+   header means the section's own top padding, forty pixels at its narrowest, is all
+   that separates the heading from the bar. */
+html:has(body.public) {
+    scroll-padding-top: var(--public-header);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════════
@@ -1260,6 +1269,39 @@ html {
 .about-name em {
     font-style: italic;
     margin-left: 0.25em;
+}
+
+/* Biography on the left, a photograph on the right. The biography alone left the right
+   half of the section empty — on a page whose entire subject is photographs, that is the
+   one place a picture should never have to be asked for.
+
+   One photograph, not a row of them: the gallery further down is where the work is shown
+   in full, and repeating it here would make the About section a worse version of it. */
+.about-body {
+    display: grid;
+    gap: clamp(2rem, 4vw, 4rem);
+}
+
+@media (min-width: 992px) {
+    .about-body {
+        grid-template-columns: minmax(0, 1fr) clamp(240px, 30%, 400px);
+        /* Start, not stretch: the photograph keeps its own proportions rather than being
+           stretched to whatever height the biography happens to be. */
+        align-items: start;
+    }
+}
+
+.about-figure {
+    margin: 0;
+}
+
+.about-figure img {
+    display: block;
+    width: 100%;
+    /* A fixed portrait shape, so the section looks composed whether the photograph
+       behind it is portrait, square or landscape. */
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
 }
 
 /* ── The hero ─────────────────────────────────────────────────────────────────────
