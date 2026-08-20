@@ -93,6 +93,11 @@
     --track-label: 0.28em;
     --track-button: 0.24em;
     --track-eyebrow: 0.32em;
+
+    /* The height of the public header: 68px of bar plus its one pixel of rule. It is
+       sticky, so it takes up room at the top of the page rather than floating over it,
+       and anything asking for "the rest of the window" has to subtract it. */
+    --public-header: 69px;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1272,9 +1277,15 @@ html {
        hidden, so a hero sized in vh is taller than the window until you scroll and the
        bottom of it is cut off. svh is the height with the bar showing, which is what
        somebody actually sees when the page loads. vh first for anything too old to know
-       svh. */
-    min-height: 100vh;
-    min-height: 100svh;
+       svh.
+
+       The header is subtracted because it is sticky: it sits in the page rather than
+       over it, so a hero asking for a whole window's worth of height starts 69px down
+       and ends 69px below the bottom of the screen. The name and the Available for
+       bookings line still looked right; it was the View portfolio button at the foot of
+       the block that was pushed over the edge and never seen. */
+    min-height: calc(100vh - var(--public-header));
+    min-height: calc(100svh - var(--public-header));
     display: flex;
     align-items: flex-end;
     overflow: hidden;
