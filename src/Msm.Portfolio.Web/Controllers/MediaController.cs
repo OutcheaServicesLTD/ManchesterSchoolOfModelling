@@ -85,7 +85,16 @@ public class MediaController(
         // targets. A raised target that only applied to the next upload would leave every
         // portfolio already in the system looking exactly as it did — which is the case
         // the complaint came from.
-        var stale = asset.RenditionVersion < ImageProcessor.RenditionVersion;
+        //
+        // Only for the large rendition, though. A library page asks for sixty thumbnails
+        // at once, and rebuilding on the strength of the version alone turned one page
+        // view into sixty decodes queueing behind each other — competing for memory with
+        // whatever the retoucher was uploading at the time, and taking the process down
+        // with it. Only the large rendition changed size in a way anybody can see, so
+        // only the large rendition is worth redoing for it; a thumbnail from the old
+        // targets is the same thumbnail.
+        var stale = asset.RenditionVersion < ImageProcessor.RenditionVersion
+                    && served == MediaVariant.Large;
 
         if ((stream is null || stale) && asset.MediaType == MediaType.Image)
         {

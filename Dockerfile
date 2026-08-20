@@ -43,8 +43,33 @@ RUN useradd --create-home --uid 10001 msm \
     && chown -R msm:msm /app /data
 USER msm
 
+# MALLOC_ARENA_MAX is the one that matters most here, and it is not obvious.
+#
+# Decoding a photograph allocates outside the .NET heap, through the system allocator,
+# which by default keeps a separate arena per thread — dozens of them on a thread pool.
+# Freed image memory goes back to whichever arena it came from and stays there, so the
+# process holds on to a little more after every photograph and never gives it back. A
+# sixty-photograph batch measured at 636MB against a 512MB container, and the kernel
+# killed it: half the batch uploaded and the rest reported a dropped connection.
+#
+# Two arenas instead of dozens: the same batch peaks at 391MB. Nothing else moved the
+# number anywhere near as far — halving how many photographs upload at once took 636 to
+# 607, because concurrency was never what was driving it.
+#
+# Workstation garbage collection, not server. Server GC is the ASP.NET Core default and
+# is tuned for a machine with cores and memory to spare: it keeps a heap per core and
+# collects lazily, which on a half-core container with 512MB is the difference between
+# comfortable and killed. Decoding photographs allocates hard and in bursts, so the
+# process is exactly the shape that punishes a lazy collector.
+#
+# ConserveMemory leans the same way: give memory back rather than hold it against the
+# next burst.
 ENV ASPNETCORE_ENVIRONMENT=Production \
     DOTNET_RUNNING_IN_CONTAINER=true \
+    DOTNET_gcServer=0 \
+    DOTNET_GCConserveMemory=5 \
+    MALLOC_ARENA_MAX=2 \
+    MALLOC_TRIM_THRESHOLD_=131072 \
     Database__Provider=Sqlite \
     Database__ConnectionString="Data Source=/data/msm-portfolio.db" \
     Media__LocalStorageRoot=/data/media

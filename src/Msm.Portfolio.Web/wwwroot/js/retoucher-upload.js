@@ -217,9 +217,15 @@
     // Two at a time, not one and not all of them.
     //
     // One leaves the connection idle while the server decodes the file just sent, which
-    // on a whole shoot is a lot of waiting. Two keeps the next file uploading while the
-    // last is processed. Much beyond that and several large photographs are decoded at
-    // once, which is what exhausted the server and dropped the batch in the first place.
+    // over a whole shoot is a lot of waiting — sixty camera photographs take 33 seconds
+    // one at a time and 19 two at a time. Much beyond two and several large photographs
+    // are decoded at once, which is what exhausted the server and dropped a batch once
+    // before.
+    //
+    // Measured rather than assumed: a sixty-photograph batch of 4000x6000 files peaks at
+    // 391MB against a 512MB container. It was 636MB before the allocator was told to stop
+    // hoarding freed image memory — see the Dockerfile — and dropping to one at a time
+    // barely touched that, because concurrency was never the thing driving it.
     const atOnce = 2;
 
     function pump() {

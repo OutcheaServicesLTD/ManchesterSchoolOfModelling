@@ -172,7 +172,15 @@ public class MediaService(
     {
         // Buffered so the image can be inspected, re-read for variants, and stored,
         // without depending on the upload stream being seekable.
-        using var buffer = new MemoryStream();
+        //
+        // Sized up front from the file's own length. An empty MemoryStream grows by
+        // doubling, so a 20MB photograph is reached through a chain of ever larger
+        // arrays — every one of them big enough for the large object heap, which is not
+        // compacted. Sixty of those in a batch fragments the heap badly enough to push a
+        // small container over its limit, which arrives at the retoucher as half a batch
+        // uploading and the rest reporting a dropped connection.
+        using var buffer = new MemoryStream(
+            file.Length > 0 && file.Length < int.MaxValue ? (int)file.Length : 0);
         await using (var source = file.OpenReadStream())
         {
             await source.CopyToAsync(buffer, cancellationToken);
@@ -552,10 +560,13 @@ public class MediaService(
     /// A grid of sixty thumbnails asks for sixty images at once. If every missing one
     /// started its own decode, a single page load would try to decode sixty photographs
     /// simultaneously and exhaust memory — turning a page that showed broken images into
-    /// a server that fell over. Two at a time, for the same reason the uploader sends two
-    /// at a time.
+    /// a server that fell over.
+    /// <para>
+    /// One at a time, not two. Repair is background work nobody is timing, and it competes
+    /// for memory with uploads, which somebody is very much waiting for.
+    /// </para>
     /// </remarks>
-    private static readonly SemaphoreSlim RebuildGate = new(2, 2);
+    private static readonly SemaphoreSlim RebuildGate = new(1, 1);
 
     public async Task<bool> RebuildVariantsAsync(
         Guid assetId, CancellationToken cancellationToken = default)
@@ -586,6 +597,11 @@ public class MediaService(
             {
                 return true;
             }
+
+            // Rebuilding writes every rendition, so the version moves forward for all of
+            // them at once — a photograph rebuilt because its hero image was out of date
+            // is not asked again when its thumbnail is fetched a moment later.
+
 
             await using var original = await storage.GetAsync(asset.StorageKey, cancellationToken);
 

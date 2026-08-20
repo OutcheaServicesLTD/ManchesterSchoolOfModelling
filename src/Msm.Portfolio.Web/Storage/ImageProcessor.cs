@@ -63,7 +63,27 @@ public class ImageProcessor(ILogger<ImageProcessor> logger) : IImageProcessor
     /// portrait and a landscape photograph are reduced by a comparable amount
     /// (specification section 13 requires both to be supported).
     /// </summary>
-    public const int LargeEdge = 4000;
+    /// <summary>
+    /// 3000, not more.
+    /// </summary>
+    /// <remarks>
+    /// Two things pin this number. Memory: a decode at 3000 costs about 23MB and the
+    /// resize another 23MB, so two uploads at once need roughly 92MB — affordable on a
+    /// 512MB container. At 4000 the same pair needs about 143MB, which on top of the
+    /// application itself and the uploaded files held in memory is enough to have the
+    /// process killed, and a killed process reaches the retoucher as half a batch
+    /// uploading and the rest reporting a dropped connection.
+    /// <para>
+    /// And JPEG only decodes at eighths, so 3000 lands exactly on the half-size step for
+    /// a 6000px original — no enlargement anywhere. A target of 4000 asks for two thirds,
+    /// gets five eighths, and quietly enlarges the difference.
+    /// </para>
+    /// <para>
+    /// 3000 on the longest edge is 2000px wide for a 2:3 portrait, which is the full
+    /// width of a 1920px hero with pixels to spare. That was the point of raising it.
+    /// </para>
+    /// </remarks>
+    public const int LargeEdge = 3000;
     public const int MediumEdge = 1200;
     public const int ThumbnailEdge = 400;
 
@@ -108,7 +128,7 @@ public class ImageProcessor(ILogger<ImageProcessor> logger) : IImageProcessor
     /// exactly the case that matters, because the complaint always comes from looking at
     /// work already done.
     /// <para>
-    /// Version 2 raised Large from 2000px to 4000px on the longest edge. A portrait
+    /// Version 2 raised Large from 2000px to 3000px on the longest edge. A portrait
     /// photograph at 2000px on its longest edge is only 1500px wide, and the hero is a
     /// full-width band: on a 1920px display that was a 1.6× enlargement, and 3.2× on a
     /// high-density screen. Both are visible as softness, and no amount of quality setting
