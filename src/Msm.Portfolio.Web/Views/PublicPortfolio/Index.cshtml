@@ -89,19 +89,19 @@
     {
         <section class="section" id="about" aria-labelledby="about-heading">
             <h2 class="section-title" id="about-heading">About</h2>
-            <div class="row">
-                <div class="col-md-6">
-                    <p class="display-6">
-                        @forename@if (surname is not null)
-                        {<br /><em>@surname</em>}
-                    </p>
-                </div>
-                <div class="col-md-6">
-                    @* Plain text: rendering client-supplied HTML here would be a stored XSS
-                       route into every agency's browser. Razor encodes it. *@
-                    <p class="lead" style="white-space: pre-line;">@p.Biography</p>
-                </div>
-            </div>
+
+            @* The name runs the full width with the biography beneath it, rather than the
+               two columns this used to be. Side by side, a short biography left most of
+               the left-hand column empty — a bigger hole the shorter the text, which is
+               the wrong way round. *@
+            <p class="about-name">
+                @forename@if (surname is not null)
+                {<em>@surname</em>}
+            </p>
+
+            @* Plain text: rendering client-supplied HTML here would be a stored XSS
+               route into every agency's browser. Razor encodes it. *@
+            <p class="lead" style="white-space: pre-line;">@p.Biography</p>
         </section>
     }
 

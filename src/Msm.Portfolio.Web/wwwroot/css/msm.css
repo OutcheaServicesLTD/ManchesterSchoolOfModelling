@@ -1236,6 +1236,27 @@ html {
     color: var(--fg);
 }
 
+/* ── The About section ──────────────────────────────────────────────────────────
+   The name across the full width, biography beneath. It was two columns, name left
+   and text right, which left the left-hand column emptier the shorter the biography
+   was — backwards, since a short biography is exactly when a page needs to look
+   deliberate rather than unfinished. */
+
+.about-name {
+    font-family: var(--display);
+    font-size: clamp(2.4rem, 7vw, 5rem);
+    font-weight: 300;
+    line-height: 1.05;
+    margin: 0 0 1.8rem;
+}
+
+/* Italic surname, set beside the forename rather than under it. Inline, so a long
+   name still wraps on a narrow screen instead of running off the side. */
+.about-name em {
+    font-style: italic;
+    margin-left: 0.25em;
+}
+
 /* ── The hero ─────────────────────────────────────────────────────────────────────
    Full-bleed photograph, the model's name set enormous in Bodoni with the surname in
    italic beneath. The gradient exists so white type stays legible over any
