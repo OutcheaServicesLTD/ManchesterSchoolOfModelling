@@ -427,6 +427,331 @@
             });
         })();
 
+        // ── The menu button on a phone or tablet ─────────────────────────────────
+        // The section links are a row on a desktop and a panel below the bar under it.
+        // Absent on every page but a portfolio, so this binds nothing elsewhere.
+        (function () {
+            var button = document.querySelector('[data-nav-toggle]');
+
+            if (!button) {
+                return;
+            }
+
+            var nav = document.getElementById(button.getAttribute('aria-controls'));
+
+            if (!nav) {
+                return;
+            }
+
+            var setOpen = function (open) {
+                nav.classList.toggle('is-open', open);
+                button.setAttribute('aria-expanded', open ? 'true' : 'false');
+            };
+
+            button.addEventListener('click', function () {
+                setOpen(button.getAttribute('aria-expanded') !== 'true');
+            });
+
+            // Following a link inside the panel scrolls the page behind it, so leaving
+            // the panel covering that section would be answering the tap with a menu.
+            nav.addEventListener('click', function (event) {
+                if (event.target.closest('a')) {
+                    setOpen(false);
+                }
+            });
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape' && nav.classList.contains('is-open')) {
+                    setOpen(false);
+                    button.focus();
+                }
+            });
+
+            // Turning a phone on its side can cross into the desktop layout, where the
+            // links are a row again and the panel would otherwise be left open on top
+            // of them.
+            var wide = window.matchMedia('(min-width: 992px)');
+            var closeIfWide = function (query) {
+                if (query.matches) {
+                    setOpen(false);
+                }
+            };
+
+            if (wide.addEventListener) {
+                wide.addEventListener('change', closeIfWide);
+            } else if (wide.addListener) {
+                wide.addListener(closeIfWide);
+            }
+        })();
+
+        // ── The photograph viewer ────────────────────────────────────────────────
+        // A portfolio photograph used to open as a bare image file, which left the
+        // agency looking at a page with no way to the next photograph and no way back
+        // but the browser's own button. The links still work as links — this takes them
+        // over only once it has run, so a viewer with scripting off loses nothing.
+        (function () {
+            var gallery = document.querySelector('[data-viewer]');
+
+            if (!gallery) {
+                return;
+            }
+
+            var links = Array.prototype.slice.call(
+                gallery.querySelectorAll('[data-viewer-item]'));
+
+            if (links.length === 0) {
+                return;
+            }
+
+            var overlay = null;
+            var photo = null;
+            var strip = null;
+            var count = null;
+            var closeButton = null;
+            var thumbs = [];
+            var index = 0;
+            var opener = null;
+
+            // An icon drawn rather than typed: a multiplication sign and two chevrons in
+            // a text node are read aloud by a screen reader as themselves.
+            var icon = function (path) {
+                var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('viewBox', '0 0 24 24');
+                svg.setAttribute('aria-hidden', 'true');
+                var shape = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                shape.setAttribute('d', path);
+                svg.appendChild(shape);
+                return svg;
+            };
+
+            var button = function (className, label, path, onClick) {
+                var element = document.createElement('button');
+                element.type = 'button';
+                element.className = className;
+                element.setAttribute('aria-label', label);
+                element.appendChild(icon(path));
+                element.addEventListener('click', onClick);
+                return element;
+            };
+
+            var build = function () {
+                overlay = document.createElement('div');
+                overlay.className = 'viewer' + (links.length === 1 ? ' is-single' : '');
+                overlay.setAttribute('role', 'dialog');
+                overlay.setAttribute('aria-modal', 'true');
+                overlay.setAttribute('aria-label', 'Photograph viewer');
+
+                var bar = document.createElement('div');
+                bar.className = 'viewer-bar';
+
+                count = document.createElement('p');
+                count.className = 'viewer-count';
+                // Announced when it changes, so moving through the shoot is audible as
+                // well as visible.
+                count.setAttribute('aria-live', 'polite');
+                bar.appendChild(count);
+
+                closeButton = button('viewer-close', 'Close', 'M6 6l12 12M18 6L6 18', close);
+                bar.appendChild(closeButton);
+
+                var stage = document.createElement('div');
+                stage.className = 'viewer-stage';
+
+                photo = document.createElement('img');
+                photo.decoding = 'async';
+                stage.appendChild(photo);
+
+                stage.appendChild(button('viewer-prev', 'Previous photograph',
+                    'M15 5l-7 7 7 7', function () { step(-1); }));
+                stage.appendChild(button('viewer-next', 'Next photograph',
+                    'M9 5l7 7-7 7', function () { step(1); }));
+
+                strip = document.createElement('div');
+                strip.className = 'viewer-strip';
+                strip.setAttribute('role', 'group');
+                strip.setAttribute('aria-label', 'Photographs in this portfolio');
+
+                thumbs = links.map(function (link, position) {
+                    var thumb = document.createElement('button');
+                    thumb.type = 'button';
+                    thumb.setAttribute('aria-label',
+                        'Photograph ' + (position + 1) + ' of ' + links.length);
+
+                    var picture = document.createElement('img');
+                    var source = link.querySelector('img');
+                    // The thumbnail rendition, not the one in the grid: the strip holds
+                    // every photograph in the portfolio at 54 pixels wide, and reusing
+                    // the grid's image would fetch sixty 1200-pixel files to do it.
+                    picture.src = link.getAttribute('data-thumb')
+                        || (source ? source.currentSrc || source.src : link.href);
+                    picture.alt = '';
+                    picture.loading = 'lazy';
+                    thumb.appendChild(picture);
+
+                    thumb.addEventListener('click', function () { show(position); });
+                    strip.appendChild(thumb);
+                    return thumb;
+                });
+
+                overlay.appendChild(bar);
+                overlay.appendChild(stage);
+                overlay.appendChild(strip);
+
+                // The backdrop closes, the photograph does not: a mistimed tap while
+                // moving through a shoot should not throw the viewer away.
+                overlay.addEventListener('click', function (event) {
+                    if (event.target === overlay || event.target === stage) {
+                        close();
+                    }
+                });
+
+                document.body.appendChild(overlay);
+            };
+
+            var show = function (position) {
+                index = (position + links.length) % links.length;
+
+                var link = links[index];
+                var source = link.querySelector('img');
+
+                photo.src = link.href;
+                photo.alt = source ? source.alt : '';
+                count.textContent = (index + 1) + ' of ' + links.length;
+
+                thumbs.forEach(function (thumb, position2) {
+                    if (position2 === index) {
+                        thumb.setAttribute('aria-current', 'true');
+                    } else {
+                        thumb.removeAttribute('aria-current');
+                    }
+                });
+
+                if (thumbs[index]) {
+                    thumbs[index].scrollIntoView({ block: 'nearest', inline: 'center' });
+                }
+
+                // The next one and the one before are fetched now rather than when they
+                // are asked for, so pressing through a shoot does not wait on the network
+                // at every step.
+                [index + 1, index - 1].forEach(function (near) {
+                    var neighbour = links[(near + links.length) % links.length];
+                    if (neighbour !== link) {
+                        new Image().src = neighbour.href;
+                    }
+                });
+            };
+
+            var step = function (by) {
+                show(index + by);
+            };
+
+            function close() {
+                if (!overlay) {
+                    return;
+                }
+
+                overlay.remove();
+                overlay = null;
+                document.body.classList.remove('viewer-open');
+                document.removeEventListener('keydown', keys, true);
+
+                // Back to the photograph that was clicked, rather than to the top of the
+                // page, so a keyboard carries on where it left off.
+                if (opener) {
+                    opener.focus();
+                    opener = null;
+                }
+            }
+
+            function keys(event) {
+                if (!overlay) {
+                    return;
+                }
+
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    close();
+                } else if (event.key === 'ArrowRight') {
+                    event.preventDefault();
+                    step(1);
+                } else if (event.key === 'ArrowLeft') {
+                    event.preventDefault();
+                    step(-1);
+                } else if (event.key === 'Tab') {
+                    // Held inside the viewer: tabbing out of it lands on a page that
+                    // cannot be seen, and the focus ring disappears with it.
+                    var focusable = Array.prototype.slice.call(
+                        overlay.querySelectorAll('button'));
+
+                    if (focusable.length === 0) {
+                        return;
+                    }
+
+                    var first = focusable[0];
+                    var last = focusable[focusable.length - 1];
+
+                    if (event.shiftKey && document.activeElement === first) {
+                        event.preventDefault();
+                        last.focus();
+                    } else if (!event.shiftKey && document.activeElement === last) {
+                        event.preventDefault();
+                        first.focus();
+                    }
+                }
+            }
+
+            var open = function (position, trigger) {
+                opener = trigger;
+                build();
+                document.body.classList.add('viewer-open');
+                document.addEventListener('keydown', keys, true);
+                show(position);
+                closeButton.focus();
+            };
+
+            links.forEach(function (link, position) {
+                link.addEventListener('click', function (event) {
+                    // A middle click, or a click with a modifier held, is a request for a
+                    // new tab or a download. Those are left alone.
+                    if (event.button !== 0 || event.metaKey || event.ctrlKey
+                        || event.shiftKey || event.altKey) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    open(position, link);
+                });
+            });
+
+            // Swiping, because on a phone that is how photographs are moved through.
+            // Only a mostly-sideways drag counts, so a scroll of the thumbnail strip is
+            // not read as a request for the next photograph.
+            var startX = 0;
+            var startY = 0;
+
+            document.addEventListener('touchstart', function (event) {
+                if (!overlay || event.touches.length !== 1) {
+                    return;
+                }
+                startX = event.touches[0].clientX;
+                startY = event.touches[0].clientY;
+            }, { passive: true });
+
+            document.addEventListener('touchend', function (event) {
+                if (!overlay || startX === 0 || event.changedTouches.length !== 1) {
+                    return;
+                }
+
+                var movedX = event.changedTouches[0].clientX - startX;
+                var movedY = event.changedTouches[0].clientY - startY;
+                startX = 0;
+
+                if (Math.abs(movedX) > 50 && Math.abs(movedX) > Math.abs(movedY)) {
+                    step(movedX < 0 ? 1 : -1);
+                }
+            }, { passive: true });
+        })();
+
         // ── Copy a value to the clipboard ────────────────────────────────────────
         // The model's own portfolio address, so they can paste it into a message.
         document.querySelectorAll('[data-copy-target]').forEach(function (button) {

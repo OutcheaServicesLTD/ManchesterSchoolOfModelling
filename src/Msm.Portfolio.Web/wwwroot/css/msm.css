@@ -1179,14 +1179,20 @@ html {
     scroll-padding-top: 84px;
 }
 
-/* The public site gets its own header's exact height instead. Overshooting there does
-   cost something: the scroll stops fifteen pixels early, and what fills those fifteen
-   pixels is the bottom of whatever section is above — clicking About left a dark strip
-   of the hero photograph wedged under the bar. Stopping exactly at the foot of the
-   header means the section's own top padding, forty pixels at its narrowest, is all
-   that separates the heading from the bar. */
+/* The public site gets its own header's height instead. Overshooting there costs
+   something: the scroll stops early, and what fills the gap is the bottom of whatever
+   section is above — clicking About left a dark strip of the hero photograph wedged
+   under the bar.
+
+   Two pixels short of the header rather than exactly its height, because exactly its
+   height is not reliably exact. The bar is 69 CSS pixels, but a screen at 125% or 150%
+   scaling rounds that to whole device pixels and the scroll position with it, and the
+   two round apart often enough to leave a hairline of the section above showing. Two
+   pixels of overlap absorbs the rounding whichever way it goes, and what it hides is
+   two pixels of the section's own top padding — forty at its narrowest, so nothing that
+   can be seen. */
 html:has(body.public) {
-    scroll-padding-top: var(--public-header);
+    scroll-padding-top: calc(var(--public-header) - 2px);
 }
 
 /* ══════════════════════════════════════════════════════════════════════════════════
@@ -1232,8 +1238,98 @@ html:has(body.public) {
     gap: clamp(1rem, 2.5vw, 2rem);
 }
 
-@media (min-width: 768px) {
+/* A row of links from a desktop width up. Below that the row is a panel, opened by the
+   button — 992 rather than 768, because on a tablet the four links and the wordmark were
+   fighting over the same middle of the bar. */
+@media (min-width: 992px) {
     .portfolio-nav { display: flex; }
+}
+
+@media (max-width: 991.98px) {
+    .portfolio-nav.is-open {
+        display: flex;
+        flex-direction: column;
+        gap: 1.4rem;
+        /* Anchored to the header, which is sticky and therefore already a positioning
+           context. Full width rather than a small floating card: a section link is the
+           only navigation this page has, and it should be easy to hit with a thumb. */
+        position: absolute;
+        top: 100%;
+        left: 0;
+        right: 0;
+        padding: 1.6rem clamp(20px, 5vw, 64px) 1.8rem;
+        /* Opaque, unlike the bar above it. The bar can afford to be translucent because
+           there is only ever a photograph behind it; a list of links cannot. */
+        background: var(--bg);
+        border-bottom: 1px solid var(--line);
+    }
+
+    .portfolio-nav.is-open a {
+        font-size: 13px;
+    }
+}
+
+/* ── The menu button ────────────────────────────────────────────────────────────── */
+
+.nav-toggle {
+    grid-column: 1;
+    justify-self: start;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    /* A 44px target: the size a finger needs, which a 20px icon is not. */
+    width: 44px;
+    height: 44px;
+    margin-left: -10px;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--fg);
+    cursor: pointer;
+}
+
+@media (min-width: 992px) {
+    .nav-toggle { display: none; }
+}
+
+/* Three bars: the middle one is the element itself, the outer two are its corners,
+   positioned absolutely so the spacing above and below is exactly equal — offset in the
+   flow instead, they are out by the height of the bar between them, and the cross they
+   fold into lands crooked. */
+.nav-toggle-bars {
+    position: relative;
+    display: block;
+    width: 22px;
+    height: 1px;
+    background: currentColor;
+    transition: background-color 0.2s ease;
+}
+
+.nav-toggle-bars::before,
+.nav-toggle-bars::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    width: 22px;
+    height: 1px;
+    background: currentColor;
+    transition: transform 0.25s ease;
+}
+
+.nav-toggle-bars::before { top: -7px; }
+.nav-toggle-bars::after { top: 7px; }
+
+/* Open, the bars fold into a cross, so the same button closes what it opened. */
+.nav-toggle[aria-expanded="true"] .nav-toggle-bars {
+    background: transparent;
+}
+
+.nav-toggle[aria-expanded="true"] .nav-toggle-bars::before {
+    transform: translateY(7px) rotate(45deg);
+}
+
+.nav-toggle[aria-expanded="true"] .nav-toggle-bars::after {
+    transform: translateY(-7px) rotate(-45deg);
 }
 
 .portfolio-nav a {
@@ -1520,6 +1616,164 @@ html:has(body.public) {
     height: auto;
     display: block;
     background: var(--raised);
+}
+
+/* ── The photograph viewer ────────────────────────────────────────────────────────
+   Clicking a photograph used to leave the portfolio for a page containing nothing but
+   an image file: no way to the next one, and no way back except the browser's own
+   button. This keeps the page underneath and puts the photograph on top of it, with the
+   rest of the shoot along the bottom.
+
+   Built by the script when a photograph is first opened, so a page nobody clicks on
+   carries none of it. */
+
+.viewer {
+    position: fixed;
+    inset: 0;
+    /* Above the sticky headers, which sit at 50. */
+    z-index: 200;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    /* Near-black rather than the page background in either theme: a photograph is judged
+       against what surrounds it, and a bright surround is a thumb on the scales. Solid,
+       not nearly solid — the portfolio grid showing faintly through is the one thing in
+       view competing with the photograph. */
+    background: #0a0a0a;
+    color: #fff;
+}
+
+/* The page behind must not scroll while the viewer is over it: on a phone, dragging the
+   photograph otherwise scrolls the portfolio underneath instead. */
+body.viewer-open {
+    overflow: hidden;
+}
+
+.viewer-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.9rem clamp(12px, 4vw, 32px);
+}
+
+.viewer-count {
+    font-size: 11px;
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.65);
+}
+
+.viewer-stage {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* Nothing wider than the arrows either side of it. */
+    padding: 0 clamp(46px, 8vw, 96px);
+    /* Without this the image's own size wins the row and the strip is pushed off the
+       bottom of the screen. */
+    min-height: 0;
+}
+
+.viewer-stage img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+}
+
+/* Close, previous and next share one look: a plain target with nothing drawn around it
+   until it is focused or pointed at. */
+.viewer button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+    color: #fff;
+    cursor: pointer;
+    transition: background-color 0.2s ease;
+}
+
+.viewer button:hover,
+.viewer button:focus-visible {
+    background: rgba(255, 255, 255, 0.18);
+}
+
+.viewer svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.viewer-prev,
+.viewer-next {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+.viewer-prev { left: clamp(4px, 2vw, 24px); }
+.viewer-next { right: clamp(4px, 2vw, 24px); }
+
+/* One photograph has nowhere to go, so it is shown without the means to go there. */
+.viewer.is-single .viewer-prev,
+.viewer.is-single .viewer-next,
+.viewer.is-single .viewer-strip {
+    display: none;
+}
+
+.viewer-strip {
+    display: flex;
+    gap: 8px;
+    /* The rest of the shoot, scrollable sideways. Kept to a strip rather than a grid so
+       the photograph above it keeps the height. */
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding: 10px clamp(12px, 4vw, 32px) calc(10px + env(safe-area-inset-bottom));
+    scrollbar-width: thin;
+}
+
+.viewer-strip button {
+    flex: 0 0 auto;
+    width: 54px;
+    height: 72px;
+    padding: 0;
+    border-radius: 0;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.06);
+    opacity: 0.45;
+    transition: opacity 0.2s ease, outline-color 0.2s ease;
+    outline: 1px solid transparent;
+    outline-offset: -1px;
+}
+
+.viewer-strip button:hover,
+.viewer-strip button:focus-visible {
+    opacity: 0.85;
+}
+
+.viewer-strip button[aria-current="true"] {
+    opacity: 1;
+    outline-color: #fff;
+}
+
+.viewer-strip img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+@media (min-width: 768px) {
+    .viewer-strip button { width: 66px; height: 88px; }
 }
 
 /* ── Measurements ─────────────────────────────────────────────────────────────────

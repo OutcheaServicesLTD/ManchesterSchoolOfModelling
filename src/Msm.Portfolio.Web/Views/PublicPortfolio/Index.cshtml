@@ -50,8 +50,17 @@
 }
 
 @section HeaderNav {
+    @* Below a desktop width the four links become this button and a panel beneath the
+       bar. They were simply hidden on a phone, which left no way to reach a section at
+       all, and on a tablet they were pressed up against the wordmark. *@
+    <button class="nav-toggle" type="button" data-nav-toggle
+            aria-controls="portfolio-nav" aria-expanded="false">
+        <span class="nav-toggle-bars" aria-hidden="true"></span>
+        <span class="visually-hidden">Menu</span>
+    </button>
+
     @* Minimal, per specification section 15: no join, no sign-up, no account prompt. *@
-    <nav class="portfolio-nav" aria-label="Sections">
+    <nav class="portfolio-nav" id="portfolio-nav" aria-label="Sections">
         @if (hasAbout)
         {
             <a href="#about">About</a>
@@ -175,13 +184,17 @@
         }
         else
         {
-            <ul class="gallery">
+            @* data-viewer turns these links into the overlay viewer. The links themselves
+               are ordinary ones and stay that way: with scripting unavailable, or before
+               the script has run, clicking a photograph still opens it. *@
+            <ul class="gallery" data-viewer>
                 @foreach (var image in p.Images)
                 {
                     <li class="@(image.Orientation == MediaOrientation.Landscape ? "landscape" : "")">
                         @* Medium in the grid, large behind the link: the archived original
                            is never served to a browser (specification sections 13 and 42). *@
-                        <a href="/media/@image.AssetId/large">
+                        <a href="/media/@image.AssetId/large" data-viewer-item
+                           data-thumb="/media/@image.AssetId/thumbnail">
                             <img src="/media/@image.AssetId/medium"
                                  loading="lazy"
                                  width="@image.Width" height="@image.Height"
