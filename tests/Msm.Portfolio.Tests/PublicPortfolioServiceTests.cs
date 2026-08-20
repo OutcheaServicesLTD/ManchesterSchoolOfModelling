@@ -270,6 +270,40 @@ public class PublicPortfolioServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task Hair_and_eye_colour_join_the_measurements()
+    {
+        var clientId = AddModel();
+        var client = _db.ClientProfiles.Single(c => c.Id == clientId);
+        client.HairColour = " Brown ";
+        client.EyeColour = "Blue";
+        _db.SaveChanges();
+
+        var portfolio = await _service.GetBySlugAsync("emma-johnson");
+
+        var labels = portfolio!.Measurements.Select(m => m.Label).ToArray();
+        Assert.Equal(["Height", "Hair", "Eyes"], labels);
+
+        // Trimmed, and with no unit: "Brown cm" would be nonsense.
+        var hair = portfolio.Measurements.Single(m => m.Label == "Hair");
+        Assert.Equal("Brown", hair.Value);
+        Assert.Null(hair.Unit);
+    }
+
+    [Fact]
+    public async Task A_colour_nobody_filled_in_is_left_out()
+    {
+        var clientId = AddModel();
+        var client = _db.ClientProfiles.Single(c => c.Id == clientId);
+        client.EyeColour = "Green";
+        client.HairColour = "   ";
+        _db.SaveChanges();
+
+        var portfolio = await _service.GetBySlugAsync("emma-johnson");
+
+        Assert.Equal(["Height", "Eyes"], portfolio!.Measurements.Select(m => m.Label));
+    }
+
+    [Fact]
     public async Task A_self_tape_appears_only_when_one_exists()
     {
         AddModel(slug: "with-tape", withSelfTape: true);

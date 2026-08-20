@@ -140,6 +140,22 @@ public class PublicPortfolioService(
             })
             .ToList();
 
+        // Hair and eye colour are columns on the client rather than measurement rows —
+        // the templates hold numbers, and these are words — but on an agency's card they
+        // belong in the same list as height and shoe size, which is where an agency looks
+        // for them. Last, because the numbers are read as a group.
+        foreach (var (label, value) in new[]
+                 {
+                     ("Hair", client.HairColour),
+                     ("Eyes", client.EyeColour)
+                 })
+        {
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                measurements.Add(new PublicMeasurement(label, value.Trim(), null));
+            }
+        }
+
         return new PublicPortfolio(
             client.Id,
             portfolio.Slug!,
