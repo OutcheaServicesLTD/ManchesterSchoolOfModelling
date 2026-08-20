@@ -121,16 +121,16 @@
         <section class="section" id="about" aria-labelledby="about-heading">
             <h2 class="section-title" id="about-heading">About</h2>
 
-            @* The name runs the full width with the biography beneath it, rather than the
-               two columns this used to be. Side by side, a short biography left most of
-               the left-hand column empty — a bigger hole the shorter the text, which is
-               the wrong way round. *@
-            <p class="about-name">
-                @forename@if (surname is not null)
-                {<em>@surname</em>}
-            </p>
-
             <div class="about-body">
+                @* Name above the biography, both of them beside the photograph, which runs
+                   the height of the two. The name used to run the full width with the
+                   photograph starting level with the text underneath it — so the picture
+                   began halfway down the section with nothing to line up against. *@
+                <p class="about-name">
+                    @forename@if (surname is not null)
+                    {<em>@surname</em>}
+                </p>
+
                 @* Plain text: rendering client-supplied HTML here would be a stored XSS
                    route into every agency's browser. Razor encodes it. *@
                 <p class="lead" style="white-space: pre-line;">@p.Biography</p>

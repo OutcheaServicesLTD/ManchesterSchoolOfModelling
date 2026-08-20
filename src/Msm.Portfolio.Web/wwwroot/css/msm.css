@@ -1258,10 +1258,23 @@ html:has(body.public) {
 
 .about-name {
     font-family: var(--display);
-    font-size: clamp(2.4rem, 7vw, 5rem);
+    font-size: var(--about-name-size);
     font-weight: 300;
     line-height: 1.05;
     margin: 0 0 1.8rem;
+}
+
+@media (min-width: 992px) {
+    /* First item in the left-hand column, with the biography under it. */
+    .about-name {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .about-body > .lead {
+        grid-column: 1;
+        grid-row: 2;
+    }
 }
 
 /* Italic surname, set beside the forename rather than under it. Inline, so a long
@@ -1278,8 +1291,20 @@ html:has(body.public) {
    One photograph, not a row of them: the gallery further down is where the work is shown
    in full, and repeating it here would make the About section a worse version of it. */
 .about-body {
+    /* Held here rather than written into .about-name, because the photograph beside it
+       has to line up with letters set at this size. */
+    --about-name-size: clamp(2.4rem, 7vw, 5rem);
+
     display: grid;
-    gap: clamp(2rem, 4vw, 4rem);
+    column-gap: clamp(2rem, 4vw, 4rem);
+    /* Stacked on a narrow screen, so this is the space above the photograph. Zeroed on a
+       wide one below, where the name's own margin already sets the gap between it and the
+       biography and a row gap on top of that would double it. */
+    row-gap: clamp(1.5rem, 4vw, 2.5rem);
+}
+
+.about-figure {
+    margin: 0;
 }
 
 @media (min-width: 992px) {
@@ -1288,12 +1313,28 @@ html:has(body.public) {
         /* Start, not stretch: the photograph keeps its own proportions rather than being
            stretched to whatever height the biography happens to be. */
         align-items: start;
+        row-gap: 0;
+        /* Named rather than left automatic. The photograph spans both rows, so with two
+           automatic rows the browser shares its extra height between them and drops eighty
+           pixels of nothing between the name and the biography. Giving the second row all
+           the slack keeps them together and lets the photograph run past the end of the
+           text instead. */
+        grid-template-rows: auto 1fr;
+    }
+
+    /* The name and the biography stack down the left; the photograph stands beside both
+       of them, its top edge level with the name rather than with the text. */
+    .about-figure {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        /* Level with the capitals of the name, not with the invisible box around them.
+           Measured rather than guessed: the capitals of this face start an eighth of the
+           font size below the top of its line box, so at 80px the photograph would sit ten
+           pixels proud of the E in Elizabeth and read as slightly adrift. */
+        margin-top: calc(var(--about-name-size) * 0.125);
     }
 }
 
-.about-figure {
-    margin: 0;
-}
 
 .about-figure img {
     display: block;
