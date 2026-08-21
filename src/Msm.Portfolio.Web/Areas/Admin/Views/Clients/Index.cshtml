@@ -9,6 +9,8 @@
     var token = Antiforgery.GetAndStoreTokens(Context).RequestToken;
     var saved = TempData["Saved"] as string;
     var error = TempData["Error"] as string;
+    var issuedPassword = TempData["GeneratedPassword"] as string;
+    var issuedFor = TempData["GeneratedFor"] as string;
     var edit = Model.ToEditModel();
 
     async Task<bool> Allowed(string permission) =>
@@ -35,6 +37,25 @@
 
 @if (saved is not null) { <div class="alert alert-success" role="alert">@saved</div> }
 @if (error is not null) { <div class="alert alert-danger" role="alert">@error</div> }
+
+@if (issuedPassword is not null)
+{
+    @* Shown once. Only the hash is kept, so there is no screen anywhere that can show
+       this again — which is the point, and is why it says so. *@
+    <div class="alert alert-warning" role="alert">
+        <h2 class="h6">Sign-in details for @issuedFor</h2>
+        <dl class="row mb-2">
+            <dt class="col-sm-2">Address</dt>
+            <dd class="col-sm-10"><code>@Model.Client.ApplicationUser.Email</code></dd>
+            <dt class="col-sm-2">Password</dt>
+            <dd class="col-sm-10"><code class="fs-5">@issuedPassword</code></dd>
+        </dl>
+        <p class="mb-0 small">
+            Copy this now and give it to them directly. It cannot be shown again, and they
+            can change it themselves once they have signed in.
+        </p>
+    </div>
+}
 
 @if (Model.GuardianApprovalPending)
 {
@@ -391,6 +412,49 @@ else
 
 @if (await Allowed(Permissions.Clients.Edit))
 {
+    @* Nested forms are not allowed, so this is its own form outside the details one
+       below rather than a button inside it. *@
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">Their sign-in</h2>
+
+            @if (Model.HasSignInDetails)
+            {
+                <p class="text-muted">
+                    @Model.Client.PublicName can sign in at
+                    <code>@Model.Client.ApplicationUser.Email</code>.
+                    Only they know their password — reset it if they have lost it, which
+                    replaces the one they have.
+                </p>
+            }
+            else
+            {
+                <p class="text-muted">
+                    @Model.Client.PublicName has no way in yet. This creates a password
+                    and shows it once, for you to pass on.
+                </p>
+            }
+
+            @* Two forms rather than one with a conditional attribute. A form tag helper
+               renders data-confirm="" for a null value rather than leaving it out, and an
+               empty confirmation is still a confirmation: the first press put an empty
+               dialog box in front of whoever pressed it. *@
+            @if (Model.HasSignInDetails)
+            {
+                <form method="post" asp-action="Access" asp-route-clientId="@Model.ClientId"
+                      data-confirm="Reset this password? The one they are using now will stop working.">
+                    <button type="submit" class="btn btn-outline-secondary">Reset their password</button>
+                </form>
+            }
+            else
+            {
+                <form method="post" asp-action="Access" asp-route-clientId="@Model.ClientId">
+                    <button type="submit" class="btn btn-primary">Create sign-in details</button>
+                </form>
+            }
+        </div>
+    </div>
+
     <div class="card mb-4">
         <div class="card-body">
             <h2 class="h5 card-title">Client details</h2>

@@ -34,6 +34,7 @@ public class ClientsController(
     IMeasurementTemplateProvider templates,
     IBiographyDraftService biographies,
     IBiographyWriter biographyWriter,
+    IClientAccessService clientAccess,
     IAuditService audit,
     UserManager<ApplicationUser> userManager,
     IOptions<MediaOptions> mediaOptions,
@@ -46,6 +47,36 @@ public class ClientsController(
         var model = await BuildAsync(clientId, cancellationToken);
 
         return model is null ? NotFound() : View(model);
+    }
+
+    /// <summary>
+    /// Gives this model the means to sign in to their own dashboard, and shows the
+    /// password once.
+    /// </summary>
+    /// <remarks>
+    /// Onboarding creates the account with no password at all, so until this is pressed
+    /// a model cannot reach their dashboard, their photographs or the enquiries that now
+    /// arrive there. Pressing it again replaces the password, which is what happens when
+    /// somebody forgets theirs.
+    /// </remarks>
+    [HttpPost("access")]
+    [Authorize(Policy = Permissions.Clients.Edit)]
+    public async Task<IActionResult> Access(Guid clientId, CancellationToken cancellationToken = default)
+    {
+        var result = await clientAccess.IssueSignInDetailsAsync(
+            clientId, CurrentUserId(), cancellationToken);
+
+        if (!result.Succeeded)
+        {
+            TempData["Error"] = result.Error;
+        }
+        else
+        {
+            TempData["GeneratedPassword"] = result.Password;
+            TempData["GeneratedFor"] = result.Email;
+        }
+
+        return RedirectToAction(nameof(Index), new { clientId });
     }
 
     [HttpPost("profile")]
@@ -361,6 +392,7 @@ public class ClientsController(
         {
             ClientId = clientId,
             Client = client,
+            HasSignInDetails = await clientAccess.HasSignInDetailsAsync(clientId, cancellationToken),
             Portfolio = client.Portfolio,
             Assets =
             [

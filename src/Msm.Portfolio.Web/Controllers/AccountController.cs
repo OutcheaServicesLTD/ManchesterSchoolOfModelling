@@ -74,6 +74,62 @@ public class AccountController(
         return Redirect(await LandingPageForAsync(user));
     }
 
+    /// <summary>
+    /// Changing your own password.
+    /// </summary>
+    /// <remarks>
+    /// Both a model and a member of staff are given their first password by somebody else,
+    /// who necessarily saw it. Until this existed there was no way to stop them knowing it
+    /// — the screen that hands it over even says to change it afterwards, which was not
+    /// true of anything the site could actually do.
+    /// </remarks>
+    [HttpGet("password")]
+    [Authorize]
+    public IActionResult Password() => View(new ChangePasswordViewModel());
+
+    [HttpPost("password")]
+    [Authorize]
+    [ValidateAntiForgeryToken]
+    [EnableRateLimiting(RateLimitPolicies.SignIn)]
+    public async Task<IActionResult> Password(ChangePasswordViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var user = await userManager.GetUserAsync(User);
+
+        if (user is null)
+        {
+            return Challenge();
+        }
+
+        var result = await userManager.ChangePasswordAsync(
+            user, model.CurrentPassword, model.NewPassword);
+
+        if (!result.Succeeded)
+        {
+            foreach (var error in result.Errors)
+            {
+                ModelState.AddModelError(string.Empty, error.Description);
+            }
+
+            return View(model);
+        }
+
+        // The sign-in cookie carries a stamp of the account's security state. Refreshing it
+        // keeps this browser signed in, and — more to the point — invalidates any other
+        // session that was opened with the old password.
+        await signInManager.RefreshSignInAsync(user);
+
+        logger.LogInformation("Password changed for {UserId}.", user.Id);
+
+        TempData["PasswordChanged"] = true;
+
+        return RedirectToAction(nameof(Password));
+    }
+
     [HttpPost("logout")]
     [Authorize]
     public async Task<IActionResult> Logout()

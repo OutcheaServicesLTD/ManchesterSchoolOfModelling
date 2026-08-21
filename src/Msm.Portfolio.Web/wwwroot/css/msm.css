@@ -2014,6 +2014,16 @@ body.viewer-open {
     text-transform: uppercase;
     color: var(--fg-lo);
     text-align: right;
+    /* A link now, to the account's own settings. Undecorated until pointed at, so the
+       bar still reads as a name rather than as another piece of navigation. */
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+
+.portal-user:hover,
+.portal-user:focus-visible {
+    color: var(--fg);
+    text-decoration: underline;
 }
 
 @media (min-width: 768px) {

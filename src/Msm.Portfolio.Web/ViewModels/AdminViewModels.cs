@@ -26,6 +26,13 @@ public class AdminDashboardViewModel
 /// <summary>One client's full record (specification section 5).</summary>
 public class AdminClientDetailViewModel
 {
+    /// <summary>
+    /// Whether this model already has a password. Only changes the wording — "create" the
+    /// first time, "reset" afterwards — so nobody presses it thinking it is harmless and
+    /// locks a model out of an account they were already using.
+    /// </summary>
+    public bool HasSignInDetails { get; set; }
+
     public Guid ClientId { get; set; }
 
     public ClientProfile Client { get; set; } = null!;

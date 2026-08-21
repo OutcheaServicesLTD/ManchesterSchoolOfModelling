@@ -67,6 +67,9 @@ public static class AuditActions
     public const string StaffPasswordReset = "StaffPasswordReset";
     public const string PermissionsChanged = "PermissionsChanged";
     public const string AdminEditedClient = "AdminEditedClient";
+
+    /// <summary>A model was given, or given back, the means to sign in.</summary>
+    public const string ClientAccessIssued = "ClientAccessIssued";
     public const string CheckoutOpened = "CheckoutOpened";
     public const string CheckoutStarted = "CheckoutStarted";
     public const string CheckoutCancelled = "CheckoutCancelled";

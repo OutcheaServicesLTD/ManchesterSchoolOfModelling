@@ -84,6 +84,7 @@ builder.Services.AddScoped<IPortfolioService, PortfolioService>();
 builder.Services.AddScoped<IAdminService, AdminService>();
 builder.Services.AddScoped<IPublicPortfolioService, PublicPortfolioService>();
 builder.Services.AddScoped<IStaffService, StaffService>();
+builder.Services.AddScoped<IClientAccessService, ClientAccessService>();
 builder.Services.AddScoped<ICheckoutService, CheckoutService>();
 builder.Services.AddScoped<IPaymentWebhookProcessor, PaymentWebhookProcessor>();
 builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();

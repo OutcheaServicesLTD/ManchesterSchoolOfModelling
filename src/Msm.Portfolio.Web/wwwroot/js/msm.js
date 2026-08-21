@@ -16,7 +16,10 @@
         // ── Confirm before a destructive submit ──────────────────────────────────
         // Unpublishing, archiving, removing a photograph and permanent deletion all
         // carry one. A cancelled confirmation must stop the submission entirely.
-        document.querySelectorAll('form[data-confirm]').forEach(function (form) {
+        // Non-empty only. A form tag helper renders data-confirm="" where the value was
+        // meant to be absent, and confirming with an empty dialog box asks nothing while
+        // still being able to refuse the submission.
+        document.querySelectorAll('form[data-confirm]:not([data-confirm=""])').forEach(function (form) {
             form.addEventListener('submit', function (event) {
                 if (!window.confirm(form.getAttribute('data-confirm'))) {
                     event.preventDefault();

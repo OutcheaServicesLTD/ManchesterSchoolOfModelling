@@ -110,7 +110,7 @@ public class StaffService(
             IsActive = true
         };
 
-        var password = GeneratePassword();
+        var password = PasswordGenerator.Create();
         var created = await userManager.CreateAsync(user, password);
 
         if (!created.Succeeded)
@@ -175,7 +175,7 @@ public class StaffService(
             return (false, null, "That account could not be found.");
         }
 
-        var password = GeneratePassword();
+        var password = PasswordGenerator.Create();
         var token = await userManager.GeneratePasswordResetTokenAsync(user);
         var result = await userManager.ResetPasswordAsync(user, token, password);
 
@@ -264,35 +264,5 @@ public class StaffService(
         await db.SaveChangesAsync(cancellationToken);
 
         return OperationResult.Ok();
-    }
-
-    /// <summary>
-    /// A random password meeting the configured complexity rules, shown once to the
-    /// Super Admin. Staff are expected to change it after signing in.
-    /// </summary>
-    private static string GeneratePassword()
-    {
-        const string upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-        const string lower = "abcdefghijkmnopqrstuvwxyz";
-        const string digits = "23456789";
-        const string symbols = "!@#$%^&*";
-
-        var characters = new List<char>
-        {
-            Pick(upper), Pick(lower), Pick(digits), Pick(symbols)
-        };
-
-        const string all = upper + lower + digits + symbols;
-        while (characters.Count < 14)
-        {
-            characters.Add(Pick(all));
-        }
-
-        // Shuffled so the guaranteed character classes are not always in the same
-        // positions, which would narrow the search space.
-        return new string([.. characters.OrderBy(_ => System.Security.Cryptography.RandomNumberGenerator.GetInt32(int.MaxValue))]);
-
-        static char Pick(string source) =>
-            source[System.Security.Cryptography.RandomNumberGenerator.GetInt32(source.Length)];
     }
 }

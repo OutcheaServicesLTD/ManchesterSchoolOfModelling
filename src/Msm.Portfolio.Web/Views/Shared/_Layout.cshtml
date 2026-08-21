@@ -71,7 +71,9 @@
             <div class="portal-utility">
                 @if (signedIn)
                 {
-                    <span class="portal-user">@User.Identity!.Name</span>
+                    @* The name is the link to the account's own settings, which today is
+                       the one setting there is. *@
+                    <a class="portal-user" href="/account/password">@User.Identity!.Name</a>
                 }
 
                 <partial name="_ThemeToggle" />
@@ -79,8 +81,14 @@
                 @if (signedIn)
                 {
                     @* A POST, so signing out cannot be triggered by a link someone else
-                       persuades a member of staff to click. *@
-                    <form method="post" action="/account/logout">
+                       persuades a member of staff to click.
+
+                       asp-antiforgery is required, not decoration. Every POST on the site
+                       is checked for a token, and the form tag helper only adds one when
+                       it generated the action itself — write the address out by hand, as
+                       here, and the token is silently left off. Signing out answered 400
+                       and did nothing at all. *@
+                    <form method="post" action="/account/logout" asp-antiforgery="true">
                         <button type="submit" class="btn btn-sm">Sign out</button>
                     </form>
                 }
