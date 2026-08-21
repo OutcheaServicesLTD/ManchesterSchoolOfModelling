@@ -736,6 +736,33 @@ select {
     margin-left: -1px;
 }
 
+/* On a phone the prefix goes above the field instead of beside it.
+   The prefix here is a whole domain — model-portfolio.manchesterschoolofmodelling.co.uk/
+   — which on a 390px screen left thirty pixels for the box you are meant to type in, and
+   pushed it off the side of the page. */
+@media (max-width: 575.98px) {
+    .input-group {
+        flex-wrap: wrap;
+    }
+
+    .input-group > .input-group-text {
+        width: 100%;
+        /* A long address wraps rather than deciding how wide the page is. */
+        word-break: break-all;
+    }
+
+    .input-group > .form-control {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+
+    /* The negative margin that laps the borders is only right side by side. */
+    .input-group > * + * {
+        margin-left: 0;
+        margin-top: -1px;
+    }
+}
+
 /* The validation summary and per-field messages Identity and MVC emit. */
 .field-validation-error,
 .validation-summary-errors {
@@ -853,6 +880,67 @@ dl.row > dd {
 .table-sm > tbody td,
 .table-sm > thead th {
     padding: 10px 12px;
+}
+
+/* ── A table that becomes a list on a phone ──────────────────────────────────────
+   A six-column table on a 390px screen is six columns you cannot read. Scrolling it
+   sideways inside its own box is better than scrolling the page, but it still means
+   dragging a client list about to find out whether somebody has paid.
+
+   Below a tablet each row becomes a small card and every value carries its column
+   heading, taken from data-label on the cell. The heading row is hidden from sight but
+   left in the page, so a screen reader still hears the table as a table. */
+
+@media (max-width: 767.98px) {
+    .table-stack thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        margin: -1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    .table-stack,
+    .table-stack > tbody,
+    .table-stack > tbody > tr,
+    .table-stack > tbody > tr > td,
+    .table-stack > tbody > tr > th {
+        display: block;
+        width: 100%;
+    }
+
+    .table-stack > tbody > tr {
+        border: 1px solid var(--line);
+        padding: 16px;
+        margin-bottom: 12px;
+    }
+
+    .table-stack > tbody > tr > td,
+    .table-stack > tbody > tr > th {
+        border: 0;
+        padding: 6px 0;
+    }
+
+    /* The column heading, printed above its value so the value is never a bare figure. */
+    .table-stack > tbody > tr > td[data-label]::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 2px;
+        font-family: var(--sans);
+        font-size: 10px;
+        font-weight: 500;
+        letter-spacing: var(--track-label);
+        text-transform: uppercase;
+        color: var(--fg-md);
+    }
+
+    /* Actions are pushed right in a table and read better on the left in a card. */
+    .table-stack > tbody > tr > td.text-end {
+        text-align: left;
+        padding-top: 12px;
+    }
 }
 
 /* ══ Alerts ══════════════════════════════════════════════════════════════════════

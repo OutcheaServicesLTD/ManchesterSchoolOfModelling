@@ -1,25 +1,49 @@
-﻿@model ErrorViewModel
+@model ErrorViewModel
+@inject Microsoft.Extensions.Options.IOptions<Msm.Portfolio.Web.Configuration.MsmBrandOptions> BrandOptions
 @{
-    ViewData["Title"] = "Error";
+    ViewData["Title"] = Model.Heading;
 }
 
-<h1 class="text-danger">Error.</h1>
-<h2 class="text-danger">An error occurred while processing your request.</h2>
+<div class="auth-panel">
+    <div class="auth-mark">
+        <partial name="_Wordmark" model="@("header")" />
+    </div>
 
-@if (Model.ShowRequestId)
-{
-    <p>
-        <strong>Request ID:</strong> <code>@Model.RequestId</code>
-    </p>
-}
+    <h1 class="mb-3">@Model.Heading</h1>
 
-<h3>Development Mode</h3>
-<p>
-    Swapping to <strong>Development</strong> environment will display more detailed information about the error that occurred.
-</p>
-<p>
-    <strong>The Development environment shouldn't be enabled for deployed applications.</strong>
-    It can result in displaying sensitive information from exceptions to end users.
-    For local debugging, enable the <strong>Development</strong> environment by setting the <strong>ASPNETCORE_ENVIRONMENT</strong> environment variable to <strong>Development</strong>
-    and restarting the app.
-</p>
+    <p class="lead">@Model.Explanation</p>
+
+    @* A way onwards, not a dead end. The board is the right place to arrive at from a
+       portfolio link that no longer works: the model may simply have a new address, and
+       the board is where an agency finds them. *@
+    <div class="d-flex flex-wrap gap-2 mt-4">
+        <a class="btn btn-primary" href="/models">See the model board</a>
+
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <a class="btn btn-outline-secondary" href="/">Back to the start</a>
+        }
+        else
+        {
+            <a class="btn btn-outline-secondary" href="/account/login">Sign in</a>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(BrandOptions.Value.ContactEmail))
+    {
+        <p class="mt-4 mb-0 small text-muted">
+            If you were sent this address by someone at @BrandOptions.Value.BusinessName,
+            tell us at <a href="mailto:@BrandOptions.Value.ContactEmail">@BrandOptions.Value.ContactEmail</a>
+            and we will put it right.
+        </p>
+    }
+
+    @if (Model.ShowRequestId)
+    {
+        @* Only on a fault, and only so support can find this exact request in the log.
+           A visitor who mistyped an address has no use for it. *@
+        <p class="mt-3 mb-0 small text-muted">
+            Reference: <code>@Model.RequestId</code>
+        </p>
+    }
+</div>

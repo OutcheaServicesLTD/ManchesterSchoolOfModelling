@@ -59,7 +59,7 @@
 else
 {
     <div class="table-responsive">
-        <table class="table align-middle">
+        <table class="table table-stack align-middle">
             <caption class="visually-hidden">Clients</caption>
             <thead>
                 <tr>
@@ -84,17 +84,17 @@ else
                                 <span class="badge text-bg-warning">Guardian pending</span>
                             }
                         </th>
-                        <td>
+                        <td data-label="Portfolio status">
                             @row.Status
                             @if (row.IsPublished)
                             {
                                 <span class="badge text-bg-success">Live</span>
                             }
                         </td>
-                        <td>@(row.Retoucher ?? "—")</td>
-                        <td>@row.SelectedCount / @row.ImageCount</td>
-                        <td>@row.SubmittedAt.ToString("d MMM yyyy")</td>
-                        <td>@(row.PaymentStatus?.ToString() ?? "—")</td>
+                        <td data-label="Retoucher">@(row.Retoucher ?? "—")</td>
+                        <td data-label="Images">@row.SelectedCount / @row.ImageCount</td>
+                        <td data-label="Submitted">@row.SubmittedAt.ToString("d MMM yyyy")</td>
+                        <td data-label="Payment">@(row.PaymentStatus?.ToString() ?? "—")</td>
                         <td class="text-end">
                             <a class="btn btn-sm btn-outline-primary"
                                href="/admin/clients/@row.ClientId">Open</a>

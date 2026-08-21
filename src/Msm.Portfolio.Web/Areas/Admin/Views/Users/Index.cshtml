@@ -36,7 +36,7 @@
 }
 
 <div class="table-responsive mb-4">
-    <table class="table align-middle">
+    <table class="table table-stack align-middle">
         <caption class="visually-hidden">Staff accounts</caption>
         <thead>
             <tr>
@@ -53,9 +53,9 @@
             {
                 <tr>
                     <th scope="row" class="fw-normal">@member.Name</th>
-                    <td>@member.Email</td>
-                    <td>@member.Role</td>
-                    <td>
+                    <td data-label="Email">@member.Email</td>
+                    <td data-label="Role">@member.Role</td>
+                    <td data-label="Status">
                         @if (member.IsActive)
                         {
                             <span class="badge text-bg-success">Active</span>
@@ -65,7 +65,7 @@
                             <span class="badge text-bg-secondary">Disabled</span>
                         }
                     </td>
-                    <td>@(member.LastLoginAt?.ToString("d MMM yyyy") ?? "Never")</td>
+                    <td data-label="Last signed in">@(member.LastLoginAt?.ToString("d MMM yyyy") ?? "Never")</td>
                     <td class="text-end">
                         @if (canManage && member.Role != Roles.SuperAdmin)
                         {

@@ -192,6 +192,23 @@ else
     app.UseHsts();
 }
 
+// A page for 404 and the rest, instead of nothing at all.
+//
+// Without this every wrong address answers with an empty body, and the browser fills the
+// gap with its own "this page isn't working" — no wordmark, no explanation, and no way
+// back to the Model Board. A mistyped or out-of-date portfolio link is the single most
+// likely wrong address on a site whose whole purpose is links people share.
+//
+// Only for requests that asked for a page. The retoucher's uploader posts one photograph
+// at a time and reads a JSON answer, including on failure; handing it a page of HTML
+// instead would replace "that file is too large" with "unexpected response from the
+// server". A browser navigating always sends text/html in Accept; an XMLHttpRequest does
+// not.
+app.UseWhen(
+    context => context.Request.Headers.Accept
+        .Any(value => value is not null && value.Contains("text/html", StringComparison.OrdinalIgnoreCase)),
+    branch => branch.UseStatusCodePagesWithReExecute("/error/{0}"));
+
 var brand = app.Services.GetRequiredService<IOptions<MsmBrandOptions>>().Value;
 
 app.UseMsmSecurityHeaders(app.Environment.IsDevelopment(), brand.DiscourageSearchEngines);

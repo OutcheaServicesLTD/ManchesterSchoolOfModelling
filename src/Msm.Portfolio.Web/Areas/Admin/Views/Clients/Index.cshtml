@@ -539,7 +539,10 @@ else
                 }
 
                 <div class="mb-3">
-                    <label asp-for="@edit.Biography" class="form-label"></label>
+                    @* for= must name the id below, not the one the tag helper would have
+                       generated: the id is overridden so the suggestion script can find the
+                       box, and that quietly orphaned the label. *@
+                    <label asp-for="@edit.Biography" for="biography-box" class="form-label"></label>
                     <textarea asp-for="@edit.Biography" name="Biography" class="form-control" rows="4"
                               id="biography-box"></textarea>
 
