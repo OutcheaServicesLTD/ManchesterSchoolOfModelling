@@ -94,8 +94,8 @@
              alt="Portrait of @p.Name" />
     }
     <div class="hero-content">
-        @* True whenever this page renders at all: an unpublished portfolio is not served,
-           and every enquiry is handled by MSM. *@
+        @* True whenever this page renders at all: an unpublished portfolio is not
+           served, and the booking form below reaches the model directly. *@
         <p class="hero-status">Available for bookings</p>
 
         <h1 class="hero-name" id="model-name">
@@ -244,15 +244,20 @@
             @if (Model.EnquirySent)
             {
                 <div class="alert alert-success" role="alert">
-                    Thank you. Your enquiry has been sent to @Model.Brand.BusinessName and
-                    someone will be in touch.
+                    Thank you. Your enquiry has gone straight to @p.Name and they will be
+                    in touch.
                 </div>
             }
 
-            @* All professional contact routes through MSM. The model's own email and
-               telephone are never shown here (specification sections 16 and 46). *@
+            @* Enquiries reach the model themselves now, rather than waiting for MSM to
+               forward them. What has not changed is that the model's own email and
+               telephone are never printed here: the form is the route to them, so the
+               address an agency writes to is never one they can harvest off the page
+               (specification sections 16 and 46). The studio's own details below are
+               MSM's, and are meant to be public. *@
             <p class="contact-note mb-3">
-                All enquiries about @p.Name are handled by @Model.Brand.BusinessName.
+                All enquiries about @p.Name go straight to them.
+                @Model.Brand.BusinessName keeps a copy of every one.
             </p>
 
             @if (!string.IsNullOrWhiteSpace(Model.Brand.ContactEmail)
