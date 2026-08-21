@@ -439,8 +439,8 @@ public class MaintenanceServiceTests : IDisposable
     /// <summary>These tests are about subscriptions, not about messages leaving.</summary>
     private sealed class SilentEmailSender : IEmailSender
     {
-        public Task SendAsync(
+        public Task<bool> SendAsync(
             string toEmail, string subject, string body, CancellationToken cancellationToken = default) =>
-            Task.CompletedTask;
+            Task.FromResult(true);
     }
 }

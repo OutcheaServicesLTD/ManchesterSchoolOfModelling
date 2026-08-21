@@ -378,19 +378,24 @@ about is taken from the portfolio in the URL rather than the posted form, so an 
 cannot be redirected at someone else, and the server re-checks the portfolio is published
 before storing anything.
 
-The enquiry then goes on to the model by email, at MSM's instruction — an agency reaches
-them without anybody at the studio forwarding it by hand. MSM keeps the record and the
-studio notification either way, and the model also sees it on their own dashboard, which
-is what shows an enquiry arrived while no email provider is configured.
+The enquiry goes to the model and nowhere else, at MSM's instruction: an agency that
+contacts a model is dealing with that model. **MSM keeps no copy and no member of staff
+is notified.** The model receives it by email and sees it on their own dashboard.
 
 **A model under eighteen is the exception.** Their enquiries go to the guardian whose
 consent already governs the portfolio, never to the child. With no guardian address on
-file nothing is sent at all, and MSM's record and notification are what carry it.
+file there is nowhere safe to send it, and the enquiry is not delivered at all.
 
-Enquiries are **stored**, not only emailed. This adds an `Enquiry` entity beyond the list
-in specification section 26 — a deliberate addition, because an enquiry must survive a
-delivery that fails. Sending happens after the record is committed, and a provider that
-throws is logged rather than allowed to fail the enquiry.
+Because nothing is stored, **delivery is not optional**. `IEmailSender.SendAsync` reports
+whether the message was delivered, and an enquiry that cannot be sent — no provider, a
+provider that refuses, no address to send to — comes back to the agency as "we could not
+deliver your enquiry just now", with what they typed still in the form. Thanking them for
+a message that reached nobody, with no record of it anywhere, would lose the enquiry and
+leave them waiting on a reply that is never coming.
+
+The `Enquiry` entity and its table are left in place but **dormant** — nothing writes to
+them. Dropping the table would destroy the enquiries taken before this decision, and
+keeping it means the decision can be reversed.
 
 ### Presentation
 

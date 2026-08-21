@@ -157,11 +157,21 @@ public class GuardianConsentService(
              If you were not expecting this, please contact {brand.BusinessName}.
              """;
 
-        await emailSender.SendAsync(
+        var delivered = await emailSender.SendAsync(
             consent.Email,
             $"Approval needed for {client.FullName} at {brand.BusinessName}",
             body,
             cancellationToken);
+
+        if (!delivered)
+        {
+            // The consent record and its link still exist, so the request can be sent
+            // again once a provider is configured. Loud, because a guardian who never
+            // receives this is a portfolio that can never be published.
+            logger.LogError(
+                "The guardian approval request for client {ClientId} was not delivered.",
+                client.Id);
+        }
     }
 
     /// <summary>

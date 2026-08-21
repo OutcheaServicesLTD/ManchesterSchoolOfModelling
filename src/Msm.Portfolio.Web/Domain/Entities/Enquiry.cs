@@ -6,14 +6,15 @@ namespace Msm.Portfolio.Web.Domain.Entities;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Not one of the entities listed in specification section 26, but the contact form it
-/// serves is required by section 46. Enquiries are stored rather than only emailed
-/// because no email provider is configured yet: without a record, a genuine agency
-/// enquiry would simply be lost.
+/// <b>Dormant.</b> Nothing writes to this any more. MSM keeps no copy of an enquiry: it
+/// goes to the model, who deals with it. The type and its table are left in place rather
+/// than dropped, so the enquiries taken before that decision are not destroyed by it and
+/// the choice can be reversed.
 /// </para>
 /// <para>
-/// The enquiry belongs to MSM, not the model. The model's own email and telephone are
-/// never disclosed to the enquirer, and the reply address here is the agency's.
+/// Because nothing is stored, delivery is no longer optional. A message that cannot be
+/// sent is reported to the agency rather than logged — see
+/// <see cref="Services.EnquiryOutcome"/>.
 /// </para>
 /// </remarks>
 public class Enquiry

@@ -249,15 +249,17 @@
                 </div>
             }
 
-            @* Enquiries reach the model themselves now, rather than waiting for MSM to
-               forward them. What has not changed is that the model's own email and
-               telephone are never printed here: the form is the route to them, so the
-               address an agency writes to is never one they can harvest off the page
-               (specification sections 16 and 46). The studio's own details below are
-               MSM's, and are meant to be public. *@
+            @* The enquiry belongs to the model. MSM neither stores it nor is told about
+               it, so the page must not imply otherwise.
+
+               What has not changed is that the model's own email and telephone are never
+               printed here: the form is the route to them, so the address an agency
+               writes to is never one that can be harvested off the page (specification
+               sections 16 and 46). The details below are the studio's own and are meant
+               to be public. *@
             <p class="contact-note mb-3">
-                All enquiries about @p.Name go straight to them.
-                @Model.Brand.BusinessName keeps a copy of every one.
+                All enquiries about @p.Name go straight to them, and they will answer
+                you directly.
             </p>
 
             @if (!string.IsNullOrWhiteSpace(Model.Brand.ContactEmail)

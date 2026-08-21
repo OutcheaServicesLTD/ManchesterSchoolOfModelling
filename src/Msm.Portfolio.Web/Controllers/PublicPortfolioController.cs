@@ -81,13 +81,30 @@ public class PublicPortfolioController(
 
         // The model is taken from the portfolio in the URL, not from the posted form,
         // so an enquiry cannot be redirected at another client.
-        var recorded = await portfolios.RecordEnquiryAsync(
+        var outcome = await portfolios.SendEnquiryAsync(
             portfolio.ClientId, model.Name, model.Company, model.Email, model.Phone, model.Message,
             cancellationToken);
 
-        if (!recorded)
+        if (outcome == EnquiryOutcome.UnknownModel)
         {
             return NotFound();
+        }
+
+        if (outcome == EnquiryOutcome.NotDelivered)
+        {
+            // Nothing is stored, so there is no copy of this to follow up. Saying "thank
+            // you" here would leave an agency waiting on a reply to a message that never
+            // existed. The form comes back with what they typed still in it.
+            ModelState.AddModelError(
+                string.Empty,
+                "We could not deliver your enquiry just now. Please try again shortly.");
+
+            return View(nameof(Index), new PublicPortfolioViewModel
+            {
+                Portfolio = portfolio,
+                Brand = brandOptions.Value,
+                Enquiry = model
+            });
         }
 
         TempData["EnquirySent"] = true;

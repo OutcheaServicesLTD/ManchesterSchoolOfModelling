@@ -68,6 +68,23 @@ public record ModelBoardCard(
     Guid? FeaturedAssetId,
     FocalPoint? CoverFocus);
 
+/// <summary>What became of an agency's enquiry.</summary>
+public enum EnquiryOutcome
+{
+    /// <summary>It reached the model, or the guardian acting for them.</summary>
+    Delivered,
+
+    /// <summary>There is no published portfolio at that id, so there is nobody to reach.</summary>
+    UnknownModel,
+
+    /// <summary>
+    /// Nobody received it. Since nothing is stored, this has to be said to the agency
+    /// rather than swallowed — otherwise they are thanked for a message that went
+    /// nowhere and they never find out.
+    /// </summary>
+    NotDelivered
+}
+
 public interface IPublicPortfolioService
 {
     /// <summary>The published portfolio at this slug, or null if there is not one.</summary>
@@ -75,7 +92,11 @@ public interface IPublicPortfolioService
 
     Task<IReadOnlyList<ModelBoardCard>> GetModelBoardAsync(CancellationToken cancellationToken = default);
 
-    Task<bool> RecordEnquiryAsync(
+    /// <summary>
+    /// Passes an agency's enquiry to the model. Nothing is kept: MSM does not store it
+    /// and is not told about it, so the message is the whole of the enquiry.
+    /// </summary>
+    Task<EnquiryOutcome> SendEnquiryAsync(
         Guid clientId, string name, string? company, string email, string? phone, string message,
         CancellationToken cancellationToken = default);
 }
@@ -234,7 +255,15 @@ public class PublicPortfolioService(
         ];
     }
 
-    public async Task<bool> RecordEnquiryAsync(
+    /// <remarks>
+    /// The enquiry belongs to the model, not to the studio. It is not stored and MSM is
+    /// not notified — an agency that contacts a model is dealing with that model.
+    ///
+    /// Which means the message has to actually arrive. With nothing kept there is no
+    /// second chance and nowhere to look afterwards, so a send that fails is reported
+    /// back to the agency instead of being logged and forgotten.
+    /// </remarks>
+    public async Task<EnquiryOutcome> SendEnquiryAsync(
         Guid clientId,
         string name,
         string? company,
@@ -254,56 +283,41 @@ public class PublicPortfolioService(
         if (client?.Portfolio is not { IsPublished: true })
         {
             logger.LogWarning("Enquiry rejected for client {ClientId}: no published portfolio.", clientId);
-            return false;
+            return EnquiryOutcome.UnknownModel;
         }
 
-        db.Enquiries.Add(new Enquiry
+        var delivered = await SendEnquiryToModelAsync(
+            client, name, company, email, phone, message, cancellationToken);
+
+        if (!delivered)
         {
-            ClientId = clientId,
-            Name = name.Trim(),
-            Company = string.IsNullOrWhiteSpace(company) ? null : company.Trim(),
-            Email = email.Trim(),
-            Phone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim(),
-            Message = message.Trim()
-        });
+            return EnquiryOutcome.NotDelivered;
+        }
 
-        // MSM still sees every enquiry: the record and the studio's own notification are
-        // unchanged, so nothing that used to be visible on the admin screens stops being
-        // visible.
-        await notifications.NotifyStaffAsync(
-            NotificationTypes.EnquiryReceived,
-            $"New enquiry about {client.PublicName} from {name.Trim()}.",
-            "/admin/enquiries",
-            cancellationToken);
-
-        // The model sees it on their own dashboard as well, which is what shows an
-        // enquiry arrived even before any email provider is configured.
+        // On the model's own dashboard, so an enquiry is visible when they next sign in
+        // as well as in their inbox. This is the model's notification, not the studio's:
+        // no member of staff is told.
         notifications.NotifyUser(
             client.ApplicationUserId,
             NotificationTypes.EnquiryReceived,
             $"New enquiry from {name.Trim()}.",
             "/client");
 
-        // Saved before the message is sent. An email provider that is slow, misconfigured
-        // or simply absent must not be able to lose the enquiry itself.
         await db.SaveChangesAsync(cancellationToken);
 
-        await SendEnquiryToModelAsync(client, name, company, email, phone, message, cancellationToken);
-
-        return true;
+        return EnquiryOutcome.Delivered;
     }
 
     /// <summary>
-    /// Sends the enquiry on to the model, so an agency reaches them without MSM having to
-    /// forward it by hand.
+    /// Sends the enquiry to the model, and reports whether it arrived.
     /// </summary>
     /// <remarks>
     /// A model under eighteen is the exception: their enquiries go to the guardian whose
-    /// consent already governs the portfolio, not to the child. If there is no guardian
-    /// address on file the message is not sent at all, and MSM's own notification — which
-    /// is raised either way — is what carries it.
+    /// consent already governs the portfolio, not to the child. With no guardian address
+    /// on file there is nowhere safe to send it, and the enquiry fails rather than being
+    /// delivered to a minor.
     /// </remarks>
-    private async Task SendEnquiryToModelAsync(
+    private async Task<bool> SendEnquiryToModelAsync(
         ClientProfile client,
         string name,
         string? company,
@@ -321,11 +335,10 @@ public class PublicPortfolioService(
 
         if (string.IsNullOrWhiteSpace(recipient))
         {
-            logger.LogWarning(
-                "Enquiry for client {ClientId} has no {Recipient} address to send to. "
-                + "It is recorded and the studio has been notified.",
+            logger.LogError(
+                "Enquiry for client {ClientId} has no {Recipient} address to send to.",
                 client.Id, isChild ? "guardian" : "model");
-            return;
+            return false;
         }
 
         var addressee = isChild
@@ -356,12 +369,13 @@ public class PublicPortfolioService(
         lines.Add("");
         lines.Add(message.Trim());
         lines.Add("");
-        lines.Add($"{brand.Value.BusinessName} has a copy of this enquiry. If anything about "
-                  + "it seems wrong, tell us before you reply.");
+        lines.Add($"This enquiry came to you, not to {brand.Value.BusinessName}. Reply to "
+                  + "the address above. If anything about it seems wrong, tell us before "
+                  + "you do.");
 
         try
         {
-            await email.SendAsync(
+            return await email.SendAsync(
                 recipient,
                 $"Enquiry about {client.PublicName} from {name.Trim()}",
                 string.Join("\n", lines),
@@ -369,11 +383,13 @@ public class PublicPortfolioService(
         }
         catch (Exception exception)
         {
-            // Never fails the enquiry. It is already recorded, and the studio has already
-            // been notified, so a delivery failure costs a message rather than the lead.
+            // Nothing is stored, so a swallowed failure is an enquiry that has simply
+            // disappeared. Reported instead, and the agency is told.
             logger.LogError(exception,
                 "Could not send the enquiry for client {ClientId} on to {Recipient}.",
                 client.Id, isChild ? "the guardian" : "the model");
+
+            return false;
         }
     }
 }

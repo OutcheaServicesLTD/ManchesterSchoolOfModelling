@@ -378,19 +378,18 @@ public class PublicPortfolioServiceTests : IDisposable
     // ---------- Enquiries ----------
 
     [Fact]
-    public async Task An_enquiry_about_a_published_model_is_recorded()
+    public async Task An_enquiry_about_a_published_model_is_delivered_and_not_stored()
     {
         var clientId = AddModel();
 
-        var recorded = await _service.RecordEnquiryAsync(
+        var outcome = await _service.SendEnquiryAsync(
             clientId, "Agency Scout", "Big Agency", "scout@agency.example", null, "We would like to meet.");
 
-        Assert.True(recorded);
+        Assert.Equal(EnquiryOutcome.Delivered, outcome);
+        Assert.Single(_email.Sent);
 
-        var enquiry = _db.Enquiries.Single();
-        Assert.Equal(clientId, enquiry.ClientId);
-        Assert.Equal("scout@agency.example", enquiry.Email);
-        Assert.False(enquiry.IsHandled);
+        // MSM keeps no copy: an agency contacting a model is dealing with that model.
+        Assert.Empty(_db.Enquiries);
     }
 
     /// <summary>
@@ -402,27 +401,26 @@ public class PublicPortfolioServiceTests : IDisposable
     {
         var clientId = AddModel(published: false);
 
-        var recorded = await _service.RecordEnquiryAsync(
+        var outcome = await _service.SendEnquiryAsync(
             clientId, "Scout", null, "scout@agency.example", null, "Hello.");
 
-        Assert.False(recorded);
-        Assert.Empty(_db.Enquiries);
+        Assert.Equal(EnquiryOutcome.UnknownModel, outcome);
+        Assert.Empty(_email.Sent);
     }
 
     [Fact]
     public async Task An_enquiry_about_an_unknown_client_is_refused()
     {
-        Assert.False(await _service.RecordEnquiryAsync(
+        Assert.Equal(EnquiryOutcome.UnknownModel, await _service.SendEnquiryAsync(
             Guid.CreateVersion7(), "Scout", null, "scout@agency.example", null, "Hello."));
     }
 
     /// <summary>
-    /// An enquiry now reaches the model as well as the studio. MSM keeps its record and
-    /// its notification — what changed is that the model no longer waits for somebody to
-    /// forward it by hand.
+    /// The enquiry is the model's. No member of staff is told about it — an agency that
+    /// contacts a model is dealing with that model, not with the studio.
     /// </summary>
     [Fact]
-    public async Task An_enquiry_notifies_both_the_studio_and_the_model()
+    public async Task An_enquiry_notifies_the_model_and_nobody_at_the_studio()
     {
         var clientId = AddModel();
         var client = _db.ClientProfiles.Single(c => c.Id == clientId);
@@ -437,10 +435,10 @@ public class PublicPortfolioServiceTests : IDisposable
         });
         await _db.SaveChangesAsync();
 
-        await _service.RecordEnquiryAsync(clientId, "Scout", null, "scout@agency.example", null, "Hello.");
+        await _service.SendEnquiryAsync(clientId, "Scout", null, "scout@agency.example", null, "Hello.");
 
-        Assert.Contains(_db.Notifications, n => n.UserId == admin.Id && n.Type == NotificationTypes.EnquiryReceived);
         Assert.Contains(_db.Notifications, n => n.UserId == client.ApplicationUserId);
+        Assert.DoesNotContain(_db.Notifications, n => n.UserId == admin.Id);
     }
 
     [Fact]
@@ -449,7 +447,7 @@ public class PublicPortfolioServiceTests : IDisposable
         var clientId = AddModel();
         var client = _db.ClientProfiles.Include(c => c.ApplicationUser).Single(c => c.Id == clientId);
 
-        await _service.RecordEnquiryAsync(
+        await _service.SendEnquiryAsync(
             clientId, "Agency Scout", "Big Agency", "scout@agency.example", "07700 900321",
             "We would like to meet.");
 
@@ -485,7 +483,7 @@ public class PublicPortfolioServiceTests : IDisposable
         });
         await _db.SaveChangesAsync();
 
-        await _service.RecordEnquiryAsync(
+        await _service.SendEnquiryAsync(
             clientId, "Scout", null, "scout@agency.example", null, "Hello.");
 
         var sent = _email.Sent.Single();
@@ -494,46 +492,54 @@ public class PublicPortfolioServiceTests : IDisposable
     }
 
     /// <summary>
-    /// With no guardian address on file there is nowhere safe to send it, and the enquiry
-    /// still has to survive: MSM's own record and notification are what carry it.
+    /// With no guardian address on file there is nowhere safe to send it. It is not
+    /// delivered to the child instead, and the agency is told rather than thanked.
     /// </summary>
     [Fact]
-    public async Task An_enquiry_about_a_child_with_no_guardian_is_still_recorded()
+    public async Task An_enquiry_about_a_child_with_no_guardian_is_not_delivered()
     {
         var clientId = AddModel();
         var client = _db.ClientProfiles.Single(c => c.Id == clientId);
         client.DateOfBirth = DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-15);
         await _db.SaveChangesAsync();
 
-        Assert.True(await _service.RecordEnquiryAsync(
+        Assert.Equal(EnquiryOutcome.NotDelivered, await _service.SendEnquiryAsync(
             clientId, "Scout", null, "scout@agency.example", null, "Hello."));
 
-        Assert.Single(_db.Enquiries);
         Assert.Empty(_email.Sent);
     }
 
     /// <summary>
-    /// A provider that is down must cost a message, not the lead behind it.
+    /// Nothing is stored, so a failed send is an enquiry that no longer exists anywhere.
+    /// The agency has to be told, not thanked.
     /// </summary>
-    [Fact]
-    public async Task An_enquiry_survives_an_email_provider_that_throws()
+    [Theory]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    public async Task An_enquiry_that_cannot_be_sent_is_reported(bool thrown, bool refused)
     {
         var clientId = AddModel();
-        _email.Throw = true;
+        _email.Throw = thrown;
+        _email.Refuse = refused;
 
-        Assert.True(await _service.RecordEnquiryAsync(
+        Assert.Equal(EnquiryOutcome.NotDelivered, await _service.SendEnquiryAsync(
             clientId, "Scout", null, "scout@agency.example", null, "Hello."));
 
-        Assert.Single(_db.Enquiries);
+        // Not left looking like an enquiry that arrived.
+        Assert.Empty(_db.Notifications);
     }
 
     private sealed class RecordingEmailSender : IEmailSender
     {
         public List<(string To, string Subject, string Body)> Sent { get; } = [];
 
+        /// <summary>A provider that fails outright.</summary>
         public bool Throw { get; set; }
 
-        public Task SendAsync(
+        /// <summary>A provider that answers, but did not deliver.</summary>
+        public bool Refuse { get; set; }
+
+        public Task<bool> SendAsync(
             string toEmail, string subject, string body, CancellationToken cancellationToken = default)
         {
             if (Throw)
@@ -541,8 +547,13 @@ public class PublicPortfolioServiceTests : IDisposable
                 throw new InvalidOperationException("No provider.");
             }
 
+            if (Refuse)
+            {
+                return Task.FromResult(false);
+            }
+
             Sent.Add((toEmail, subject, body));
-            return Task.CompletedTask;
+            return Task.FromResult(true);
         }
     }
 }

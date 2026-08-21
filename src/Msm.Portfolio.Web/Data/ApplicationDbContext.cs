@@ -41,6 +41,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<SystemSetting> SystemSettings => Set<SystemSetting>();
+    /// <summary>Dormant — see <see cref="Enquiry"/>. Nothing writes to it.</summary>
     public DbSet<Enquiry> Enquiries => Set<Enquiry>();
 
     protected override void OnModelCreating(ModelBuilder builder)
