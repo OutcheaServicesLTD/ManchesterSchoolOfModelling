@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Msm.Portfolio.Web.Configuration;
 using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.Domain.Enums;
@@ -82,6 +84,8 @@ public class PublicPortfolioService(
     ApplicationDbContext db,
     IMeasurementTemplateProvider templates,
     INotificationService notifications,
+    IEmailSender email,
+    IOptions<MsmBrandOptions> brand,
     ILogger<PublicPortfolioService> logger) : IPublicPortfolioService
 {
     public async Task<PublicPortfolio?> GetBySlugAsync(
@@ -243,6 +247,8 @@ public class PublicPortfolioService(
         // possible against a portfolio that is actually public.
         var client = await db.ClientProfiles
             .Include(c => c.Portfolio)
+            .Include(c => c.ApplicationUser)
+            .Include(c => c.GuardianConsent)
             .FirstOrDefaultAsync(c => c.Id == clientId, cancellationToken);
 
         if (client?.Portfolio is not { IsPublished: true })
@@ -261,16 +267,113 @@ public class PublicPortfolioService(
             Message = message.Trim()
         });
 
-        // Goes to MSM, never to the model. The client is not notified and their own
-        // contact details are not involved (specification section 46).
+        // MSM still sees every enquiry: the record and the studio's own notification are
+        // unchanged, so nothing that used to be visible on the admin screens stops being
+        // visible.
         await notifications.NotifyStaffAsync(
             NotificationTypes.EnquiryReceived,
             $"New enquiry about {client.PublicName} from {name.Trim()}.",
             "/admin/enquiries",
             cancellationToken);
 
+        // The model sees it on their own dashboard as well, which is what shows an
+        // enquiry arrived even before any email provider is configured.
+        notifications.NotifyUser(
+            client.ApplicationUserId,
+            NotificationTypes.EnquiryReceived,
+            $"New enquiry from {name.Trim()}.",
+            "/client");
+
+        // Saved before the message is sent. An email provider that is slow, misconfigured
+        // or simply absent must not be able to lose the enquiry itself.
         await db.SaveChangesAsync(cancellationToken);
 
+        await SendEnquiryToModelAsync(client, name, company, email, phone, message, cancellationToken);
+
         return true;
+    }
+
+    /// <summary>
+    /// Sends the enquiry on to the model, so an agency reaches them without MSM having to
+    /// forward it by hand.
+    /// </summary>
+    /// <remarks>
+    /// A model under eighteen is the exception: their enquiries go to the guardian whose
+    /// consent already governs the portfolio, not to the child. If there is no guardian
+    /// address on file the message is not sent at all, and MSM's own notification — which
+    /// is raised either way — is what carries it.
+    /// </remarks>
+    private async Task SendEnquiryToModelAsync(
+        ClientProfile client,
+        string name,
+        string? company,
+        string enquirerEmail,
+        string? phone,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var isChild = client.RequiresGuardianConsent(today);
+
+        var recipient = isChild
+            ? client.GuardianConsent?.Email
+            : client.ApplicationUser?.Email;
+
+        if (string.IsNullOrWhiteSpace(recipient))
+        {
+            logger.LogWarning(
+                "Enquiry for client {ClientId} has no {Recipient} address to send to. "
+                + "It is recorded and the studio has been notified.",
+                client.Id, isChild ? "guardian" : "model");
+            return;
+        }
+
+        var addressee = isChild
+            ? $"{client.GuardianConsent!.GuardianName}, about {client.PublicName}"
+            : client.PublicName;
+
+        var lines = new List<string>
+        {
+            $"An enquiry has come in through your {brand.Value.BusinessName} portfolio.",
+            "",
+            $"For: {addressee}",
+            $"From: {name.Trim()}"
+        };
+
+        if (!string.IsNullOrWhiteSpace(company))
+        {
+            lines.Add($"Company: {company.Trim()}");
+        }
+
+        // Their address and telephone number, so a reply goes straight back to them.
+        lines.Add($"Email: {enquirerEmail.Trim()}");
+
+        if (!string.IsNullOrWhiteSpace(phone))
+        {
+            lines.Add($"Telephone: {phone.Trim()}");
+        }
+
+        lines.Add("");
+        lines.Add(message.Trim());
+        lines.Add("");
+        lines.Add($"{brand.Value.BusinessName} has a copy of this enquiry. If anything about "
+                  + "it seems wrong, tell us before you reply.");
+
+        try
+        {
+            await email.SendAsync(
+                recipient,
+                $"Enquiry about {client.PublicName} from {name.Trim()}",
+                string.Join("\n", lines),
+                cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            // Never fails the enquiry. It is already recorded, and the studio has already
+            // been notified, so a delivery failure costs a message rather than the lead.
+            logger.LogError(exception,
+                "Could not send the enquiry for client {ClientId} on to {Recipient}.",
+                client.Id, isChild ? "the guardian" : "the model");
+        }
     }
 }

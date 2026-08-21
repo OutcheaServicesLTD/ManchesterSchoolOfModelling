@@ -130,6 +130,32 @@ public class HardeningTests
         Assert.Null(SecurityHeaders.RobotsHeaderFor(discourageSearchEngines: false));
     }
 
+    /// <summary>
+    /// The enquiry form is the only route an agency has to a model, and it was silently
+    /// rejecting every submission: the fields post as "Enquiry.Name" because they are
+    /// rendered from the page's view model, and the action bound them without that
+    /// prefix. Nothing failed loudly — the page simply came back asking for details that
+    /// were already filled in.
+    /// </summary>
+    [Fact]
+    public void The_enquiry_form_is_bound_under_the_prefix_it_posts_under()
+    {
+        var parameter = typeof(PublicPortfolioController)
+            .GetMethod(nameof(PublicPortfolioController.Enquire))!
+            .GetParameters()
+            .Single(p => p.ParameterType == typeof(Msm.Portfolio.Web.ViewModels.EnquiryViewModel));
+
+        var binding = parameter.GetCustomAttribute<Microsoft.AspNetCore.Mvc.BindAttribute>();
+
+        Assert.NotNull(binding);
+
+        // Tied to the property the form is rendered from, so renaming it breaks this
+        // test rather than the enquiry form.
+        Assert.Equal(
+            nameof(Msm.Portfolio.Web.ViewModels.PublicPortfolioViewModel.Enquiry),
+            binding!.Prefix);
+    }
+
     [Fact]
     public void Insecure_requests_are_upgraded_outside_development()
     {

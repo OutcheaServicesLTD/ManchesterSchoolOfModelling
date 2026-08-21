@@ -45,13 +45,22 @@ public class PublicPortfolioController(
     }
 
     /// <summary>
-    /// Receives an agency enquiry. The message goes to MSM; the model's own email and
-    /// telephone are never disclosed (specification section 46).
+    /// Receives an agency enquiry. It reaches MSM and the model; the model's own email
+    /// and telephone are never disclosed to the enquirer (specification section 46).
     /// </summary>
+    /// <remarks>
+    /// The prefix is not optional. The form is rendered from the page's view model, so
+    /// every field posts as "Enquiry.Name" and so on. Bound without the prefix, the
+    /// binder finds nothing, and the page comes back saying "Please enter your name"
+    /// over a form with the name still typed into it — every enquiry rejected, and
+    /// looking to the agency like their own mistake.
+    /// </remarks>
     [HttpPost("/{slug}/enquire")]
     [EnableRateLimiting(RateLimitPolicies.PublicEnquiry)]
     public async Task<IActionResult> Enquire(
-        string slug, EnquiryViewModel model, CancellationToken cancellationToken = default)
+        string slug,
+        [Bind(Prefix = nameof(PublicPortfolioViewModel.Enquiry))] EnquiryViewModel model,
+        CancellationToken cancellationToken = default)
     {
         var portfolio = await portfolios.GetBySlugAsync(slug, cancellationToken);
 

@@ -18,6 +18,7 @@ public class PublicPortfolioServiceTests : IDisposable
     private readonly SqliteConnection _connection;
     private readonly ApplicationDbContext _db;
     private readonly PublicPortfolioService _service;
+    private readonly RecordingEmailSender _email = new();
 
     public PublicPortfolioServiceTests()
     {
@@ -32,6 +33,8 @@ public class PublicPortfolioServiceTests : IDisposable
             new MeasurementTemplateProvider(
                 new StaticOptionsMonitor<MeasurementTemplateOptions>(new MeasurementTemplateOptions())),
             new NotificationService(_db),
+            _email,
+            Microsoft.Extensions.Options.Options.Create(new MsmBrandOptions()),
             NullLogger<PublicPortfolioService>.Instance);
     }
 
@@ -414,11 +417,12 @@ public class PublicPortfolioServiceTests : IDisposable
     }
 
     /// <summary>
-    /// The enquiry belongs to MSM. The model is not notified and their own contact
-    /// details are not involved (specification section 46).
+    /// An enquiry now reaches the model as well as the studio. MSM keeps its record and
+    /// its notification — what changed is that the model no longer waits for somebody to
+    /// forward it by hand.
     /// </summary>
     [Fact]
-    public async Task An_enquiry_notifies_staff_and_not_the_model()
+    public async Task An_enquiry_notifies_both_the_studio_and_the_model()
     {
         var clientId = AddModel();
         var client = _db.ClientProfiles.Single(c => c.Id == clientId);
@@ -436,6 +440,109 @@ public class PublicPortfolioServiceTests : IDisposable
         await _service.RecordEnquiryAsync(clientId, "Scout", null, "scout@agency.example", null, "Hello.");
 
         Assert.Contains(_db.Notifications, n => n.UserId == admin.Id && n.Type == NotificationTypes.EnquiryReceived);
-        Assert.DoesNotContain(_db.Notifications, n => n.UserId == client.ApplicationUserId);
+        Assert.Contains(_db.Notifications, n => n.UserId == client.ApplicationUserId);
+    }
+
+    [Fact]
+    public async Task An_enquiry_is_emailed_to_the_model_with_the_agencys_details()
+    {
+        var clientId = AddModel();
+        var client = _db.ClientProfiles.Include(c => c.ApplicationUser).Single(c => c.Id == clientId);
+
+        await _service.RecordEnquiryAsync(
+            clientId, "Agency Scout", "Big Agency", "scout@agency.example", "07700 900321",
+            "We would like to meet.");
+
+        var sent = _email.Sent.Single();
+        Assert.Equal(client.ApplicationUser.Email, sent.To);
+        Assert.Contains("Agency Scout", sent.Subject);
+
+        // Everything needed to reply, without going back through MSM.
+        Assert.Contains("scout@agency.example", sent.Body);
+        Assert.Contains("07700 900321", sent.Body);
+        Assert.Contains("Big Agency", sent.Body);
+        Assert.Contains("We would like to meet.", sent.Body);
+    }
+
+    /// <summary>
+    /// A model under eighteen never receives an agency's approach directly: it goes to the
+    /// guardian whose consent already governs the portfolio.
+    /// </summary>
+    [Fact]
+    public async Task An_enquiry_about_a_child_is_emailed_to_the_guardian()
+    {
+        var clientId = AddModel();
+        var client = _db.ClientProfiles.Include(c => c.ApplicationUser).Single(c => c.Id == clientId);
+        client.DateOfBirth = DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-15);
+
+        _db.GuardianConsents.Add(new GuardianConsent
+        {
+            ClientId = clientId,
+            GuardianName = "Pat Johnson",
+            Relationship = "Mother",
+            Email = "guardian@example.com",
+            VerificationToken = Guid.NewGuid().ToString("N")
+        });
+        await _db.SaveChangesAsync();
+
+        await _service.RecordEnquiryAsync(
+            clientId, "Scout", null, "scout@agency.example", null, "Hello.");
+
+        var sent = _email.Sent.Single();
+        Assert.Equal("guardian@example.com", sent.To);
+        Assert.NotEqual(client.ApplicationUser.Email, sent.To);
+    }
+
+    /// <summary>
+    /// With no guardian address on file there is nowhere safe to send it, and the enquiry
+    /// still has to survive: MSM's own record and notification are what carry it.
+    /// </summary>
+    [Fact]
+    public async Task An_enquiry_about_a_child_with_no_guardian_is_still_recorded()
+    {
+        var clientId = AddModel();
+        var client = _db.ClientProfiles.Single(c => c.Id == clientId);
+        client.DateOfBirth = DateOnly.FromDateTime(DateTime.UtcNow).AddYears(-15);
+        await _db.SaveChangesAsync();
+
+        Assert.True(await _service.RecordEnquiryAsync(
+            clientId, "Scout", null, "scout@agency.example", null, "Hello."));
+
+        Assert.Single(_db.Enquiries);
+        Assert.Empty(_email.Sent);
+    }
+
+    /// <summary>
+    /// A provider that is down must cost a message, not the lead behind it.
+    /// </summary>
+    [Fact]
+    public async Task An_enquiry_survives_an_email_provider_that_throws()
+    {
+        var clientId = AddModel();
+        _email.Throw = true;
+
+        Assert.True(await _service.RecordEnquiryAsync(
+            clientId, "Scout", null, "scout@agency.example", null, "Hello."));
+
+        Assert.Single(_db.Enquiries);
+    }
+
+    private sealed class RecordingEmailSender : IEmailSender
+    {
+        public List<(string To, string Subject, string Body)> Sent { get; } = [];
+
+        public bool Throw { get; set; }
+
+        public Task SendAsync(
+            string toEmail, string subject, string body, CancellationToken cancellationToken = default)
+        {
+            if (Throw)
+            {
+                throw new InvalidOperationException("No provider.");
+            }
+
+            Sent.Add((toEmail, subject, body));
+            return Task.CompletedTask;
+        }
     }
 }

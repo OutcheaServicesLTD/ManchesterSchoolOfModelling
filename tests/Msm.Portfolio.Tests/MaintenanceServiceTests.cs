@@ -57,6 +57,8 @@ public class MaintenanceServiceTests : IDisposable
             new MeasurementTemplateProvider(
                 new StaticOptionsMonitor<MeasurementTemplateOptions>(new MeasurementTemplateOptions())),
             notifications,
+            new SilentEmailSender(),
+            Microsoft.Extensions.Options.Options.Create(new MsmBrandOptions()),
             NullLogger<PublicPortfolioService>.Instance);
     }
 
@@ -432,5 +434,13 @@ public class MaintenanceServiceTests : IDisposable
         Assert.DoesNotContain("Insufficient", serialised);
         Assert.DoesNotContain("PaymentWarning", serialised);
         Assert.DoesNotContain("grace", serialised, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>These tests are about subscriptions, not about messages leaving.</summary>
+    private sealed class SilentEmailSender : IEmailSender
+    {
+        public Task SendAsync(
+            string toEmail, string subject, string body, CancellationToken cancellationToken = default) =>
+            Task.CompletedTask;
     }
 }

@@ -370,17 +370,27 @@ Unpublishing removes the portfolio page, the Model Board card **and** public acc
 the images in one move, because all three read the same `IsPublished` flag. There is no
 separate board record to fall out of step (specification section 47).
 
-### Contact routes to MSM, never to the model
+### Contact routes through the page, never through the model's own details
 
 The enquiry form collects the *enquirer's* details. The model's own email and telephone
-are never shown and never used. The model enquired about is taken from the portfolio in
-the URL rather than the posted form, so an enquiry cannot be redirected at someone else,
-and the server re-checks the portfolio is published before storing anything. MSM staff
-are notified; the model is not.
+are never shown on the page and are never posted back through it. The model enquired
+about is taken from the portfolio in the URL rather than the posted form, so an enquiry
+cannot be redirected at someone else, and the server re-checks the portfolio is published
+before storing anything.
+
+The enquiry then goes on to the model by email, at MSM's instruction — an agency reaches
+them without anybody at the studio forwarding it by hand. MSM keeps the record and the
+studio notification either way, and the model also sees it on their own dashboard, which
+is what shows an enquiry arrived while no email provider is configured.
+
+**A model under eighteen is the exception.** Their enquiries go to the guardian whose
+consent already governs the portfolio, never to the child. With no guardian address on
+file nothing is sent at all, and MSM's record and notification are what carry it.
 
 Enquiries are **stored**, not only emailed. This adds an `Enquiry` entity beyond the list
-in specification section 26 — a deliberate addition, because no email provider is
-configured yet and an unstored enquiry would simply be lost.
+in specification section 26 — a deliberate addition, because an enquiry must survive a
+delivery that fails. Sending happens after the record is committed, and a provider that
+throws is logged rather than allowed to fail the enquiry.
 
 ### Presentation
 

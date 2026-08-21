@@ -597,13 +597,10 @@
                 overlay.appendChild(stage);
                 overlay.appendChild(strip);
 
-                // The backdrop closes, the photograph does not: a mistimed tap while
-                // moving through a shoot should not throw the viewer away.
-                overlay.addEventListener('click', function (event) {
-                    if (event.target === overlay || event.target === stage) {
-                        close();
-                    }
-                });
+                // Nothing here closes on a stray click. Clicking the space around a
+                // photograph used to close the viewer, which meant a missed tap on an
+                // arrow — the thing either side of that space — threw away the shoot
+                // being looked through. The cross closes it, and so does Escape.
 
                 document.body.appendChild(overlay);
             };
