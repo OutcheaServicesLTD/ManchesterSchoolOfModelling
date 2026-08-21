@@ -70,6 +70,9 @@ public static class AuditActions
 
     /// <summary>A model was given, or given back, the means to sign in.</summary>
     public const string ClientAccessIssued = "ClientAccessIssued";
+
+    /// <summary>The purchased year ran out and the portfolio came down.</summary>
+    public const string PortfolioTermExpired = "PortfolioTermExpired";
     public const string CheckoutOpened = "CheckoutOpened";
     public const string CheckoutStarted = "CheckoutStarted";
     public const string CheckoutCancelled = "CheckoutCancelled";

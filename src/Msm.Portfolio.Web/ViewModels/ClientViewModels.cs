@@ -35,6 +35,22 @@ public class ClientDashboardViewModel
     /// </summary>
     public Services.MaintenanceWarning? MaintenanceWarning { get; set; }
 
+    /// <summary>
+    /// When the purchased year ends. Null before anything is bought, and on portfolios
+    /// sold before the year had a meaning.
+    /// </summary>
+    public DateTimeOffset? ExpiresAt { get; set; }
+
+    /// <summary>Days left of the purchased year, or null when there is no term.</summary>
+    public int? DaysOfTermRemaining =>
+        ExpiresAt is { } expires ? (int)Math.Ceiling((expires - DateTimeOffset.UtcNow).TotalDays) : null;
+
+    /// <summary>
+    /// Whether to say anything about it. A year away is not news; a month away is, and
+    /// is enough notice to do something about it.
+    /// </summary>
+    public bool TermIsEndingSoon => DaysOfTermRemaining is > 0 and <= 30;
+
     public string StatusDescription => PortfolioStatus switch
     {
         PortfolioStatus.AwaitingClientInformation => "We are waiting for your details.",

@@ -149,14 +149,30 @@ public class DbSeeder(
         // changed a price through the application, and orders reference the agreed
         // amount rather than this record.
         await EnsureProductAsync(
-            ProductCodes.ModelDevelopmentProgramme,
-            "4 Week Model Development Programme",
-            "Four week model development programme including the digital portfolio.",
-            commerce.ProgrammePrice,
+            ProductCodes.DigitalPortfolioYear,
+            "Digital Portfolio",
+            $"The public digital portfolio, live for {commerce.PortfolioTermDays / 365} year.",
+            commerce.PortfolioPrice,
             commerce.Currency,
             BillingType.OneOff,
             BillingInterval.None,
             cancellationToken);
+
+        // A new product rather than a corrected old one. Orders reference the product they
+        // were bought against, and rewriting the row would restate every past sale of the
+        // £3,499 programme as a sale of something else. Retiring it instead leaves that
+        // history intact and stops anything new being sold against it.
+        var retired = await db.Products
+            .FirstOrDefaultAsync(p => p.Code == ProductCodes.ModelDevelopmentProgramme
+                                      && p.IsActive, cancellationToken);
+
+        if (retired is not null)
+        {
+            retired.IsActive = false;
+            logger.LogInformation(
+                "Retired product {Code}. The website now sells {Replacement}.",
+                ProductCodes.ModelDevelopmentProgramme, ProductCodes.DigitalPortfolioYear);
+        }
 
         await EnsureProductAsync(
             ProductCodes.PortfolioMaintenance,
@@ -267,6 +283,14 @@ public class DbSeeder(
 /// <summary>Stable product keys used by seeding and checkout.</summary>
 public static class ProductCodes
 {
+    /// <summary>What the website sells: the portfolio, for a year.</summary>
+    public const string DigitalPortfolioYear = "digital-portfolio-year";
+
+    /// <summary>
+    /// The £3,499 programme this used to sell. Kept because orders reference it, and
+    /// deactivated on start-up so nothing new can be bought against it.
+    /// </summary>
     public const string ModelDevelopmentProgramme = "model-development-programme";
+
     public const string PortfolioMaintenance = "portfolio-maintenance";
 }

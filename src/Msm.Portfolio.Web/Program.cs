@@ -92,6 +92,8 @@ builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
 // A grace period expires by the passage of time, so nothing in a request can be
 // relied on to notice it (specification section 23).
 builder.Services.AddHostedService<MaintenanceGracePeriodWorker>();
+builder.Services.AddScoped<IPortfolioTermService, PortfolioTermService>();
+builder.Services.AddHostedService<PortfolioTermWorker>();
 
 builder.Services.AddScoped<ICrmSyncService, CrmSyncService>();
 

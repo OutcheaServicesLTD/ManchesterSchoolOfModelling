@@ -473,11 +473,35 @@ cannot corrupt an order.
   money, not the sale; tearing the portfolio down there would bypass the grace period in
   specification section 23.
 
+## What the website sells
+
+**£99, once, and the portfolio is public for a year.** That is the only payment. The
+price and the length of the term are both configuration — `Commerce:PortfolioPrice` and
+`Commerce:PortfolioTermDays` — because both are commercial decisions rather than facts
+about the software.
+
+Buying sets `Portfolio.ExpiresAt` a year out. Buying again **adds** a year to whatever is
+left rather than replacing it: somebody who renews two months early has paid for a year
+and should get a year. When the date passes, `PortfolioTermWorker` takes the portfolio
+down — hourly, because a year runs out by the passage of time and nothing in a request
+can be relied on to notice. A model with a month left is told on their dashboard.
+
+A portfolio with **no** expiry never expires. Those are the ones sold under the old
+£3,499 programme price, which carried no term; reading a null as "expired long ago" would
+take down every one of them on the first run.
+
+The programme product is retired rather than rewritten, and orders still reference it.
+Restating a past £3,499 sale as a sale of something else would falsify the record.
+
 ## Maintenance and the grace period
 
-The monthly portfolio maintenance charge is a separate product from the £3,499
-programme. A subscription record is created when the programme is purchased, fixing the
-price agreed that day so a later change cannot alter it, and starting at the offset in
+**Off.** `Commerce:MaintenanceEnabled` is false, so no subscription is opened on purchase
+and none of what follows can fire. It is a switch rather than a deletion, so MSM can go
+back to charging maintenance without the work being rebuilt.
+
+When it is on: the monthly maintenance charge is a separate product. A subscription
+record is created when the portfolio is purchased, fixing the price agreed that day so a
+later change cannot alter it, and starting at the offset in
 `Commerce:MaintenanceStartsAfterDays`.
 
 ### What happens when a payment fails
@@ -768,7 +792,7 @@ will maintain them in a later phase.
 | `Media` | 60-image pool limit, 30-image portfolio limit, file size and type restrictions, storage provider |
 | `MeasurementTemplates` | Which measurements are collected per profile type. Overrides the section 9 defaults without a schema change |
 | `GuardianConsent` | Consent wording version, approval link lifetime, consent text |
-| `Commerce` | Programme price (£3,499), maintenance price (£19.99), 7-day grace period, maintenance start offset |
+| `Commerce` | Portfolio price (£99) and term (365 days), whether maintenance is charged at all (off), maintenance price (£19.99), 7-day grace period, maintenance start offset |
 | `Msm` | Business name, public domain, contact email/phone/WhatsApp, social links |
 | `Integrations` | GoCardless and GoHighLevel credentials |
 
@@ -788,9 +812,9 @@ requirements.
 - **Malware scanning** — specification section 38 asks for it where the hosting
   infrastructure supports it. Uploads are currently validated by decoding rather than
   scanned; wire a scanner in once hosting is chosen.
-- **Final maintenance price** — `Commerce:MaintenancePrice`, placeholder £19.99.
-  Existing subscriptions keep the price agreed when they started.
-- **Maintenance start date** — `Commerce:MaintenanceStartsAfterDays`, currently 0.
+- **Maintenance** — not charged. `Commerce:MaintenanceEnabled` is false and the £99 is
+  the only payment. The price, grace period and start offset settings are all still there
+  and take effect the moment it is switched back on.
 - **MSM contact details** — `Msm:ContactEmail`, `ContactPhone`, `WhatsApp`, to be
   supplied by MSM. Until they are set, the public portfolio shows the enquiry form but
   no direct contact options, and the footer omits them.

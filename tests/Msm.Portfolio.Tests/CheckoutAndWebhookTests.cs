@@ -69,16 +69,16 @@ public class CheckoutAndWebhookTests : IDisposable
 
     private void SeedProducts()
     {
-        var programme = new Product
+        var portfolio = new Product
         {
-            Code = ProductCodes.ModelDevelopmentProgramme,
-            Name = "4 Week Model Development Programme",
-            Price = 3499.00m,
+            Code = ProductCodes.DigitalPortfolioYear,
+            Name = "Digital Portfolio",
+            Price = 99.00m,
             Currency = "GBP",
             BillingType = BillingType.OneOff
         };
 
-        _db.Products.AddRange(programme, new Product
+        _db.Products.AddRange(portfolio, new Product
         {
             Code = ProductCodes.PortfolioMaintenance,
             Name = "Portfolio Maintenance",
@@ -89,7 +89,7 @@ public class CheckoutAndWebhookTests : IDisposable
         });
 
         _db.SaveChanges();
-        _programmeProductId = programme.Id;
+        _programmeProductId = portfolio.Id;
     }
 
     private Guid AddClient(
@@ -164,14 +164,14 @@ public class CheckoutAndWebhookTests : IDisposable
     // ---------- Orders ----------
 
     [Fact]
-    public async Task Opening_checkout_creates_an_order_at_the_programme_price()
+    public async Task Opening_checkout_creates_an_order_at_the_portfolio_price()
     {
         var clientId = AddClient();
 
         var result = await _checkout.OpenAsync(clientId, null);
 
         Assert.True(result.Succeeded);
-        Assert.Equal(3499.00m, result.Order!.Amount);
+        Assert.Equal(99.00m, result.Order!.Amount);
         Assert.Equal("GBP", result.Order.Currency);
         Assert.Equal(OrderStatus.Draft, result.Order.Status);
         Assert.Equal(PortfolioStatus.AwaitingPurchase,
@@ -188,10 +188,10 @@ public class CheckoutAndWebhookTests : IDisposable
         var clientId = AddClient();
         var order = (await _checkout.OpenAsync(clientId, null)).Order!;
 
-        _db.Products.Single(p => p.Id == _programmeProductId).Price = 3999.00m;
+        _db.Products.Single(p => p.Id == _programmeProductId).Price = 149.00m;
         await _db.SaveChangesAsync();
 
-        Assert.Equal(3499.00m, (await _checkout.GetOrderAsync(order.Id))!.Amount);
+        Assert.Equal(99.00m, (await _checkout.GetOrderAsync(order.Id))!.Amount);
     }
 
     /// <summary>A client returning after abandoning the provider page must not be charged twice.</summary>
@@ -299,17 +299,70 @@ public class CheckoutAndWebhookTests : IDisposable
         Assert.Equal("emma-johnson", portfolio.Slug);
     }
 
+    /// <summary>
+    /// The £99 is the only payment, so nothing recurring is opened against the client. A
+    /// subscription created here would sit waiting to fail a collection that is never
+    /// attempted, and take the portfolio down when it did.
+    /// </summary>
     [Fact]
-    public async Task A_successful_payment_starts_the_maintenance_subscription_at_todays_price()
+    public async Task A_successful_payment_starts_no_subscription()
     {
         var clientId = AddClient();
         var order = (await _checkout.OpenAsync(clientId, null)).Order!;
         await _checkout.BeginPaymentAsync(order.Id, "https://x/s", "https://x/f");
         await _checkout.CompleteAsync(order.Id);
 
-        var subscription = _db.MaintenanceSubscriptions.Single(s => s.ClientId == clientId);
-        Assert.Equal(19.99m, subscription.PriceAtCreation);
-        Assert.Equal(MaintenanceSubscriptionStatus.NotStarted, subscription.Status);
+        Assert.Empty(_db.MaintenanceSubscriptions);
+    }
+
+    [Fact]
+    public async Task A_purchase_costs_ninety_nine_pounds()
+    {
+        var clientId = AddClient();
+
+        var order = (await _checkout.OpenAsync(clientId, null)).Order!;
+
+        Assert.Equal(99.00m, order.Amount);
+        Assert.Equal("GBP", order.Currency);
+    }
+
+    [Fact]
+    public async Task A_purchase_keeps_the_portfolio_public_for_a_year()
+    {
+        var clientId = AddClient();
+        var order = (await _checkout.OpenAsync(clientId, null)).Order!;
+        await _checkout.BeginPaymentAsync(order.Id, "https://x/s", "https://x/f");
+        await _checkout.CompleteAsync(order.Id);
+
+        var portfolio = _db.Portfolios.Single(p => p.ClientId == clientId);
+
+        Assert.NotNull(portfolio.ExpiresAt);
+
+        // A day either side, so the test is not a clock comparison.
+        var days = (portfolio.ExpiresAt!.Value - DateTimeOffset.UtcNow).TotalDays;
+        Assert.InRange(days, 364, 366);
+    }
+
+    /// <summary>
+    /// Somebody who renews early has paid for a year and should get a year. Replacing the
+    /// expiry rather than adding to it would quietly take back the time they had left.
+    /// </summary>
+    [Fact]
+    public async Task Buying_again_adds_a_year_to_what_is_left()
+    {
+        var clientId = AddClient();
+        var portfolio = _db.Portfolios.Single(p => p.ClientId == clientId);
+        portfolio.ExpiresAt = DateTimeOffset.UtcNow.AddDays(60);
+        _db.SaveChanges();
+
+        var order = (await _checkout.OpenAsync(clientId, null)).Order!;
+        await _checkout.BeginPaymentAsync(order.Id, "https://x/s", "https://x/f");
+        await _checkout.CompleteAsync(order.Id);
+
+        _db.Entry(portfolio).Reload();
+
+        var days = (portfolio.ExpiresAt!.Value - DateTimeOffset.UtcNow).TotalDays;
+        Assert.InRange(days, 424, 426);
     }
 
     [Fact]

@@ -44,6 +44,23 @@ public class Portfolio
 
     public DateTimeOffset? UnpublishedAt { get; set; }
 
+    /// <summary>
+    /// When the purchased year runs out and the portfolio stops being public.
+    /// </summary>
+    /// <remarks>
+    /// Null before anything is bought, and on portfolios sold under the old programme
+    /// price, which carried no term. A null expiry never expires — it is not treated as
+    /// "expired long ago", which would take down every portfolio sold before this existed.
+    /// </remarks>
+    public DateTimeOffset? ExpiresAt { get; set; }
+
+    /// <summary>Days left of the purchased year, or null when there is no term.</summary>
+    public int? DaysRemaining(DateTimeOffset now) =>
+        ExpiresAt is { } expires ? (int)Math.Ceiling((expires - now).TotalDays) : null;
+
+    /// <summary>True when the year is up and the portfolio should no longer be public.</summary>
+    public bool HasExpired(DateTimeOffset now) => ExpiresAt is { } expires && expires <= now;
+
     /// <summary>Result of the last CRM push, per specification section 45.</summary>
     public CrmSyncStatus CrmSyncStatus { get; set; } = CrmSyncStatus.NotSynced;
 

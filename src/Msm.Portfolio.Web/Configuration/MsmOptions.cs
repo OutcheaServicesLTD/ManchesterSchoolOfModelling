@@ -72,10 +72,35 @@ public class CommerceOptions
 
     public string Currency { get; set; } = "GBP";
 
-    /// <summary>Price of the 4 Week Model Development Programme (specification section 19).</summary>
-    public decimal ProgrammePrice { get; set; } = 3499.00m;
+    /// <summary>
+    /// What the website sells: the public digital portfolio, live for one year.
+    /// </summary>
+    /// <remarks>
+    /// This used to be the 4 Week Model Development Programme at £3,499 (specification
+    /// section 19). MSM sell the programme elsewhere; what is bought here is the
+    /// portfolio, once, for a year.
+    /// </remarks>
+    public decimal PortfolioPrice { get; set; } = 99.00m;
 
-    /// <summary>Placeholder monthly maintenance price, pending MSM's final figure.</summary>
+    /// <summary>
+    /// How long a purchase keeps the portfolio public. A year, and configurable rather
+    /// than assumed, because "a year" is a commercial decision and not a fact about the
+    /// software.
+    /// </summary>
+    public int PortfolioTermDays { get; set; } = 365;
+
+    /// <summary>
+    /// Whether a recurring maintenance subscription is created on purchase.
+    /// </summary>
+    /// <remarks>
+    /// Off. The £99 is the only payment — nothing is collected monthly, so no
+    /// subscription is opened and none of the payment-failure machinery below can fire.
+    /// It is a switch rather than a deletion so MSM can go back to charging maintenance
+    /// without the work being rebuilt.
+    /// </remarks>
+    public bool MaintenanceEnabled { get; set; }
+
+    /// <summary>Monthly maintenance price. Unused while maintenance is off.</summary>
     public decimal MaintenancePrice { get; set; } = 19.99m;
 
     /// <summary>

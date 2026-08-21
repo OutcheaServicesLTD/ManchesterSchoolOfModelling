@@ -104,6 +104,26 @@
             <dt class="col-sm-3">Photographs</dt>
             <dd class="col-sm-9">@Model.Selected.Count on portfolio, @Model.Assets.Count in library</dd>
 
+            @* The purchased year. Absent on a portfolio nobody has bought yet, and on the
+               ones sold under the old programme price, which carried no term. *@
+            @if (Model.Portfolio?.ExpiresAt is { } expires)
+            {
+                var left = Model.Portfolio.DaysRemaining(DateTimeOffset.UtcNow) ?? 0;
+
+                <dt class="col-sm-3">Paid until</dt>
+                <dd class="col-sm-9">
+                    @expires.ToString("d MMMM yyyy")
+                    @if (left <= 0)
+                    {
+                        <span class="badge text-bg-danger">Ended</span>
+                    }
+                    else if (left <= 30)
+                    {
+                        <span class="badge text-bg-warning">@left day@(left == 1 ? "" : "s") left</span>
+                    }
+                </dd>
+            }
+
             <dt class="col-sm-3">Public address</dt>
             <dd class="col-sm-9">
                 @if (Model.PublicUrl is not null)
@@ -208,7 +228,7 @@ else if (Model.Client.BiographyDraftStatus == BiographyDraftStatus.Failed)
             {
                 @* Opened with the client present in the studio (specification section 20). *@
                 <a class="btn btn-primary" href="/checkout/@Model.ClientId">
-                    Purchase — @Model.ProgrammePrice
+                    Purchase — @Model.PortfolioPrice for a year
                 </a>
             }
 

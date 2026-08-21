@@ -112,12 +112,12 @@ public class CheckoutService(
         }
 
         var product = await db.Products.FirstOrDefaultAsync(
-            p => p.Code == ProductCodes.ModelDevelopmentProgramme && p.IsActive, cancellationToken);
+            p => p.Code == ProductCodes.DigitalPortfolioYear && p.IsActive, cancellationToken);
 
         if (product is null)
         {
-            logger.LogError("The programme product is missing or inactive; checkout cannot open.");
-            return new CheckoutStart(false, Error: "The programme is not available for purchase.");
+            logger.LogError("The portfolio product is missing or inactive; checkout cannot open.");
+            return new CheckoutStart(false, Error: "The portfolio is not available for purchase.");
         }
 
         order = new Order
@@ -310,6 +310,11 @@ public class CheckoutService(
         // marked here; the push happens on a worker (specification section 45).
         portfolio?.RequestCrmSync();
 
+        if (portfolio is not null)
+        {
+            ExtendTerm(portfolio);
+        }
+
         await StartMaintenanceAsync(order, cancellationToken);
 
         // Saved before publishing so the sale is durable even if publication is refused.
@@ -338,8 +343,33 @@ public class CheckoutService(
     /// (specification section 22). Collection itself is Phase 8; this fixes the price
     /// agreed today so a later change cannot alter it.
     /// </summary>
+    /// <summary>
+    /// Sets the date the portfolio stops being public: a year from now, which is what the
+    /// £99 buys.
+    /// </summary>
+    /// <remarks>
+    /// Added to whatever is left rather than replacing it. Somebody who renews two months
+    /// early has paid for a year and should get a year, not lose the sixty days they had
+    /// already bought.
+    /// </remarks>
+    private void ExtendTerm(Domain.Entities.Portfolio portfolio)
+    {
+        var now = DateTimeOffset.UtcNow;
+        var from = portfolio.ExpiresAt is { } current && current > now ? current : now;
+
+        portfolio.ExpiresAt = from.AddDays(commerceOptions.Value.PortfolioTermDays);
+        portfolio.UpdatedAt = now;
+    }
+
     private async Task StartMaintenanceAsync(Order order, CancellationToken cancellationToken)
     {
+        // Off by default: the £99 is the only payment, so no subscription is opened and
+        // none of the payment-failure machinery can fire.
+        if (!commerceOptions.Value.MaintenanceEnabled)
+        {
+            return;
+        }
+
         if (await db.MaintenanceSubscriptions.AnyAsync(s => s.ClientId == order.ClientId, cancellationToken))
         {
             return;

@@ -423,8 +423,8 @@ public class ClientsController(
             PublicUrlBase = brand.PublicDomain.TrimEnd('/'),
             HasPaid = await db.Orders.AnyAsync(
                 o => o.ClientId == clientId && o.Status == OrderStatus.Confirmed, cancellationToken),
-            ProgrammePriceValue = await db.Products
-                .Where(p => p.Code == ProductCodes.ModelDevelopmentProgramme)
+            PortfolioPriceValue = await db.Products
+                .Where(p => p.Code == ProductCodes.DigitalPortfolioYear)
                 .Select(p => p.Price)
                 .FirstOrDefaultAsync(cancellationToken)
         };

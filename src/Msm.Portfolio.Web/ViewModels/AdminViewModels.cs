@@ -103,9 +103,10 @@ public class AdminClientDetailViewModel
 
     public bool HasPaid { get; set; }
 
-    public decimal ProgrammePriceValue { get; set; }
+    /// <summary>What a purchase costs today: the portfolio, for a year.</summary>
+    public decimal PortfolioPriceValue { get; set; }
 
-    public string ProgrammePrice => $"£{ProgrammePriceValue:N2}";
+    public string PortfolioPrice => $"£{PortfolioPriceValue:N2}";
 
     public bool IsArchived => Status == PortfolioStatus.Archived;
 

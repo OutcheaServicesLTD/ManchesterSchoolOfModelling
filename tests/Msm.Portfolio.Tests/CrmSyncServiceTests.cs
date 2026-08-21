@@ -160,7 +160,7 @@ public class CrmSyncServiceTests : IDisposable
 
         var product = new Product
         {
-            Code = ProductCodes.ModelDevelopmentProgramme, Name = "Programme",
+            Code = ProductCodes.DigitalPortfolioYear, Name = "Digital Portfolio",
             Price = 3499m, Currency = "GBP", BillingType = BillingType.OneOff
         };
         _db.Products.Add(product);

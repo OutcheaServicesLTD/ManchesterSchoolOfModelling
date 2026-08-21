@@ -21,7 +21,7 @@ Run a full sandbox checkout and confirm each item.
 - [ ] `POST /billing_requests` is the correct endpoint, and the envelope key is
       `billing_requests`.
 - [ ] `payment_request.amount` is in the **smallest currency unit** (pence for GBP).
-      The code multiplies by 100 — confirm £3,499.00 arrives as `349900`, not `3499`.
+      The code multiplies by 100 — confirm £99.00 arrives as `9900`, not `99`.
 - [ ] `payment_request.currency` accepts `"GBP"`.
 - [ ] `metadata` accepts the `order_id` and `client_id` keys, and they come back on the
       webhook. If they do not, order matching relies solely on the payment id.

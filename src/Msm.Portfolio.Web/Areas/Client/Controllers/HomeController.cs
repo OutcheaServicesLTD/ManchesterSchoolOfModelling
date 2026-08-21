@@ -62,7 +62,8 @@ public class HomeController(
             MediaPoolLimit = media.MediaPoolImageLimit,
             ProfileCompletionPercent = CalculateCompletion(client),
             GuardianApprovalPending = client.IsBlockedPendingGuardianConsent(today),
-            MaintenanceWarning = await maintenance.GetWarningAsync(client.Id, cancellationToken)
+            MaintenanceWarning = await maintenance.GetWarningAsync(client.Id, cancellationToken),
+            ExpiresAt = client.Portfolio?.ExpiresAt
         };
 
         return View(model);
