@@ -290,13 +290,18 @@ else
     }
 }
 
-<div class="border-top pt-3 d-flex gap-2 flex-wrap">
-    <form method="post" asp-action="Submit" asp-route-clientId="@Model.ClientId">
+<div class="border-top pt-3 d-flex gap-2 flex-wrap align-items-center">
+    @* Sent without reloading, so the answer appears where the retoucher is standing
+       rather than throwing them to the top of a fresh page. Falls back to an ordinary
+       post with no script — the data attribute is all that changes. *@
+    <form method="post" asp-action="Submit" asp-route-clientId="@Model.ClientId"
+          data-submit-review>
         <button type="submit" class="btn btn-primary btn-lg" @(Model.CanSubmit ? "" : "disabled")>
             Send for review
         </button>
     </form>
     <a class="btn btn-outline-secondary btn-lg" href="/retoucher">Save and close</a>
+    <span class="form-text mb-0" data-submit-status role="status" aria-live="polite"></span>
 </div>
 
 @if (!Model.CanSubmit)

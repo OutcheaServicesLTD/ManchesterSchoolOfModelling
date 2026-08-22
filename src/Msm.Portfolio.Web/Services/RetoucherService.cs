@@ -31,7 +31,14 @@ public record QueueItem(
     /// belongs to whoever claimed it, and a queue that offers an Open button to everybody
     /// answers half of them with Access denied and no explanation.
     /// </summary>
-    bool CanOpen);
+    bool CanOpen,
+
+    /// <summary>
+    /// Arrived in the last day. Marked and sorted first, because the queue is otherwise
+    /// oldest-first and a portfolio submitted this morning appears below a fortnight of
+    /// older work — which is the one row somebody opening the queue is looking for.
+    /// </summary>
+    bool IsNew);
 
 public record QueueCounts(int Waiting, int InProgress, int ReadyForReview, int Completed);
 
@@ -107,6 +114,8 @@ public class RetoucherService(
                 client.DateOfBirth,
                 portfolio.Status,
                 portfolio.CreatedAt,
+                // When it last changed state, which for a submission is when it arrived.
+                portfolio.UpdatedAt,
                 GuardianStatus = client.GuardianConsent == null
                     ? (GuardianConsentStatus?)null
                     : client.GuardianConsent.Status,
@@ -124,10 +133,18 @@ public class RetoucherService(
 
         var rows = await query.ToListAsync(cancellationToken);
 
+        // A day. Long enough that work arriving overnight is still marked when the studio
+        // opens, short enough that the mark still means something.
+        var newSince = DateTimeOffset.UtcNow.AddDays(-1);
+
         return
         [
             .. rows
-                .OrderBy(r => r.CreatedAt)
+                // New first, then the old order: oldest waiting the longest, so the queue
+                // still reads as a queue underneath.
+                .OrderByDescending(r => r.UpdatedAt >= newSince)
+                .ThenByDescending(r => r.UpdatedAt >= newSince ? r.UpdatedAt : DateTimeOffset.MinValue)
+                .ThenBy(r => r.CreatedAt)
                 .Select(r =>
                 {
                     var profile = new ClientProfile { DateOfBirth = r.DateOfBirth };
@@ -151,7 +168,8 @@ public class RetoucherService(
                         // offering a button that answers Access denied.
                         CanOpen: r.Assignment is null
                             ? r.Status == PortfolioStatus.ReadyForRetoucher
-                            : r.Assignment.RetoucherUserId == retoucherUserId);
+                            : r.Assignment.RetoucherUserId == retoucherUserId,
+                        IsNew: r.UpdatedAt >= newSince);
                 })
         ];
     }

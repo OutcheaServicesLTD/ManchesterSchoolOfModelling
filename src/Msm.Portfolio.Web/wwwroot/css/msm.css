@@ -155,6 +155,13 @@ html {
 }
 
 body {
+    /* A column, so the last thing in the page can be told to sit at the bottom of the
+       window rather than immediately after the content. Both shells put header, main and
+       footer directly in the body. */
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    min-height: 100svh;
     margin: 0;
     background: var(--bg);
     color: var(--fg);
@@ -875,6 +882,17 @@ dl.row > dd {
 
 .table > tbody tr:hover {
     background: var(--card);
+}
+
+/* Work that arrived in the last day. A left edge in the live green rather than a filled
+   row: a whole coloured row on a page of hairlines shouts, and the queue is read many
+   times a day. */
+.table > tbody tr.is-new > * {
+    background: color-mix(in srgb, var(--live) 7%, transparent);
+}
+
+.table > tbody tr.is-new > :first-child {
+    box-shadow: inset 2px 0 0 var(--live);
 }
 
 .table-sm > tbody td,
@@ -2047,7 +2065,10 @@ body.viewer-open {
 .portal-brand {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
+    /* Centred, so the word sits under the middle of the mark rather than hanging off
+       its left edge. The mark is wider than the word in every case, so this is what
+       reads as one thing rather than two. */
+    align-items: center;
     gap: 5px;
     text-decoration: none;
     margin-right: 0.6rem;
@@ -2120,7 +2141,16 @@ body.viewer-open {
 
 .portal-main {
     padding: clamp(1.8rem, 4vw, 3rem) 0 5rem;
-    min-height: 60vh;
+    /* Takes whatever height is left over, which is what holds the footer against the
+       bottom of a tall screen. min-height in vh could not: 60vh of an iPad's 1366px is
+       820px, and a page shorter than that left the footer floating in the middle with
+       blank page beneath it. */
+    flex: 1 0 auto;
+}
+
+/* The public shell's main carries no class of its own; same job as .portal-main. */
+body.public > main {
+    flex: 1 0 auto;
 }
 
 .portal-footer {

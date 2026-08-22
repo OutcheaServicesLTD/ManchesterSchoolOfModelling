@@ -169,6 +169,10 @@ public class AdminClientEditViewModel
     public string? EyeColour { get; set; }
 
     [StringLength(4000)]
+    /// <summary>
+    /// Shown, never saved from here. The model writes their own biography; the admin form
+    /// ignores whatever is posted under this name.
+    /// </summary>
     [Display(Name = "About me")]
     public string? Biography { get; set; }
 }

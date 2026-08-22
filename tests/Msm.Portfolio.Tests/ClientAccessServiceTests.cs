@@ -3,6 +3,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using Msm.Portfolio.Web.Configuration;
 using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.Domain.Enums;
@@ -22,6 +23,7 @@ public class ClientAccessServiceTests : IDisposable
     private readonly ApplicationDbContext _db;
     private readonly UserManager<ApplicationUser> _users;
     private readonly ClientAccessService _service;
+    private readonly RecordingSender _email = new();
 
     public ClientAccessServiceTests()
     {
@@ -49,7 +51,9 @@ public class ClientAccessServiceTests : IDisposable
         _users = _scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
 
         _service = new ClientAccessService(
-            _db, _users, new AuditService(_db), NullLogger<ClientAccessService>.Instance);
+            _db, _users, new AuditService(_db), _email,
+            Microsoft.Extensions.Options.Options.Create(new MsmBrandOptions()),
+            NullLogger<ClientAccessService>.Instance);
     }
 
     public void Dispose()
@@ -180,6 +184,64 @@ public class ClientAccessServiceTests : IDisposable
 
             // Nothing that gets misread when it is spelled out down a telephone.
             Assert.DoesNotContain(password, c => "Il1O0".Contains(c));
+        }
+    }
+
+    /// <summary>
+    /// The details go to the model as well as to the screen, so a password does not have to
+    /// be read down a telephone.
+    /// </summary>
+    [Fact]
+    public async Task The_details_are_emailed_to_the_model()
+    {
+        var clientId = await AddClientAsync();
+
+        var result = await _service.IssueSignInDetailsAsync(clientId, actingUserId: null);
+
+        Assert.True(result.Delivered);
+
+        var sent = _email.Sent.Single();
+        Assert.Equal("model@example.com", sent.To);
+        Assert.Contains(result.Password!, sent.Body);
+        Assert.Contains("/account/login", sent.Body);
+    }
+
+    /// <summary>
+    /// With no provider the message cannot go, and the model must still be able to get in:
+    /// the password is set and shown on screen, and the page says it was not sent.
+    /// </summary>
+    [Fact]
+    public async Task A_provider_that_fails_does_not_stop_the_account_working()
+    {
+        var clientId = await AddClientAsync();
+        _email.Throw = true;
+
+        var result = await _service.IssueSignInDetailsAsync(clientId, actingUserId: null);
+
+        Assert.True(result.Succeeded);
+        Assert.False(result.Delivered);
+        Assert.NotNull(result.Password);
+
+        var user = await _users.FindByEmailAsync("model@example.com");
+        Assert.True(await _users.CheckPasswordAsync(user!, result.Password!));
+    }
+
+    private sealed class RecordingSender : IEmailSender
+    {
+        public List<(string To, string Subject, string Body)> Sent { get; } = [];
+
+        public bool Throw { get; set; }
+
+        public Task<bool> SendAsync(
+            string toEmail, string subject, string body, CancellationToken cancellationToken = default)
+        {
+            if (Throw)
+            {
+                throw new InvalidOperationException("No provider.");
+            }
+
+            Sent.Add((toEmail, subject, body));
+            return Task.FromResult(true);
         }
     }
 }

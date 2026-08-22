@@ -54,9 +54,13 @@ else
             <tbody>
                 @foreach (var item in Model.Items)
                 {
-                    <tr>
+                    <tr class="@(item.IsNew ? "is-new" : null)">
                         <th scope="row" class="fw-normal">
                             @item.ClientName
+                            @if (item.IsNew)
+                            {
+                                <span class="badge text-bg-success ms-1">New</span>
+                            }
                             @if (item.GuardianApprovalPending)
                             {
                                 <span class="badge text-bg-warning ms-1"

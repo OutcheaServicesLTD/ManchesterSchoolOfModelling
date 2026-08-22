@@ -300,12 +300,25 @@ public class WorkspaceController(
         return reordered;
     }
 
+    /// <summary>
+    /// Sends the prepared portfolio to an administrator to review.
+    /// </summary>
+    /// <remarks>
+    /// Answers JSON to a script and a redirect to a plain form post, so the page can say
+    /// "sent" where the retoucher is standing rather than reloading the whole workspace and
+    /// putting them back at the top of it — and so the button still works with no script.
+    /// </remarks>
     [HttpPost("submit")]
     public async Task<IActionResult> Submit(Guid clientId, CancellationToken cancellationToken = default)
     {
+        var wantsJson = Request.Headers.XRequestedWith == "XMLHttpRequest";
+
         if (!await IsAllowedAsync(clientId, cancellationToken))
         {
-            return Forbid();
+            return wantsJson
+                ? StatusCode(StatusCodes.Status403Forbidden,
+                    new { error = "You are not assigned to this client." })
+                : Forbid();
         }
 
         var (succeeded, error) = await retouchers.SubmitForReviewAsync(
@@ -313,8 +326,23 @@ public class WorkspaceController(
 
         if (!succeeded)
         {
+            if (wantsJson)
+            {
+                return BadRequest(new { error });
+            }
+
             TempData["Error"] = error;
             return RedirectToAction(nameof(Index), new { clientId });
+        }
+
+        if (wantsJson)
+        {
+            return Json(new
+            {
+                submitted = true,
+                message = "Sent for review. An administrator has been told.",
+                queueUrl = "/retoucher?tab=ReadyForReview"
+            });
         }
 
         TempData["Submitted"] = true;

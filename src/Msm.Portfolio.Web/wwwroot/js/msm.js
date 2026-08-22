@@ -430,6 +430,72 @@
             });
         })();
 
+        // ── Staying where you were ───────────────────────────────────────────────
+        // Almost every button on the site posts and redirects back to the same page, which
+        // is what stops a refresh repeating the action — and which lands the browser at the
+        // top every time. Choosing a photograph forty rows down, or saving details at the
+        // foot of a long client record, threw the reader back to the heading.
+        //
+        // The position is remembered as the form is submitted and put back when the page
+        // returns. Nothing on the server changes, so it covers every form at once,
+        // including any added later.
+        (function () {
+            var key = 'msm:scroll:' + window.location.pathname + window.location.search;
+
+            var remember = function () {
+                try {
+                    window.sessionStorage.setItem(key, JSON.stringify({
+                        y: window.scrollY,
+                        at: Date.now()
+                    }));
+                } catch (error) {
+                    // Private browsing, or storage turned off. Losing the position is a
+                    // nuisance; throwing here would stop the form submitting at all.
+                }
+            };
+
+            // Capturing, so it runs even where another handler stops the event later.
+            document.addEventListener('submit', remember, true);
+
+            // A link that acts like a button — the ones that publish, archive or open a
+            // workspace and come straight back.
+            document.addEventListener('click', function (event) {
+                var link = event.target.closest('a[data-keep-position]');
+
+                if (link) {
+                    remember();
+                }
+            }, true);
+
+            // An in-page link was the reader asking to be moved, so it wins.
+            if (window.location.hash) {
+                return;
+            }
+
+            var stored = null;
+
+            try {
+                stored = JSON.parse(window.sessionStorage.getItem(key) || 'null');
+                window.sessionStorage.removeItem(key);
+            } catch (error) {
+                stored = null;
+            }
+
+            // Only for a page that came straight back from a submission. Without the
+            // window, arriving at the same address tomorrow would restore a position from
+            // a form filled in today.
+            if (!stored || typeof stored.y !== 'number' || Date.now() - stored.at >= 30000) {
+                return;
+            }
+
+            // Twice: once now, and again once the photographs have loaded. At this point
+            // the page is often shorter than it will be, and scrolling past the end of a
+            // short page simply stops at the end of it — which is the top, on a page whose
+            // images have not arrived.
+            window.scrollTo(0, stored.y);
+            window.addEventListener('load', function () { window.scrollTo(0, stored.y); });
+        })();
+
         // ── The menu button on a phone or tablet ─────────────────────────────────
         // The section links are a row on a desktop and a panel below the bar under it.
         // Absent on every page but a portfolio, so this binds nothing elsewhere.
@@ -492,13 +558,10 @@
         // agency looking at a page with no way to the next photograph and no way back
         // but the browser's own button. The links still work as links — this takes them
         // over only once it has run, so a viewer with scripting off loses nothing.
-        (function () {
-            var gallery = document.querySelector('[data-viewer]');
-
-            if (!gallery) {
-                return;
-            }
-
+        // One per group of photographs, because a page can hold more than one: the client
+        // record shows what is on the portfolio and what is only in the library, and each
+        // is its own shoot to look through.
+        Array.prototype.forEach.call(document.querySelectorAll('[data-viewer]'), function (gallery) {
             var links = Array.prototype.slice.call(
                 gallery.querySelectorAll('[data-viewer-item]'));
 
@@ -750,6 +813,90 @@
                     step(movedX < 0 ? 1 : -1);
                 }
             }, { passive: true });
+        });
+
+        // ── Sending a portfolio for review ───────────────────────────────────────
+        // Without this the button posts, redirects to the queue, and the retoucher loses
+        // the page they were working on to find out whether it worked. The answer now
+        // arrives beside the button, and the workspace says it has been sent.
+        (function () {
+            var form = document.querySelector('[data-submit-review]');
+
+            if (!form) {
+                return;
+            }
+
+            var button = form.querySelector('button[type="submit"]');
+            var status = document.querySelector('[data-submit-status]');
+
+            var say = function (message, isError) {
+                if (!status) {
+                    return;
+                }
+
+                status.textContent = message;
+                status.className = 'mb-0 ' + (isError ? 'text-danger' : 'form-text');
+            };
+
+            form.addEventListener('submit', function (event) {
+                event.preventDefault();
+
+                if (button.disabled) {
+                    return;
+                }
+
+                button.disabled = true;
+                say('Sending…', false);
+
+                var request = new XMLHttpRequest();
+                request.open('POST', form.getAttribute('action'));
+
+                // What the server reads to decide between JSON and a redirect.
+                request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+                request.addEventListener('load', function () {
+                    var payload = null;
+
+                    try {
+                        payload = JSON.parse(request.responseText);
+                    } catch (error) {
+                        payload = null;
+                    }
+
+                    if (request.status === 200 && payload && payload.submitted) {
+                        say(payload.message, false);
+
+                        // The banner the page shows on a reload, put up now instead.
+                        var notice = document.createElement('div');
+                        notice.className = 'alert alert-info';
+                        notice.setAttribute('role', 'alert');
+                        notice.textContent =
+                            'This portfolio has been sent for review. Any further changes will '
+                            + 'be seen by the reviewing administrator.';
+
+                        var main = document.querySelector('main .container') || document.body;
+                        var heading = main.querySelector('h1');
+
+                        if (heading && !main.querySelector('.alert-info')) {
+                            heading.insertAdjacentElement('afterend', notice);
+                        }
+
+                        // Left disabled: sending the same portfolio twice does nothing but
+                        // raise a second notification for the administrator.
+                        return;
+                    }
+
+                    button.disabled = false;
+                    say((payload && payload.error) || 'That could not be sent. Please try again.', true);
+                });
+
+                request.addEventListener('error', function () {
+                    button.disabled = false;
+                    say('The connection dropped. Please try again.', true);
+                });
+
+                request.send(new FormData(form));
+            });
         })();
 
         // ── Copy a value to the clipboard ────────────────────────────────────────

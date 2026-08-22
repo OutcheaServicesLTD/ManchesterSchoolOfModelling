@@ -1,12 +1,21 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
+using Msm.Portfolio.Web.Configuration;
 using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Entities;
 
 namespace Msm.Portfolio.Web.Services;
 
 /// <summary>What came of giving a model a way in.</summary>
-public record ClientAccess(bool Succeeded, string? Email = null, string? Password = null, string? Error = null);
+/// <summary>
+/// What came of giving a model a way in. <c>Delivered</c> says whether the details also
+/// reached them by email — false while no provider is configured, which is why the
+/// password is shown on screen as well.
+/// </summary>
+public record ClientAccess(
+    bool Succeeded, string? Email = null, string? Password = null, string? Error = null,
+    bool Delivered = false);
 
 /// <summary>
 /// Gives a model the means to sign in to their own dashboard.
@@ -35,6 +44,8 @@ public class ClientAccessService(
     ApplicationDbContext db,
     UserManager<ApplicationUser> userManager,
     IAuditService audit,
+    IEmailSender email,
+    IOptions<MsmBrandOptions> brand,
     ILogger<ClientAccessService> logger) : IClientAccessService
 {
     public async Task<bool> HasSignInDetailsAsync(
@@ -89,7 +100,63 @@ public class ClientAccessService(
 
         await db.SaveChangesAsync(cancellationToken);
 
-        return new ClientAccess(true, user.Email, password);
+        return new ClientAccess(
+            true, user.Email, password,
+            Delivered: await SendAsync(user, password, cancellationToken));
+    }
+
+    /// <summary>
+    /// Emails the details to the model, and says whether it went.
+    /// </summary>
+    /// <remarks>
+    /// A password read down a telephone is a password mistyped, and it puts the studio in
+    /// the loop for something the model can be given directly. It is still shown on screen
+    /// as well: no provider is configured yet, and a model who cannot be emailed must not
+    /// be a model who cannot be let in.
+    /// </remarks>
+    private async Task<bool> SendAsync(
+        ApplicationUser user, string password, CancellationToken cancellationToken)
+    {
+        var business = brand.Value.BusinessName;
+        var site = brand.Value.PublicDomain.TrimEnd('/');
+
+        var body =
+            $"Your {business} account is ready."
+            + "\n"
+            + $""
+            + "\n"
+            + $"Sign in at {site}/account/login"
+            + "\n"
+            + $""
+            + "\n"
+            + $"Email address: {user.Email}"
+            + "\n"
+            + $"Password: {password}"
+            + "\n"
+            + $""
+            + "\n"
+            + $"Change the password once you are in - your name at the top of the page is the link."
+            + "\n"
+            + $"Nobody at {business} needs to know it."
+            + "\n"
+            + $""
+            + "\n"
+            + $"From here you can see your portfolio, your photographs, and any enquiries an agency"
+            + "\n"
+            + $"sends you.";
+
+        try
+        {
+            return await email.SendAsync(
+                user.Email!, $"Your {business} account", body, cancellationToken);
+        }
+        catch (Exception exception)
+        {
+            // Never fails the grant. The password is set and shown on screen, so the studio
+            // can still hand it over; only the message was lost.
+            logger.LogError(exception, "Could not email sign-in details to {Email}.", user.Email);
+            return false;
+        }
     }
 
     private Task<ApplicationUser?> FindUserAsync(Guid clientId, CancellationToken cancellationToken) =>

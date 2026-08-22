@@ -134,6 +134,7 @@ public class ClientsController(
         {
             TempData["GeneratedPassword"] = result.Password;
             TempData["GeneratedFor"] = result.Email;
+            TempData["GeneratedDelivered"] = result.Delivered;
         }
 
         return RedirectToAction(nameof(Index), new { clientId });
@@ -165,7 +166,11 @@ public class ClientsController(
         client.DateOfBirth = model.DateOfBirth;
         client.Location = model.Location?.Trim();
         client.ModelProfileType = model.ModelProfileType;
-        client.Biography = model.Biography?.Trim();
+        // Deliberately not taken from the form. The biography is the model's own words
+        // about themselves, written in their own account; staff read it, accept or discard
+        // a suggestion, and otherwise leave it alone. Ignoring the posted value rather than
+        // only disabling the box is the half that matters — a readonly attribute is a
+        // courtesy to the person at the keyboard, not a rule about what may be saved.
 
         // Saving is how a suggestion gets accepted, since it is offered in the box rather
         // than applied behind the scenes.

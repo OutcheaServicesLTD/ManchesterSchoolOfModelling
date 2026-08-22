@@ -11,6 +11,7 @@
     var error = TempData["Error"] as string;
     var issuedPassword = TempData["GeneratedPassword"] as string;
     var issuedFor = TempData["GeneratedFor"] as string;
+    var issuedDelivered = TempData["GeneratedDelivered"] as bool? ?? false;
     var edit = Model.ToEditModel();
 
     async Task<bool> Allowed(string permission) =>
@@ -51,8 +52,22 @@
             <dd class="col-sm-10"><code class="fs-5">@issuedPassword</code></dd>
         </dl>
         <p class="mb-0 small">
-            Copy this now and give it to them directly. It cannot be shown again, and they
-            can change it themselves once they have signed in.
+            @if (issuedDelivered)
+            {
+                <text>
+                    <strong>Emailed to them.</strong> It is shown here too in case they cannot
+                    find it. It cannot be shown again, and they can change it themselves once
+                    they have signed in.
+                </text>
+            }
+            else
+            {
+                <text>
+                    <strong>Not emailed</strong> — no email provider is set up yet, so copy
+                    this now and give it to them directly. It cannot be shown again, and they
+                    can change it themselves once they have signed in.
+                </text>
+            }
         </p>
     </div>
 }
@@ -137,12 +152,11 @@
             </dd>
         </dl>
 
-        @* Only when the About me box is already occupied. When it is empty the suggestion goes
-   straight into the box further down, and showing it twice would be two of the same
-   thing with two different sets of buttons. *@
+        @* Always, now. The About me box below is read-only — the biography is the model's own
+   words — so accepting or throwing away a suggestion here is the only way it can become
+   one, whether or not they have written something already. *@
 @if (Model.Client.BiographyDraftStatus == BiographyDraftStatus.Ready
-     && !string.IsNullOrWhiteSpace(Model.Client.BiographyDraft)
-     && !string.IsNullOrWhiteSpace(Model.Client.Biography))
+     && !string.IsNullOrWhiteSpace(Model.Client.BiographyDraft))
 {
     @* A suggestion, never the published biography. This text describes a real person and
        is what an agency reads about them, so somebody reads it before it goes anywhere. *@
@@ -322,15 +336,21 @@ else if (Model.Client.BiographyDraftStatus == BiographyDraftStatus.Failed)
 }
 else
 {
-    <ol class="row row-cols-2 row-cols-md-4 g-3 list-unstyled mb-4">
+    @* data-viewer turns these into the same viewer an agency gets on the public page:
+       click one and it opens large, with the rest of the shoot along the bottom and arrows
+       either side. Reviewing a portfolio one thumbnail at a time is not reviewing it. *@
+    <ol class="row row-cols-2 row-cols-md-4 g-3 list-unstyled mb-4" data-viewer>
         @for (var i = 0; i < Model.Selected.Count; i++)
         {
             var asset = Model.Selected[i];
             <li class="col">
                 <div class="card h-100 @(asset.IsFeatured ? "border-primary" : "")">
-                    <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
-                         style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
-                         alt="@asset.Filename" />
+                    <a href="/media/@asset.Id/large" data-viewer-item
+                       data-thumb="/media/@asset.Id/thumbnail" title="Look at this one full size">
+                        <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
+                             style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
+                             alt="@asset.Filename" />
+                    </a>
                     <div class="card-body p-2">
                         <p class="small text-muted mb-1">
                             @(i + 1). @asset.Orientation
@@ -389,14 +409,17 @@ else
 }
 else
 {
-    <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
+    <div class="row row-cols-2 row-cols-md-4 g-3 mb-4" data-viewer>
         @foreach (var asset in Model.Unselected)
         {
             <div class="col">
                 <div class="card h-100">
-                    <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
-                         style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
-                         alt="@asset.Filename" />
+                    <a href="/media/@asset.Id/large" data-viewer-item
+                       data-thumb="/media/@asset.Id/thumbnail" title="Look at this one full size">
+                        <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
+                             style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
+                             alt="@asset.Filename" />
+                    </a>
                     <div class="card-body p-2">
                         <p class="small text-muted mb-1">@asset.Orientation</p>
                         @if (await Allowed(Permissions.Media.Select))
@@ -572,21 +595,10 @@ else
                     </div>
                 </div>
                 @{
-                    // A biography that has been written and not yet used fills the box on
-                    // its own. That is the whole point of it being automatic: open the
-                    // client and it is already there, waiting to be read and saved.
-                    //
-                    // Put into the edit model rather than into the element's content,
-                    // because asp-for on a textarea writes the model value over whatever is
-                    // between the tags — the content is ignored and the box renders empty.
-                    var suggested = Model.Client.BiographyDraftStatus == BiographyDraftStatus.Ready
-                        && !string.IsNullOrWhiteSpace(Model.Client.BiographyDraft)
-                        && string.IsNullOrWhiteSpace(edit.Biography);
-
-                    if (suggested)
-                    {
-                        edit.Biography = Model.Client.BiographyDraft;
-                    }
+                    // Nothing is put into the box from here any more. The biography is
+                    // the model's own words, so an administrator reads it rather than
+                    // types in it, and a suggestion is accepted or thrown away on the card
+                    // above rather than edited in place.
                 }
 
                 <div class="mb-3">
@@ -594,58 +606,29 @@ else
                        generated: the id is overridden so the suggestion script can find the
                        box, and that quietly orphaned the label. *@
                     <label asp-for="@edit.Biography" for="biography-box" class="form-label"></label>
-                    <textarea asp-for="@edit.Biography" name="Biography" class="form-control" rows="4"
-                              id="biography-box"></textarea>
+                    <textarea asp-for="@edit.Biography" name="Biography" class="form-control"
+                              rows="4" id="biography-box" readonly aria-readonly="true"></textarea>
 
-                    @if (suggested)
+                    <p class="form-text mb-0">
+                        @Model.Client.PublicName writes this in their own account. You can
+                        accept or throw away a suggestion above, but this is theirs to word.
+                    </p>
+
+                    @if (Model.BiographyFeatureIsOn
+                         && Model.Client.BiographyDraftStatus == BiographyDraftStatus.Pending)
                     {
                         <p class="form-text mb-0">
-                            <strong>This was written for you.</strong> Read it, change
-                            anything that is wrong, then press Save client details. It is
-                            not saved and nothing is published until you do.
+                            A biography is being written for this client and will appear at the
+                            top of this page within a minute or so, to accept or throw away.
                         </p>
                     }
-
-                    @if (Model.BiographyFeatureIsOn)
+                    else if (!Model.BiographyFeatureIsOn)
                     {
-                        @* Hidden until script reveals it: without script it could not do
-                           anything, and the box is perfectly usable by typing. *@
-                        <div class="d-flex align-items-center gap-2 flex-wrap mt-2">
-                            <button type="button" class="btn btn-outline-secondary btn-sm d-none"
-                                    data-suggest-bio
-                                    data-suggest-url="/admin/clients/@Model.ClientId/biography/suggest"
-                                    data-suggest-token="@token"
-                                    data-suggest-target="biography-box">
-                                @(suggested ? "Write a different one" : "Write one for me")
-                            </button>
-                            <span class="form-text mb-0" data-suggest-status aria-live="polite"></span>
-                        </div>
-
-                        @if (!suggested
-                             && Model.Client.BiographyDraftStatus == BiographyDraftStatus.Pending)
-                        {
-                            <p class="form-text mb-0">
-                                A biography is being written for this client and will appear
-                                here within a minute or so. Refresh the page to see it.
-                            </p>
-                        }
-                        else if (!suggested)
-                        {
-                            <p class="form-text mb-0">
-                                Written from this client's details and measurements. It cannot
-                                know anything the studio has not recorded, so read it and change
-                                whatever is wrong — nothing is saved until you press Save client
-                                details.
-                            </p>
-                        }
-                    }
-                    else
-                    {
-                        @* No provider, so no button. Offering one that can only ever answer
-                           "not configured" makes working software look broken. *@
+                        @* No provider, so nothing is written automatically. Said plainly
+                           rather than left as a box that silently never fills. *@
                         <p class="form-text mb-0">
-                            Biographies are not being written automatically yet — this needs an
-                            API key setting up before it can. Until then, type one here.
+                            Biographies are not being written automatically yet — that needs an
+                            API key setting up. Until then this stays as the model wrote it.
                         </p>
                     }
                 </div>
