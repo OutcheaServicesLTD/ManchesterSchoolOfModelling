@@ -51,6 +51,32 @@ public class ClientsController(
     }
 
     /// <summary>
+    /// Passes this client's retouching to somebody else, or releases it back to the queue.
+    /// </summary>
+    /// <remarks>
+    /// Claimed work belongs to whoever claimed it, so two people cannot unknowingly prepare
+    /// the same portfolio. Without this, work claimed by the wrong person — or by somebody
+    /// who has since left — is stuck with them, and the retoucher who should have it is
+    /// answered with Access denied.
+    /// </remarks>
+    [HttpPost("retoucher")]
+    [Authorize(Policy = Permissions.Clients.Edit)]
+    public async Task<IActionResult> Retoucher(
+        Guid clientId, Guid? retoucherUserId, CancellationToken cancellationToken = default)
+    {
+        var (succeeded, error) = await retouchers.ReassignAsync(
+            clientId, retoucherUserId, CurrentUserId(), cancellationToken);
+
+        TempData[succeeded ? "Saved" : "Error"] = succeeded
+            ? retoucherUserId is null
+                ? "Released back to the queue. Any retoucher can pick it up."
+                : "Passed on. They have been told."
+            : error;
+
+        return RedirectToAction(nameof(Index), new { clientId });
+    }
+
+    /// <summary>
     /// Shows what this model sees on their own dashboard.
     /// </summary>
     /// <remarks>
@@ -447,6 +473,7 @@ public class ClientsController(
             RetoucherName = assignment is null
                 ? null
                 : $"{assignment.RetoucherUser.FirstName} {assignment.RetoucherUser.LastName}".Trim(),
+            AssignedRetoucherUserId = assignment?.RetoucherUserId,
             MeasurementTemplate = templates.GetTemplate(client.ModelProfileType),
             PortfolioLimit = mediaOptions.Value.PortfolioImageLimit,
             PoolLimit = mediaOptions.Value.MediaPoolImageLimit,
@@ -457,6 +484,21 @@ public class ClientsController(
             PublicUrlBase = brand.PublicDomain.TrimEnd('/'),
             HasPaid = await db.Orders.AnyAsync(
                 o => o.ClientId == clientId && o.Status == OrderStatus.Confirmed, cancellationToken),
+            Retouchers = await (
+                from user in db.Users
+                join userRole in db.UserRoles on user.Id equals userRole.UserId
+                join role in db.Roles on userRole.RoleId equals role.Id
+                where user.IsActive && (role.Name == Roles.Retoucher || role.Name == Roles.Admin
+                                        || role.Name == Roles.SuperAdmin)
+                orderby user.FirstName, user.LastName
+                select new Services.StaffOption(
+                    user.Id,
+                    // The address as well as the name: a studio can easily have two people
+                    // called the same thing, and picking the wrong one hides a client from
+                    // whoever should have it.
+                    $"{user.FirstName} {user.LastName}".Trim() + " — " + user.Email))
+                .Distinct()
+                .ToListAsync(cancellationToken),
             PortfolioPriceValue = await db.Products
                 .Where(p => p.Code == ProductCodes.DigitalPortfolioYear)
                 .Select(p => p.Price)

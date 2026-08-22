@@ -88,10 +88,20 @@ else
                                     <button type="submit" class="btn btn-sm btn-primary">Start work</button>
                                 </form>
                             }
-                            else
+                            else if (item.CanOpen)
                             {
                                 <a class="btn btn-sm btn-outline-primary"
                                    href="/retoucher/client/@item.ClientId">Open</a>
+                            }
+                            else
+                            {
+                                @* Somebody else claimed it. Saying so beats an Open button
+                                   that answers Access denied and leaves them wondering what
+                                   they broke. An administrator can pass it over from the
+                                   client record. *@
+                                <span class="text-muted small">
+                                    @(item.AssignedRetoucher ?? "Someone else") has this one
+                                </span>
                             }
                         </td>
                     </tr>

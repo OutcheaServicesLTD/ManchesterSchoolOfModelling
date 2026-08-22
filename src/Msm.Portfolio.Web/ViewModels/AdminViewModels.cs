@@ -33,6 +33,14 @@ public class AdminClientDetailViewModel
     /// </summary>
     public bool HasSignInDetails { get; set; }
 
+    /// <summary>
+    /// Everybody who can be given retouching work, for the hand-over control.
+    /// </summary>
+    public IReadOnlyList<Services.StaffOption> Retouchers { get; set; } = [];
+
+    /// <summary>The user id the retouching is with now, or null when it is unclaimed.</summary>
+    public Guid? AssignedRetoucherUserId { get; set; }
+
     public Guid ClientId { get; set; }
 
     public ClientProfile Client { get; set; } = null!;

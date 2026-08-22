@@ -1,6 +1,7 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using Msm.Portfolio.Web.Authorization;
 using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.Domain.Enums;
@@ -326,5 +327,132 @@ public class RetoucherServiceTests : IDisposable
         Assert.True(rows.Single(r => r.ClientId == mine).AssignedToMe);
         Assert.False(rows.Single(r => r.ClientId == theirs).AssignedToMe);
         Assert.Equal("Ann A", rows.Single(r => r.ClientId == mine).AssignedRetoucher);
+    }
+
+    // ---------- Handing work over ----------
+
+    /// <summary>
+    /// Claimed work belongs to whoever claimed it, so nobody else can open it. Without a
+    /// way to move it, a client claimed by mistake — or by somebody who has left — is stuck
+    /// with them, and the retoucher who should have it is answered with Access denied.
+    /// </summary>
+    private void MakeRetoucher(Guid userId)
+    {
+        var role = _db.Roles.FirstOrDefault(r => r.Name == Roles.Retoucher);
+
+        if (role is null)
+        {
+            role = new ApplicationRole(Roles.Retoucher) { Id = Guid.CreateVersion7() };
+            _db.Roles.Add(role);
+        }
+
+        _db.UserRoles.Add(new Microsoft.AspNetCore.Identity.IdentityUserRole<Guid>
+        {
+            RoleId = role.Id, UserId = userId
+        });
+
+        var user = _db.Users.Single(u => u.Id == userId);
+        user.IsActive = true;
+
+        _db.SaveChanges();
+    }
+
+    [Fact]
+    public async Task Work_can_be_passed_to_another_retoucher()
+    {
+        MakeRetoucher(_retoucherA);
+        MakeRetoucher(_retoucherB);
+
+        var clientId = AddClient(PortfolioStatus.ReadyForRetoucher);
+        await _service.StartWorkAsync(clientId, _retoucherA);
+
+        Assert.False(await _service.CanOpenAsync(clientId, _retoucherB));
+
+        var (succeeded, error) = await _service.ReassignAsync(clientId, _retoucherB, actingUserId: null);
+
+        Assert.True(succeeded, error);
+        Assert.True(await _service.CanOpenAsync(clientId, _retoucherB));
+        Assert.False(await _service.CanOpenAsync(clientId, _retoucherA));
+    }
+
+    /// <summary>
+    /// Somebody now has work they did not claim, so they are told rather than left to
+    /// find it.
+    /// </summary>
+    [Fact]
+    public async Task The_new_retoucher_is_told()
+    {
+        MakeRetoucher(_retoucherA);
+        MakeRetoucher(_retoucherB);
+
+        var clientId = AddClient(PortfolioStatus.ReadyForRetoucher);
+        await _service.StartWorkAsync(clientId, _retoucherA);
+        await _service.ReassignAsync(clientId, _retoucherB, actingUserId: null);
+
+        Assert.Contains(_db.Notifications, n => n.UserId == _retoucherB);
+    }
+
+    /// <summary>
+    /// Released, it goes back to being work anybody can pick up — which is what an
+    /// unclaimed client already looks like, so the row goes rather than being blanked.
+    /// </summary>
+    [Fact]
+    public async Task Work_can_be_released_back_to_the_queue()
+    {
+        MakeRetoucher(_retoucherA);
+
+        var clientId = AddClient(PortfolioStatus.ReadyForRetoucher);
+        await _service.StartWorkAsync(clientId, _retoucherA);
+
+        Assert.True((await _service.ReassignAsync(clientId, null, actingUserId: null)).Succeeded);
+
+        Assert.Empty(_db.RetoucherAssignments.Where(a => a.ClientId == clientId));
+        Assert.Equal(PortfolioStatus.ReadyForRetoucher,
+            _db.Portfolios.Single(p => p.ClientId == clientId).Status);
+
+        // Anybody can pick it up again, including somebody who never had it.
+        Assert.True(await _service.CanOpenAsync(clientId, _retoucherB));
+    }
+
+    /// <summary>
+    /// A model must not be handed retouching work: they would be given a workspace over
+    /// somebody else's photographs.
+    /// </summary>
+    [Fact]
+    public async Task Work_cannot_be_handed_to_somebody_who_is_not_staff()
+    {
+        MakeRetoucher(_retoucherA);
+
+        var clientId = AddClient(PortfolioStatus.ReadyForRetoucher);
+        await _service.StartWorkAsync(clientId, _retoucherA);
+
+        var outsider = _db.ClientProfiles.Single(c => c.Id == clientId).ApplicationUserId;
+
+        var (succeeded, error) = await _service.ReassignAsync(clientId, outsider, actingUserId: null);
+
+        Assert.False(succeeded);
+        Assert.NotNull(error);
+
+        // And the person who had it still has it.
+        Assert.True(await _service.CanOpenAsync(clientId, _retoucherA));
+    }
+
+    /// <summary>
+    /// The queue asks the same question the workspace enforces, so a row can say who has
+    /// something instead of offering an Open button that answers Access denied.
+    /// </summary>
+    [Fact]
+    public async Task The_queue_says_whether_a_row_can_be_opened()
+    {
+        MakeRetoucher(_retoucherA);
+
+        var clientId = AddClient(PortfolioStatus.ReadyForRetoucher);
+        await _service.StartWorkAsync(clientId, _retoucherA);
+
+        var mine = await _service.GetQueueAsync(RetoucherQueueTab.InProgress, _retoucherA);
+        var theirs = await _service.GetQueueAsync(RetoucherQueueTab.InProgress, _retoucherB);
+
+        Assert.True(mine.Single(i => i.ClientId == clientId).CanOpen);
+        Assert.False(theirs.Single(i => i.ClientId == clientId).CanOpen);
     }
 }

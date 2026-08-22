@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Msm.Portfolio.Web.Authorization;
 using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.Domain.Enums;
@@ -24,7 +25,13 @@ public record QueueItem(
     PortfolioStatus Status,
     string? AssignedRetoucher,
     bool AssignedToMe,
-    bool GuardianApprovalPending);
+    bool GuardianApprovalPending,
+    /// <summary>
+    /// Whether the person reading the queue can actually open this one. Claimed work
+    /// belongs to whoever claimed it, and a queue that offers an Open button to everybody
+    /// answers half of them with Access denied and no explanation.
+    /// </summary>
+    bool CanOpen);
 
 public record QueueCounts(int Waiting, int InProgress, int ReadyForReview, int Completed);
 
@@ -42,6 +49,20 @@ public interface IRetoucherService
     Task<bool> CanOpenAsync(Guid clientId, Guid retoucherUserId, CancellationToken cancellationToken = default);
 
     /// <summary>Claims unassigned work and moves the portfolio into Retouching.</summary>
+    /// <summary>
+    /// Moves a client's retouching to somebody else, or releases it back to the queue when
+    /// <paramref name="toRetoucherUserId"/> is null.
+    /// </summary>
+    /// <remarks>
+    /// Claimed work belongs to whoever claimed it, so that two people cannot unknowingly
+    /// prepare the same portfolio. Without a way to hand it over, work claimed by somebody
+    /// who has left — or claimed by mistake — is stuck with them for good, and the only
+    /// remedy is the database.
+    /// </remarks>
+    Task<(bool Succeeded, string? Error)> ReassignAsync(
+        Guid clientId, Guid? toRetoucherUserId, Guid? actingUserId,
+        CancellationToken cancellationToken = default);
+
     Task<(bool Succeeded, string? Error)> StartWorkAsync(
         Guid clientId, Guid retoucherUserId, CancellationToken cancellationToken = default);
 
@@ -123,7 +144,14 @@ public class RetoucherService(
                         // Surfaced so a retoucher knows the portfolio cannot complete yet,
                         // without blocking them from preparing it (specification section 11).
                         profile.RequiresGuardianConsent(today)
-                            && r.GuardianStatus != GuardianConsentStatus.Approved);
+                            && r.GuardianStatus != GuardianConsentStatus.Approved,
+                        // Unclaimed work waiting in the queue is open to anybody; claimed
+                        // work is open to the person it was claimed by. Same rule the
+                        // workspace enforces, asked here so the row can say so instead of
+                        // offering a button that answers Access denied.
+                        CanOpen: r.Assignment is null
+                            ? r.Status == PortfolioStatus.ReadyForRetoucher
+                            : r.Assignment.RetoucherUserId == retoucherUserId);
                 })
         ];
     }
@@ -167,6 +195,103 @@ public class RetoucherService(
         // Otherwise it belongs to the retoucher it was assigned to, so two people
         // cannot unknowingly prepare the same portfolio (specification section 6).
         return assignment.RetoucherUserId == retoucherUserId;
+    }
+
+    public async Task<(bool Succeeded, string? Error)> ReassignAsync(
+        Guid clientId, Guid? toRetoucherUserId, Guid? actingUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var portfolio = await db.Portfolios.FirstOrDefaultAsync(p => p.ClientId == clientId, cancellationToken);
+
+        if (portfolio is null)
+        {
+            return (false, "That client could not be found.");
+        }
+
+        var assignment = await GetAssignmentAsync(clientId, cancellationToken);
+        var before = assignment is null
+            ? "unassigned"
+            : (await db.Users.Where(u => u.Id == assignment.RetoucherUserId)
+                .Select(u => u.Email).FirstOrDefaultAsync(cancellationToken) ?? "someone");
+
+        if (toRetoucherUserId is null)
+        {
+            // Released. The row is removed rather than blanked, because an assignment with
+            // nobody in it is what an unclaimed client already looks like — no row at all.
+            if (assignment is not null)
+            {
+                db.RetoucherAssignments.Remove(assignment);
+            }
+
+            // Back to waiting, or the queue would show it in progress with nobody on it.
+            if (portfolio.Status == PortfolioStatus.Retouching)
+            {
+                portfolio.Status = PortfolioStatus.ReadyForRetoucher;
+                portfolio.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+        }
+        else
+        {
+            var isRetoucher = await (
+                from user in db.Users
+                join userRole in db.UserRoles on user.Id equals userRole.UserId
+                join role in db.Roles on userRole.RoleId equals role.Id
+                where user.Id == toRetoucherUserId && user.IsActive
+                      && (role.Name == Roles.Retoucher || role.Name == Roles.Admin
+                          || role.Name == Roles.SuperAdmin)
+                select user.Id).AnyAsync(cancellationToken);
+
+            if (!isRetoucher)
+            {
+                return (false, "That person cannot be given retouching work.");
+            }
+
+            if (assignment is null)
+            {
+                assignment = new RetoucherAssignment { ClientId = clientId };
+                db.RetoucherAssignments.Add(assignment);
+            }
+
+            assignment.RetoucherUserId = toRetoucherUserId.Value;
+            assignment.AssignedAt = DateTimeOffset.UtcNow;
+
+            // Whoever picks it up starts where the last person left off, so the queue tab
+            // it appears under does not change under them.
+            if (assignment.Status == RetoucherAssignmentStatus.Waiting)
+            {
+                assignment.Status = RetoucherAssignmentStatus.InProgress;
+                assignment.StartedAt ??= DateTimeOffset.UtcNow;
+            }
+
+            if (portfolio.Status == PortfolioStatus.ReadyForRetoucher)
+            {
+                portfolio.Status = PortfolioStatus.Retouching;
+                portfolio.UpdatedAt = DateTimeOffset.UtcNow;
+            }
+
+            // Told, rather than left to notice: somebody now has work they did not claim.
+            notifications.NotifyUser(
+                toRetoucherUserId.Value,
+                NotificationTypes.PortfolioReadyForReview,
+                "A client's retouching has been passed to you.",
+                $"/retoucher/client/{clientId}");
+        }
+
+        var after = toRetoucherUserId is null
+            ? "the queue"
+            : (await db.Users.Where(u => u.Id == toRetoucherUserId)
+                .Select(u => u.Email).FirstOrDefaultAsync(cancellationToken) ?? "someone");
+
+        audit.Record(nameof(RetoucherAssignment), clientId.ToString(),
+            AuditActions.RetouchingReassigned,
+            userId: actingUserId, oldValue: before, newValue: after);
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        logger.LogInformation(
+            "Retouching for client {ClientId} moved from {Before} to {After}.", clientId, before, after);
+
+        return (true, null);
     }
 
     public async Task<(bool Succeeded, string? Error)> StartWorkAsync(

@@ -73,6 +73,9 @@ public static class AuditActions
 
     /// <summary>The purchased year ran out and the portfolio came down.</summary>
     public const string PortfolioTermExpired = "PortfolioTermExpired";
+
+    /// <summary>A client's retouching was passed to somebody else, or released.</summary>
+    public const string RetouchingReassigned = "RetouchingReassigned";
     public const string CheckoutOpened = "CheckoutOpened";
     public const string CheckoutStarted = "CheckoutStarted";
     public const string CheckoutCancelled = "CheckoutCancelled";

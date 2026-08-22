@@ -434,6 +434,47 @@ else
 {
     @* Nested forms are not allowed, so this is its own form outside the details one
        below rather than a button inside it. *@
+    @* Claimed work belongs to whoever claimed it, so nobody else can open it. Without a
+       way to hand it over, a client claimed by mistake — or by somebody who has left — is
+       stuck with them, and the retoucher who should have it is answered with Access
+       denied and no explanation. *@
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">Retouching</h2>
+
+            <p class="text-muted">
+                @if (Model.RetoucherName is { } holder)
+                {
+                    <text>@holder has this client. Only they can open the workspace.</text>
+                }
+                else
+                {
+                    <text>Nobody has claimed this client. Any retoucher can pick them up.</text>
+                }
+            </p>
+
+            <form method="post" asp-action="Retoucher" asp-route-clientId="@Model.ClientId"
+                  class="row g-2 align-items-end">
+                <div class="col-sm-7">
+                    <label for="retoucherUserId" class="form-label">Give it to</label>
+                    <select id="retoucherUserId" name="retoucherUserId" class="form-select">
+                        <option value="">Nobody — put it back in the queue</option>
+                        @foreach (var person in Model.Retouchers)
+                        {
+                            <option value="@person.UserId"
+                                    selected="@(person.UserId == Model.AssignedRetoucherUserId)">
+                                @person.Name
+                            </option>
+                        }
+                    </select>
+                </div>
+                <div class="col-sm-5">
+                    <button type="submit" class="btn btn-outline-primary">Hand over</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <div class="card mb-4">
         <div class="card-body">
             <h2 class="h5 card-title">Their sign-in</h2>
