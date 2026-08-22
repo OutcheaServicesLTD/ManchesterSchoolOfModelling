@@ -41,6 +41,18 @@ public class ClientDashboardViewModel
     /// </summary>
     public DateTimeOffset? ExpiresAt { get; set; }
 
+    /// <summary>
+    /// True when an administrator is looking at this dashboard from the client record
+    /// rather than the model looking at their own.
+    /// </summary>
+    /// <remarks>
+    /// Changes nothing about what is shown — that is the point, and a preview that showed
+    /// something different would be worthless. It only stands down the controls that
+    /// belong to the model: their own profile form is theirs to open, and staff edit the
+    /// same details on the record behind the preview.
+    /// </remarks>
+    public bool IsPreview { get; set; }
+
     /// <summary>Days left of the purchased year, or null when there is no term.</summary>
     public int? DaysOfTermRemaining =>
         ExpiresAt is { } expires ? (int)Math.Ceiling((expires - DateTimeOffset.UtcNow).TotalDays) : null;

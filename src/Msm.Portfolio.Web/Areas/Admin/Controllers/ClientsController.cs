@@ -35,6 +35,7 @@ public class ClientsController(
     IBiographyDraftService biographies,
     IBiographyWriter biographyWriter,
     IClientAccessService clientAccess,
+    IClientDashboardBuilder dashboards,
     IAuditService audit,
     UserManager<ApplicationUser> userManager,
     IOptions<MediaOptions> mediaOptions,
@@ -47,6 +48,39 @@ public class ClientsController(
         var model = await BuildAsync(clientId, cancellationToken);
 
         return model is null ? NotFound() : View(model);
+    }
+
+    /// <summary>
+    /// Shows what this model sees on their own dashboard.
+    /// </summary>
+    /// <remarks>
+    /// Seeing it used to mean issuing the model a password and signing in as them — which
+    /// resets the password of anybody already using theirs, and puts a staff member inside
+    /// a real person's account to answer a question about layout.
+    ///
+    /// This is a preview, not an impersonation: the same builder and the same view, read
+    /// from the record, with nothing signed in as anyone. The model's own controls stand
+    /// down, because they are the model's.
+    /// </remarks>
+    [HttpGet("portal")]
+    [Authorize(Policy = Permissions.Clients.ViewAll)]
+    public async Task<IActionResult> Portal(Guid clientId, CancellationToken cancellationToken = default)
+    {
+        var client = await db.ClientProfiles
+            .Include(c => c.Portfolio)
+            .Include(c => c.Measurements)
+            .Include(c => c.GuardianConsent)
+            .FirstOrDefaultAsync(c => c.Id == clientId, cancellationToken);
+
+        if (client is null)
+        {
+            return NotFound();
+        }
+
+        ViewData["ClientId"] = clientId;
+        ViewData["ClientName"] = client.PublicName;
+
+        return View(await dashboards.BuildAsync(client, isPreview: true, cancellationToken));
     }
 
     /// <summary>

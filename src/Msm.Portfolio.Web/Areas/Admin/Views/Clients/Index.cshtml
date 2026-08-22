@@ -459,6 +459,16 @@ else
                renders data-confirm="" for a null value rather than leaving it out, and an
                empty confirmation is still a confirmation: the first press put an empty
                dialog box in front of whoever pressed it. *@
+            <p class="mb-3">
+                <a class="btn btn-outline-primary" asp-action="Portal" asp-route-clientId="@Model.ClientId">
+                    See their portal
+                </a>
+                <span class="form-text d-block mt-1">
+                    What @Model.Client.PublicName sees when they sign in. Nothing is changed
+                    and nobody is signed in as them.
+                </span>
+            </p>
+
             @if (Model.HasSignInDetails)
             {
                 <form method="post" asp-action="Access" asp-route-clientId="@Model.ClientId"

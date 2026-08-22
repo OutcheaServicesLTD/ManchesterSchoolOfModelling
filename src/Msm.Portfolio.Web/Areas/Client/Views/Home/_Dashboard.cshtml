@@ -1,0 +1,138 @@
+@model Msm.Portfolio.Web.ViewModels.ClientDashboardViewModel
+@*
+    The model's dashboard.
+
+    Shared by two pages: the model's own, and the read-only preview an administrator opens
+    from the client record. One copy, so what staff are shown is what the model is shown —
+    a second copy would drift, and the whole point of the preview is that it does not.
+*@
+<h1>Hello, @Model.Name</h1>
+
+@if (Model.GuardianApprovalPending)
+{
+    @* Shown to the client and to staff, but never on the public portfolio (spec 23/11). *@
+    <div class="alert alert-warning" role="alert">
+        We are still waiting for your parent or guardian to approve. Your portfolio
+        cannot be completed until they do.
+    </div>
+}
+
+@if (Model.TermIsEndingSoon)
+{
+    @* A month's notice, and not a day sooner: a year away is not news, and a banner that
+       is always there is one nobody reads. *@
+    <div class="alert alert-warning" role="alert">
+        <h2 class="h6">Your year is nearly up</h2>
+        <p class="mb-0">
+            Your portfolio stays online until
+            @Model.ExpiresAt!.Value.ToString("d MMMM yyyy")
+            — @Model.DaysOfTermRemaining day@(Model.DaysOfTermRemaining == 1 ? "" : "s") from now.
+            Contact us before then if you would like to keep it up for another year.
+        </p>
+    </div>
+}
+else if (Model.ExpiresAt is { } liveUntil && Model.IsPublished)
+{
+    <p class="text-muted">Your portfolio is online until @liveUntil.ToString("d MMMM yyyy").</p>
+}
+
+@if (Model.MaintenanceWarning is { } warning)
+{
+    @* Visible to the client and to staff only. Agencies viewing the public portfolio
+       never see a payment problem (specification section 23). *@
+    <div class="alert @(warning.PortfolioTakenDown ? "alert-danger" : "alert-warning")" role="alert">
+        @if (warning.PortfolioTakenDown)
+        {
+            <h2 class="h6">Your portfolio is no longer online</h2>
+            <p class="mb-0">
+                We were not able to take your portfolio payment, so your portfolio has
+                been taken offline. Please contact us and we will put it back up.
+            </p>
+        }
+        else
+        {
+            <h2 class="h6">There is a problem with your payment</h2>
+            <p class="mb-0">
+                We could not take your portfolio payment. Your portfolio is still online
+                @if (warning.DaysRemaining is { } days)
+                {
+                    <text>
+                        for another @days day@(days == 1 ? "" : "s")@(warning.GracePeriodEndsAt is { } ends
+                            ? $", until {ends:d MMMM yyyy}" : "")</text>
+                }
+                . Please contact us so it stays that way.
+            </p>
+        }
+    </div>
+}
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 class="h5 card-title">Portfolio status</h2>
+                <p class="card-text">@Model.StatusDescription</p>
+
+                @if (Model.PublicUrl is not null)
+                {
+                    <label for="publicUrl" class="form-label">Your portfolio link</label>
+                    <div class="input-group">
+                        <input id="publicUrl" class="form-control" readonly value="@Model.PublicUrl" />
+                        <button class="btn btn-outline-secondary" type="button"
+                                data-copy-target="publicUrl">
+                            Copy
+                        </button>
+                    </div>
+                    <a class="btn btn-primary mt-3" href="@Model.PublicUrl">View my portfolio</a>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h2 class="h5 card-title">Your photographs</h2>
+
+                <p class="card-text mb-1">
+                    On your portfolio: @Model.PortfolioImageCount of @Model.PortfolioImageLimit
+                </p>
+                <div class="progress mb-3" role="progressbar"
+                     aria-label="Portfolio images used"
+                     aria-valuenow="@Model.PortfolioImageCount"
+                     aria-valuemin="0" aria-valuemax="@Model.PortfolioImageLimit">
+                    <div class="progress-bar"
+                         style="width:@(Model.PortfolioImageLimit == 0 ? 0 : Model.PortfolioImageCount * 100 / Model.PortfolioImageLimit)%"></div>
+                </div>
+
+                <p class="card-text">
+                    In your library: @Model.MediaPoolCount of @Model.MediaPoolLimit
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h2 class="h5 card-title">Your profile</h2>
+        <p class="card-text">Profile completeness: @Model.ProfileCompletionPercent%</p>
+        <div class="progress mb-3" role="progressbar"
+             aria-label="Profile completeness"
+             aria-valuenow="@Model.ProfileCompletionPercent" aria-valuemin="0" aria-valuemax="100">
+            <div class="progress-bar" style="width:@Model.ProfileCompletionPercent%"></div>
+        </div>
+        @if (Model.IsPreview)
+        {
+            @* Their button, not yours. It goes to their own profile form, which is theirs
+               to open — you edit the same details on the client record behind this page. *@
+            <span class="btn btn-outline-primary disabled" aria-disabled="true">Edit my profile</span>
+        }
+        else
+        {
+            <a class="btn btn-outline-primary" asp-area="Client" asp-controller="Profile" asp-action="Index">
+                Edit my profile
+            </a>
+        }
+    </div>
+</div>
