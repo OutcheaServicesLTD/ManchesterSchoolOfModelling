@@ -4,7 +4,12 @@
 @{
     ViewData["Title"] = "Retoucher queue";
     var error = TempData["Error"] as string;
-    var submitted = TempData["Submitted"] as bool? ?? false;
+    // Two ways to arrive here having just sent something for review: the ordinary
+    // form post, which sets this in TempData, and the script-driven send, which
+    // navigates here with the same fact on the URL instead — there is no server round
+    // trip at the point it knows to set TempData. Either is enough to show the banner.
+    var submitted = (TempData["Submitted"] as bool? ?? false)
+                     || string.Equals(Context.Request.Query["submitted"], "true", StringComparison.OrdinalIgnoreCase);
 }
 
 <h1>Queue</h1>
@@ -15,7 +20,19 @@
 }
 @if (submitted)
 {
-    <div class="alert alert-success" role="alert">Portfolio sent for review.</div>
+    @* Deliberately larger than an ordinary alert: this confirms the one thing a
+       retoucher came here to check just happened, and a line of small print was the
+       complaint before this existed. *@
+    <div class="confirmation-banner" role="alert">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M8 12.5l2.5 2.5L16 9" />
+        </svg>
+        <div>
+            <strong>Sent for review</strong>
+            <span>An administrator has been told and will review it shortly.</span>
+        </div>
+    </div>
 }
 
 <ul class="nav nav-tabs mb-3">

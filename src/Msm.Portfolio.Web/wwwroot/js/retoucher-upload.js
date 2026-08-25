@@ -1,9 +1,12 @@
 // Batch uploader for the retoucher workspace.
 //
-// Each file is sent in its own request. That is what makes the behaviour specification
-// section 42 asks for possible: a per-file progress bar, a failure reported against the
-// file that caused it, and a retry that re-sends only that file rather than restarting
-// the whole batch.
+// Each file is still sent in its own request — that is what makes a failure reported
+// against the one file that caused it possible, and a retry that re-sends only that file
+// rather than restarting the whole batch. What changed is what the retoucher sees while
+// it happens: one bar for the whole batch, not a row per photograph. Sixty rows each
+// cycling Waiting, then Uploading, then Uploaded was sixty things to read to learn one
+// thing — how much is left — and a successful upload has nothing worth a row of its own
+// once it has happened. Only a photograph that needs attention gets one.
 (function () {
     'use strict';
 
@@ -23,61 +26,96 @@
     const list = document.getElementById('upload-list');
     const summary = document.getElementById('upload-summary');
 
+    const progressPanel = document.getElementById('upload-progress');
+    const progressBarWrap = progressPanel ? progressPanel.querySelector('.progress') : null;
+    const progressBar = document.getElementById('upload-progress-bar');
+    const progressLabel = document.getElementById('upload-progress-label');
+    const progressCount = document.getElementById('upload-progress-count');
+
     let remaining = remainingAtStart;
     let inFlight = 0;
     let uploaded = 0;
 
+    // The whole batch this page has seen, across every drop and every selection, until
+    // it either reloads on success or a retry replaces a failure. Retrying a file does
+    // not add to this — it was already counted once.
+    let batchTotal = 0;
+    let openProblems = 0;
+
+    // How much of each in-flight or finished file counts toward the bar: 0 while
+    // queued, the upload's own byte fraction while sending, 1 once it has succeeded.
+    // A failed file is removed rather than left at its stalled fraction, so the bar
+    // does not overstate progress on a batch that still needs attention.
+    const fileProgress = new Map();
+
     function announce(message) {
-        // aria-live, so a screen reader hears progress rather than only seeing bars.
+        // aria-live, so a screen reader hears progress rather than only seeing the bar.
         summary.textContent = message;
     }
 
-    function row(file) {
-        const item = document.createElement('li');
-        item.className = 'list-group-item';
-        item.innerHTML =
-            '<div class="d-flex justify-content-between align-items-center gap-2">' +
-            '<span class="text-truncate"></span>' +
-            '<span class="badge text-bg-secondary flex-shrink-0">Waiting</span>' +
-            '</div>' +
-            '<div class="progress mt-2" role="progressbar" aria-label="Upload progress"' +
-            ' aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" style="height:6px">' +
-            '<div class="progress-bar" style="width:0%"></div></div>';
-
-        item.querySelector('span.text-truncate').textContent = file.name;
-        list.appendChild(item);
-
-        return {
-            element: item,
-            label: item.querySelector('.badge'),
-            bar: item.querySelector('.progress-bar'),
-            progress: item.querySelector('.progress')
-        };
-    }
-
-    function setState(ui, text, variant) {
-        ui.label.textContent = text;
-        ui.label.className = 'badge flex-shrink-0 text-bg-' + variant;
-    }
-
-    function addRetry(ui, file) {
-        if (ui.element.querySelector('.retry')) {
+    function updateOverall() {
+        if (!progressPanel) {
             return;
         }
 
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'btn btn-sm btn-outline-secondary mt-2 retry';
-        button.textContent = 'Retry';
-        button.addEventListener('click', function () {
-            button.remove();
-            // Only this file is sent again; everything already uploaded is untouched.
-            // Queued rather than sent directly, so clicking several Retry buttons in a
-            // row cannot put the server back under the load that failed them.
-            queue(file, ui);
-        });
+        if (batchTotal === 0) {
+            progressPanel.classList.add('d-none');
+            return;
+        }
 
-        ui.element.appendChild(button);
+        progressPanel.classList.remove('d-none');
+
+        let sum = 0;
+        fileProgress.forEach(function (fraction) { sum += fraction; });
+        const percent = Math.min(100, Math.round((sum / batchTotal) * 100));
+
+        progressBar.style.width = percent + '%';
+        if (progressBarWrap) {
+            progressBarWrap.setAttribute('aria-valuenow', String(percent));
+        }
+
+        const active = inFlight > 0 || pending.length > 0;
+
+        progressLabel.textContent = active
+            ? 'Uploading'
+            : (openProblems > 0 ? 'Finished, with problems' : 'Uploaded');
+
+        progressCount.textContent = openProblems > 0
+            ? (uploaded + ' of ' + batchTotal + ' — ' + openProblems
+                + (openProblems === 1 ? ' needs' : ' need') + ' attention')
+            : (uploaded + ' of ' + batchTotal);
+    }
+
+    function problemRow(file, message, retryable) {
+        const item = document.createElement('li');
+        item.className = 'list-group-item d-flex justify-content-between align-items-center gap-2';
+
+        const text = document.createElement('span');
+        text.className = 'text-truncate';
+        text.textContent = file.name + ' — ' + message;
+        text.title = file.name + ' — ' + message;
+        item.appendChild(text);
+
+        if (retryable) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn btn-sm btn-outline-secondary flex-shrink-0';
+            button.textContent = 'Retry';
+            button.addEventListener('click', function () {
+                item.remove();
+                openProblems -= 1;
+                // Only this file is sent again; everything already uploaded is
+                // untouched. Queued rather than sent directly, so clicking several
+                // Retry buttons in a row cannot put the server back under the load
+                // that failed them.
+                queue(file);
+                updateOverall();
+            });
+            item.appendChild(button);
+        }
+
+        list.appendChild(item);
+        return item;
     }
 
     function validate(file) {
@@ -93,10 +131,10 @@
         return null;
     }
 
-    function send(file, ui) {
-        setState(ui, 'Uploading', 'secondary');
-        ui.progress.classList.remove('d-none');
+    function send(file) {
+        fileProgress.set(file, 0);
         inFlight += 1;
+        updateOverall();
 
         const body = new FormData();
         body.append('files', file);
@@ -109,9 +147,8 @@
             if (!event.lengthComputable) {
                 return;
             }
-            const percent = Math.round((event.loaded / event.total) * 100);
-            ui.bar.style.width = percent + '%';
-            ui.progress.setAttribute('aria-valuenow', String(percent));
+            fileProgress.set(file, event.loaded / event.total);
+            updateOverall();
         });
 
         request.addEventListener('load', function () {
@@ -133,45 +170,48 @@
                     : (payload === null
                         ? 'Your session may have expired. Reload the page and sign in again.'
                         : 'Upload failed. Please try again.');
-                fail(ui, file, reason);
+                fail(file, reason);
                 return;
             }
 
             if (payload === null) {
-                fail(ui, file, 'Unexpected response from the server.');
+                fail(file, 'Unexpected response from the server.');
                 return;
             }
 
             const result = payload.results && payload.results[0];
 
             if (!result || !result.succeeded) {
-                fail(ui, file, (result && result.error) || 'This file was not accepted.');
+                fail(file, (result && result.error) || 'This file was not accepted.');
                 return;
             }
 
-            setState(ui, 'Uploaded', 'success');
-            ui.bar.style.width = '100%';
-            ui.progress.setAttribute('aria-valuenow', '100');
+            fileProgress.set(file, 1);
             uploaded += 1;
             remaining -= 1;
-            announce(uploaded + ' uploaded.');
+            announce(uploaded + ' of ' + batchTotal + ' uploaded.');
+            updateOverall();
             finishIfIdle();
         });
 
         request.addEventListener('error', function () {
             inFlight -= 1;
             sendFinished();
-            fail(ui, file, 'The connection dropped. The server may have been busy — try again.');
+            fail(file, 'The connection dropped. The server may have been busy — try again.');
         });
 
         request.send(body);
     }
 
-    function fail(ui, file, message) {
-        setState(ui, message, 'danger');
-        ui.progress.classList.add('d-none');
-        addRetry(ui, file);
+    function fail(file, message) {
+        // Taken out of the numerator, not left at its stalled fraction: a failed file
+        // still counts toward the total, so the bar cannot reach 100% while one is
+        // sitting there needing attention.
+        fileProgress.delete(file);
+        openProblems += 1;
+        problemRow(file, message, true);
         announce(message);
+        updateOverall();
         finishIfIdle();
     }
 
@@ -180,15 +220,7 @@
             return;
         }
 
-        // Reloads itself rather than revealing a button and asking for a click. The
-        // page is re-rendered from what was actually stored, so the grid can never
-        // drift from the library it claims to show.
-        //
-        // Briefly delayed so the last "Uploaded" badge is visible, and so a failed file
-        // still shows its Retry button rather than vanishing on reload.
-        const failures = list.querySelectorAll('.retry').length;
-
-        if (failures > 0) {
+        if (openProblems > 0) {
             // Something needs attention, so the page is left alone and the manual link
             // offered instead — reloading would discard the Retry buttons.
             const manual = document.getElementById('refresh-after-upload');
@@ -198,6 +230,11 @@
             return;
         }
 
+        // Reloads itself rather than revealing a button and asking for a click. The
+        // page is re-rendered from what was actually stored, so the grid can never
+        // drift from the library it claims to show.
+        //
+        // Briefly delayed so the bar reaching the end is actually seen.
         announce(uploaded + ' uploaded. Refreshing.');
         window.setTimeout(function () { window.location.reload(); }, 700);
     }
@@ -209,7 +246,7 @@
     // decoded, and a modest server runs out of memory and restarts — which arrives here
     // as "the connection dropped" partway through a batch, with no indication why.
     //
-    // One at a time is also kinder to a studio's upload speed, and makes each progress
+    // One at a time is also kinder to a studio's upload speed, and makes the progress
     // bar mean something: with six at once they all crawl together.
     const pending = [];
     let active = 0;
@@ -231,8 +268,8 @@
     function pump() {
         while (active < atOnce && pending.length > 0) {
             active += 1;
-            const next = pending.shift();
-            send(next.file, next.ui);
+            const file = pending.shift();
+            send(file);
         }
     }
 
@@ -243,33 +280,39 @@
         pump();
     }
 
-    function queue(file, ui) {
-        pending.push({ file: file, ui: ui });
-        setState(ui, 'Waiting', 'secondary');
+    function queue(file) {
+        pending.push(file);
         pump();
     }
 
     function handle(files) {
         Array.prototype.forEach.call(files, function (file) {
-            const ui = row(file);
             const problem = validate(file);
 
             if (problem) {
                 // Rejected in the browser, so an obviously invalid file never leaves
-                // the machine. The server repeats every one of these checks.
-                setState(ui, problem, 'danger');
-                ui.progress.classList.add('d-none');
+                // the machine. The server repeats every one of these checks. Not
+                // retryable — sending the same oversized or unsupported file again
+                // would only fail the same way.
+                batchTotal += 1;
+                openProblems += 1;
+                problemRow(file, problem, false);
+                updateOverall();
                 return;
             }
 
             if (remaining <= 0) {
-                setState(ui, 'The library is full.', 'danger');
-                ui.progress.classList.add('d-none');
+                batchTotal += 1;
+                openProblems += 1;
+                problemRow(file, 'The library is full.', false);
+                updateOverall();
                 return;
             }
 
             remaining -= 1;
-            queue(file, ui);
+            batchTotal += 1;
+            updateOverall();
+            queue(file);
         });
     }
 
@@ -362,9 +405,8 @@
         if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
             handle(event.dataTransfer.files);
 
-            // The list of what is happening lives further down the page on a long
-            // library, and a drop that scrolls nothing looks like a drop that did
-            // nothing.
+            // The progress bar lives further down the page on a long library, and a
+            // drop that scrolls nothing looks like a drop that did nothing.
             dropZone.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
         }
     });

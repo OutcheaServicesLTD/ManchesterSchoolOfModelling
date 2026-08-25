@@ -36,6 +36,7 @@ public class ClientsController(
     IBiographyWriter biographyWriter,
     IClientAccessService clientAccess,
     IClientDashboardBuilder dashboards,
+    ISlugService slugs,
     IAuditService audit,
     UserManager<ApplicationUser> userManager,
     IOptions<MediaOptions> mediaOptions,
@@ -433,6 +434,22 @@ public class ClientsController(
         if (client is null)
         {
             return null;
+        }
+
+        // The web address, ready before anybody asks for it. Once retouching reaches
+        // review the portfolio is genuinely close to going live, and an administrator
+        // reviewing it used to see an empty box and had to invent an address themselves —
+        // the same one PublishAsync would have generated anyway, just typed by hand first.
+        // Earlier stages are left alone: a client still being onboarded or retouched may
+        // never be published at all, and there is no reason to spend the plain form of
+        // their name on a portfolio that might not happen.
+        if (client.Portfolio is { Slug: null } portfolio
+            && portfolio.Status is PortfolioStatus.ReadyForReview or PortfolioStatus.InViewing
+                or PortfolioStatus.AwaitingPurchase or PortfolioStatus.Purchased
+                or PortfolioStatus.Published)
+        {
+            portfolio.Slug = await slugs.GenerateUniqueAsync(client.PublicName, portfolio.Id, cancellationToken);
+            await db.SaveChangesAsync(cancellationToken);
         }
 
         var pool = await media.GetPoolAsync(clientId, cancellationToken);

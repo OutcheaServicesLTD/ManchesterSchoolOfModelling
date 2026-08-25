@@ -88,8 +88,26 @@
                 }
             </div>
 
+            @* One bar for the whole batch rather than a row per photograph. Sixty rows
+               each saying Waiting, then Uploading, then Uploaded was sixty things to read
+               to learn one thing: how much is left. Hidden until there is a batch to show. *@
+            <div id="upload-progress" class="upload-progress d-none">
+                <div class="d-flex justify-content-between align-items-baseline mb-1">
+                    <span id="upload-progress-label">Uploading</span>
+                    <span id="upload-progress-count" class="text-muted small"></span>
+                </div>
+                <div class="progress" role="progressbar" aria-label="Upload progress"
+                     aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                    <div id="upload-progress-bar" class="progress-bar"></div>
+                </div>
+            </div>
+
             <p id="upload-summary" class="visually-hidden" aria-live="polite"></p>
-            <ul id="upload-list" class="list-group"></ul>
+
+            @* Only photographs that need attention appear here: a rejected format, a file
+               too large, or one the server refused. A successful upload has nothing to
+               show and nothing to say — the bar above already said it. *@
+            <ul id="upload-list" class="list-group mt-2"></ul>
 
             @* Only offered when a file failed: a clean batch reloads on its own.
                Reloading with failures showing would discard their Retry buttons. *@

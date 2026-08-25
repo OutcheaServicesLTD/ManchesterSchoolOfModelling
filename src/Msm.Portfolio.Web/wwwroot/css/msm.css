@@ -884,15 +884,66 @@ dl.row > dd {
     background: var(--card);
 }
 
-/* Work that arrived in the last day. A left edge in the live green rather than a filled
-   row: a whole coloured row on a page of hairlines shouts, and the queue is read many
-   times a day. */
+/* Work that arrived in the last day. A visible tint across the row plus a border on
+   every side of it, not a box-shadow on one cell: box-shadow on a table cell is
+   unreliable across browsers once the table's borders are collapsed, which is exactly
+   the rule two lines above this one — it can be set with no visible effect at all. A
+   real border cannot silently fail the same way. */
 .table > tbody tr.is-new > * {
-    background: color-mix(in srgb, var(--live) 7%, transparent);
+    background: color-mix(in srgb, var(--live) 12%, transparent);
+    border-top: 1px solid color-mix(in srgb, var(--live) 45%, transparent);
+    border-bottom: 1px solid color-mix(in srgb, var(--live) 45%, transparent);
 }
 
 .table > tbody tr.is-new > :first-child {
-    box-shadow: inset 2px 0 0 var(--live);
+    border-left: 3px solid var(--live);
+}
+
+.table > tbody tr.is-new > :last-child {
+    border-right: 1px solid color-mix(in srgb, var(--live) 45%, transparent);
+}
+
+/* ── The confirmation banner ──────────────────────────────────────────────────────
+   Deliberately its own thing rather than a bigger .alert-success: an ordinary alert on
+   this site is a hairline with one accented edge, right for a warning read alongside a
+   form. This confirms the one thing a retoucher came back to the queue to check, and
+   has the room in the page to say so plainly. */
+.confirmation-banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    margin-bottom: 1.5rem;
+    padding: 1.1rem 1.4rem;
+    background: color-mix(in srgb, var(--live) 10%, var(--bg));
+    border: 1px solid var(--live);
+}
+
+.confirmation-banner svg {
+    flex-shrink: 0;
+    width: 26px;
+    height: 26px;
+    margin-top: 2px;
+    fill: none;
+    stroke: var(--live);
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.confirmation-banner div {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.confirmation-banner strong {
+    font-size: 17px;
+    font-weight: 600;
+}
+
+.confirmation-banner span {
+    color: var(--fg-md);
+    font-size: 14px;
 }
 
 .table-sm > tbody td,
@@ -1017,6 +1068,26 @@ dl.row > dd {
     height: 100%;
     background: var(--fg);
     transition: width 0.25s ease;
+}
+
+/* ── The upload progress bar ──────────────────────────────────────────────────────
+   Deliberately bigger and in the live green rather than the 2px neutral hairline
+   above: this is the one progress bar on the page standing in for sixty rows of
+   "Waiting / Uploading / Uploaded", and it has to be readable at a glance, not
+   found by looking closely. */
+.upload-progress .progress {
+    height: 10px;
+    border-radius: 0;
+}
+
+.upload-progress .progress-bar {
+    background: var(--live);
+}
+
+.upload-progress-label,
+#upload-progress-label {
+    font-size: 13px;
+    font-weight: 500;
 }
 
 /* ══ Tabs ════════════════════════════════════════════════════════════════════════ */

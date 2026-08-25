@@ -337,12 +337,13 @@ public class WorkspaceController(
 
         if (wantsJson)
         {
-            return Json(new
-            {
-                submitted = true,
-                message = "Sent for review. An administrator has been told.",
-                queueUrl = "/retoucher?tab=ReadyForReview"
-            });
+            // A URL to navigate to, not text to display in place. Staying on the
+            // workspace after sending — with only a line of text to say so — was the
+            // complaint: this is finished work, and the retoucher's next move is
+            // always back to the queue for whatever is next. The same address the
+            // plain form post below uses, so the two paths land on one banner rather
+            // than two different ones to keep in step.
+            return Json(new { submitted = true, queueUrl = "/retoucher?tab=ReadyForReview&submitted=true" });
         }
 
         TempData["Submitted"] = true;

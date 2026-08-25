@@ -864,25 +864,13 @@
                     }
 
                     if (request.status === 200 && payload && payload.submitted) {
-                        say(payload.message, false);
-
-                        // The banner the page shows on a reload, put up now instead.
-                        var notice = document.createElement('div');
-                        notice.className = 'alert alert-info';
-                        notice.setAttribute('role', 'alert');
-                        notice.textContent =
-                            'This portfolio has been sent for review. Any further changes will '
-                            + 'be seen by the reviewing administrator.';
-
-                        var main = document.querySelector('main .container') || document.body;
-                        var heading = main.querySelector('h1');
-
-                        if (heading && !main.querySelector('.alert-info')) {
-                            heading.insertAdjacentElement('afterend', notice);
-                        }
-
-                        // Left disabled: sending the same portfolio twice does nothing but
-                        // raise a second notification for the administrator.
+                        // Off the workspace and back to the queue, where a confirmation
+                        // impossible to miss is waiting — not a line of text left behind
+                        // on a page whose work is finished. Left disabled while the
+                        // browser navigates, so a slow connection cannot be used to send
+                        // the same portfolio twice.
+                        say('Sent. Taking you back to the queue…', false);
+                        window.location.href = payload.queueUrl;
                         return;
                     }
 
