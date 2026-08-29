@@ -157,4 +157,29 @@ public class ImageProcessorTests
         Assert.Equal(400, width);
         Assert.True(height >= 1);
     }
+
+    // ---------- WebP (specification version 2, item 1) ----------
+
+    [Fact]
+    public void A_jpeg_rendition_re_encodes_as_a_smaller_webp()
+    {
+        using var jpeg = MakeJpeg(1200, 800);
+
+        var webp = Processor.ToWebp(jpeg.ToArray());
+
+        Assert.NotNull(webp);
+        // "RIFF....WEBP" — the container format's own signature, not this class's
+        // opinion of what a WebP file looks like.
+        Assert.Equal("RIFF"u8.ToArray(), webp![..4]);
+        Assert.Equal("WEBP"u8.ToArray(), webp[8..12]);
+        // A photograph re-encoded at a slightly lower quality into a format built for
+        // it should not come out larger than the JPEG it started from.
+        Assert.True(webp.Length < jpeg.Length);
+    }
+
+    [Fact]
+    public void Bytes_that_are_not_an_image_yield_no_webp()
+    {
+        Assert.Null(Processor.ToWebp("this is not an image"u8.ToArray()));
+    }
 }

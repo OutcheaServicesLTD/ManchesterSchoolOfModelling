@@ -670,6 +670,8 @@ internal class RefusesToDecode : IImageProcessor
     public ImageDetails? Inspect(Stream content) => _real.Inspect(content);
 
     public ProcessedImage Process(Stream content) => new([], null);
+
+    public byte[]? ToWebp(byte[] jpegContent, int quality = 82) => _real.ToWebp(jpegContent, quality);
 }
 
 internal class InMemoryStorage : IMediaStorageService

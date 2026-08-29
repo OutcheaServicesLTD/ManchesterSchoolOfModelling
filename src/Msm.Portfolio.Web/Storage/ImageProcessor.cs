@@ -46,6 +46,19 @@ public interface IImageProcessor
     /// from an uploaded photograph belongs here, on the decode that already happened.
     /// </remarks>
     ProcessedImage Process(Stream content);
+
+    /// <summary>
+    /// Re-encodes an already-generated JPEG rendition as WebP, for a browser that has
+    /// said it can use one (specification version 2, item 1).
+    /// </summary>
+    /// <remarks>
+    /// Not a fourth upload-time rendition: it runs against a rendition already reduced
+    /// to at most 3000px on its longest edge, so re-encoding it costs a fraction of a
+    /// second rather than the memory a full camera file would need — the same reasoning
+    /// that keeps every other resize on this class working from a small decode rather
+    /// than the original. Null when the bytes are not a decodable image.
+    /// </remarks>
+    byte[]? ToWebp(byte[] jpegContent, int quality = 82);
 }
 
 /// <summary>
@@ -162,6 +175,31 @@ public class ImageProcessor(ILogger<ImageProcessor> logger) : IImageProcessor
             // A corrupt or non-image upload must not take the request down; the caller
             // reports it as a rejected file.
             logger.LogWarning(ex, "Could not read an uploaded image.");
+            return null;
+        }
+    }
+
+    public byte[]? ToWebp(byte[] jpegContent, int quality = 82)
+    {
+        try
+        {
+            using var bitmap = SKBitmap.Decode(jpegContent);
+
+            if (bitmap is null)
+            {
+                return null;
+            }
+
+            using var image = SKImage.FromBitmap(bitmap);
+            using var data = image.Encode(SKEncodedImageFormat.Webp, quality);
+
+            return data.ToArray();
+        }
+        catch (Exception ex)
+        {
+            // A rendition that cannot be converted is still a perfectly good rendition:
+            // the caller falls back to serving the JPEG it already had.
+            logger.LogWarning(ex, "Could not re-encode a rendition as WebP.");
             return null;
         }
     }

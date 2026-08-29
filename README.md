@@ -30,6 +30,17 @@ remain open — see [Decisions still open](#decisions-still-open) and
 | 9 | GoHighLevel synchronisation | Done, except the provider's own HTTP calls — see below |
 | 10 | Audit, security, permissions, upload, payment, mobile, accessibility and performance hardening | Done |
 
+### Version 2
+
+Four items requested after the platform went into real use:
+
+| Item | Scope | State |
+| ---- | ----- | ----- |
+| 1 | Image optimisation | Was already mostly built (multi-size JPEG renditions, lazy loading, responsive `srcset`). Added: a WebP rendition, offered automatically to any browser that says it can use one via content negotiation on the existing `/media` URLs — no template changes needed, roughly 60% smaller than the JPEG for the same photograph in testing |
+| 2 | Auto-preview after retoucher upload | Submitting now carries a portfolio straight to viewable, reusing the same checks the old manual "Mark in viewing" click applied. That click still exists for a legacy portfolio stuck mid-review, but nothing new ever needs it |
+| 3 | Stripe subscriptions | A second, optional recurring layer alongside the existing £99 one-off purchase — GoCardless is untouched. A client starts and manages it themselves from the client portal; Stripe Checkout and the Stripe Customer Portal do almost all of the work. See below |
+| 4 | Portfolio URL collisions | Was already collision-safe (`SlugService` auto-suffixes a taken slug). Changing a slug by hand is now Super Admin only, so an ordinary Admin cannot break a link an agency already has |
+
 ## Just want to look at the site?
 
 No terminal needed.
@@ -794,7 +805,7 @@ will maintain them in a later phase.
 | `GuardianConsent` | Consent wording version, approval link lifetime, consent text |
 | `Commerce` | Portfolio price (£99) and term (365 days), whether maintenance is charged at all (off), maintenance price (£19.99), 7-day grace period, maintenance start offset |
 | `Msm` | Business name, public domain, contact email/phone/WhatsApp, social links |
-| `Integrations` | GoCardless and GoHighLevel credentials |
+| `Integrations` | GoCardless, GoHighLevel and Stripe credentials |
 
 Credentials are never committed. Supply them through user secrets in development and
 environment variables in deployment.
@@ -832,6 +843,14 @@ requirements.
 - **GoHighLevel** — `Integrations:HighLevel:ApiKey` and `LocationId`, plus the six
   custom fields listed in `docs/gohighlevel-verification.md`. Same position as
   GoCardless: written, unverified, stub by default.
+- **Stripe** — `Integrations:Stripe:SecretKey`, `WebhookSecret` and `PriceId` (the
+  recurring Price created for the Portfolio Maintenance product in the Stripe
+  Dashboard). Optional: the client portal simply does not offer a subscription until
+  all three are set, and the stub takes over in the meantime — same position as
+  GoCardless and GoHighLevel, and equally unverified against a real Stripe account.
+  `webhooks/stripe` needs a webhook endpoint configured in the Stripe Dashboard for
+  `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed` and
+  `customer.subscription.deleted`.
 - **Image and video size limits** — `Media:MaxImageBytes`, `Media:MaxVideoBytes`.
 
 ### One judgement call worth confirming

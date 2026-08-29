@@ -26,6 +26,7 @@ public class MediaController(
     ApplicationDbContext db,
     IMediaStorageService storage,
     IMediaService media,
+    IImageProcessor images,
     UserManager<ApplicationUser> userManager) : Controller
 {
     [HttpGet("{assetId:guid}/{variant?}")]
@@ -136,9 +137,41 @@ public class MediaController(
             ? "public, max-age=31536000, immutable"
             : "private, max-age=3600";
 
+        // A rendition, offered as WebP to a browser that says it can use one
+        // (specification version 2, item 1). Re-encoded from the JPEG rendition rather
+        // than stored as a fourth upload-time variant, so this is the only place that
+        // decision lives; a browser that never sends the header is untouched, and one
+        // that does gets a materially smaller download for the same photograph.
+        if (contentType == "image/jpeg" && AcceptsWebp())
+        {
+            // Caches must not hand a WebP response to a browser that cannot decode it,
+            // or the other way round.
+            Response.Headers.Vary = "Accept";
+
+            using var buffer = new MemoryStream();
+            await stream.CopyToAsync(buffer, cancellationToken);
+
+            if (images.ToWebp(buffer.ToArray()) is { } webp)
+            {
+                return File(webp, "image/webp", enableRangeProcessing: true);
+            }
+
+            buffer.Position = 0;
+            return File(buffer.ToArray(), contentType, enableRangeProcessing: true);
+        }
+
         // Range support lets a self-tape be scrubbed rather than only played from the start.
         return File(stream, contentType, enableRangeProcessing: true);
     }
+
+    /// <summary>
+    /// Whether this browser said it can decode WebP. Every browser that supports it has
+    /// sent <c>image/webp</c> in Accept since 2020; one that has not is treated as
+    /// unable to, which only ever costs it the JPEG it would have received anyway.
+    /// </summary>
+    private bool AcceptsWebp() =>
+        Request.Headers.Accept.Any(value =>
+            value is not null && value.Contains("image/webp", StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// Who may see this file. Staff see everything, a client sees their own library,
