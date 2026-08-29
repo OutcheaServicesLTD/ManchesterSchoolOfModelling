@@ -288,7 +288,7 @@ else if (Model.Client.BiographyDraftStatus == BiographyDraftStatus.Failed)
     </div>
 </div>
 
-@if (await Allowed(Permissions.Portfolios.Edit))
+@if (await Allowed(Permissions.Portfolios.ChangeSlug))
 {
     <div class="card mb-4">
         <div class="card-body">

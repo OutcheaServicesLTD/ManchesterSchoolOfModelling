@@ -6,6 +6,7 @@ using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.Domain.Enums;
 using Msm.Portfolio.Web.Services;
+using Msm.Portfolio.Web.Storage;
 
 namespace Msm.Portfolio.Tests;
 
@@ -32,8 +33,18 @@ public class RetoucherServiceTests : IDisposable
             new ApplicationUser { Id = _retoucherB, UserName = "b@msm.local", Email = "b@msm.local", FirstName = "Ben", LastName = "B" });
         _db.SaveChanges();
 
+        var portfolios = new PortfolioService(
+            _db,
+            new SlugService(_db),
+            new InMemoryStorage(),
+            new AuditService(_db),
+            new NotificationService(_db),
+            new SilentBiographyWriter(),
+            NullLogger<PortfolioService>.Instance);
+
         _service = new RetoucherService(
-            _db, new AuditService(_db), new NotificationService(_db), NullLogger<RetoucherService>.Instance);
+            _db, portfolios, new AuditService(_db), new NotificationService(_db),
+            NullLogger<RetoucherService>.Instance);
     }
 
     public void Dispose()
@@ -114,9 +125,12 @@ public class RetoucherServiceTests : IDisposable
 
         Assert.Equal(1, counts.Waiting);
         Assert.Equal(1, counts.InProgress);
-        Assert.Equal(1, counts.ReadyForReview);
-        // Everything past review counts as done for the retoucher.
-        Assert.Equal(2, counts.Completed);
+        // InViewing counts alongside ReadyForReview: submitting now carries a portfolio
+        // straight there (specification section 27, version 2), so from a retoucher's
+        // chair both still just mean "sent, not yet bought".
+        Assert.Equal(2, counts.ReadyForReview);
+        // Only what is actually being paid for, or beyond, counts as done.
+        Assert.Equal(1, counts.Completed);
     }
 
     [Fact]
@@ -199,7 +213,7 @@ public class RetoucherServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task Submitting_moves_the_portfolio_to_ready_for_review()
+    public async Task Submitting_carries_the_portfolio_straight_to_viewing()
     {
         var clientId = AddClient(PortfolioStatus.ReadyForRetoucher);
         await _service.StartWorkAsync(clientId, _retoucherA);
@@ -208,8 +222,14 @@ public class RetoucherServiceTests : IDisposable
         var (succeeded, _) = await _service.SubmitForReviewAsync(clientId, _retoucherA);
 
         Assert.True(succeeded);
-        Assert.Equal(PortfolioStatus.ReadyForReview, _db.Portfolios.Single(p => p.ClientId == clientId).Status);
 
+        // No administrator click is required any more: submitting reuses
+        // MarkInViewingAsync itself, so the portfolio is already showable and its
+        // checkout is already open the moment the retoucher sends it (spec 27, v2).
+        Assert.Equal(PortfolioStatus.InViewing, _db.Portfolios.Single(p => p.ClientId == clientId).Status);
+
+        // The assignment itself still records ReadyForReview — that is what keeps this
+        // submission in the retoucher's own "ready for review" tab (spec 6).
         var assignment = await _service.GetAssignmentAsync(clientId);
         Assert.Equal(RetoucherAssignmentStatus.ReadyForReview, assignment!.Status);
         Assert.NotNull(assignment.SubmittedForReviewAt);

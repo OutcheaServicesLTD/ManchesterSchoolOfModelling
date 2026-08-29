@@ -70,7 +70,12 @@ public class RetoucherWorkspaceViewModel
 
     public bool CanSubmit => Selected.Count > 0 && HasFeatured;
 
-    public bool AlreadySubmitted => Status is PortfolioStatus.ReadyForReview;
+    /// <summary>
+    /// InViewing is included because submitting now carries a portfolio straight there
+    /// (specification section 27, version 2) — a retoucher reopening it should still be
+    /// told it has already gone in, not just while it briefly sat at ReadyForReview.
+    /// </summary>
+    public bool AlreadySubmitted => Status is PortfolioStatus.ReadyForReview or PortfolioStatus.InViewing;
 
     public string AcceptAttribute => string.Join(",", AllowedContentTypes);
 

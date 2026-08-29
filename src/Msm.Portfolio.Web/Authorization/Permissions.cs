@@ -55,6 +55,14 @@ public static class Permissions
 
         /// <summary>Super Admin only: brings an archived portfolio back.</summary>
         public const string Restore = "portfolio.restore";
+
+        /// <summary>
+        /// Super Admin only: retypes the web address by hand. Editing the photographs,
+        /// biography and other portfolio content stays under <see cref="Edit"/> — this is
+        /// narrower and covers only the slug, because a link already shared with an
+        /// agency breaks the moment it changes (specification section 39).
+        /// </summary>
+        public const string ChangeSlug = "portfolio.slug.change";
     }
 
     public static class Payments
@@ -92,6 +100,7 @@ public static class Permissions
     {
         Portfolios.DeletePermanently,
         Portfolios.Restore,
+        Portfolios.ChangeSlug,
         Payments.Override,
         Users.ManageAdministrators,
         System.ChangeConfiguration
@@ -158,6 +167,7 @@ public static class Permissions
         yield return Portfolios.Archive;
         yield return Portfolios.DeletePermanently;
         yield return Portfolios.Restore;
+        yield return Portfolios.ChangeSlug;
 
         yield return Payments.View;
         yield return Payments.StartCheckout;

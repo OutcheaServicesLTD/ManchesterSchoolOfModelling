@@ -368,7 +368,7 @@ public class ClientsController(
             "Portfolio archived.");
 
     [HttpPost("slug")]
-    [Authorize(Policy = Permissions.Portfolios.Edit)]
+    [Authorize(Policy = Permissions.Portfolios.ChangeSlug)]
     public Task<IActionResult> Slug(
         Guid clientId, string slug, CancellationToken cancellationToken = default) =>
         RunAsync(clientId, () => portfolios.ChangeSlugAsync(clientId, slug, CurrentUserId(), cancellationToken),

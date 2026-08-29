@@ -81,17 +81,21 @@ public interface IRetoucherService
 
 public class RetoucherService(
     ApplicationDbContext db,
+    IPortfolioService portfolios,
     IAuditService audit,
     INotificationService notifications,
     ILogger<RetoucherService> logger) : IRetoucherService
 {
     /// <summary>
-    /// Statuses where the retoucher's part is finished. Anything past review has moved
-    /// on to Admin, the viewing room or the client.
+    /// Statuses where a sale is in progress or done. Submitting now carries a portfolio
+    /// straight through to <see cref="PortfolioStatus.InViewing"/> (see
+    /// <see cref="SubmitForReviewAsync"/>), so that status moved into the "ready for
+    /// review" tab below rather than here — from a retoucher's chair it is still simply
+    /// "submitted, not yet bought", and payment is what actually marks their part done.
     /// </summary>
     private static readonly PortfolioStatus[] CompletedStatuses =
     [
-        PortfolioStatus.InViewing, PortfolioStatus.AwaitingPurchase, PortfolioStatus.Purchased,
+        PortfolioStatus.AwaitingPurchase, PortfolioStatus.Purchased,
         PortfolioStatus.Published, PortfolioStatus.PaymentWarning, PortfolioStatus.Unpublished,
         PortfolioStatus.NoSale, PortfolioStatus.Archived
     ];
@@ -413,6 +417,26 @@ public class RetoucherService(
 
         await db.SaveChangesAsync(cancellationToken);
 
+        // Used to wait here for an administrator to click "Mark in viewing" before the
+        // client could be shown anything or a sale could start (specification section
+        // 27, version 1). That click checked exactly what this method already checked
+        // above — a chosen main image, at least one selected photograph — so it added a
+        // step without adding a decision. Reusing MarkInViewingAsync rather than
+        // duplicating its transition keeps the biography-draft trigger and audit trail
+        // in the one place that owns them; an administrator can still return the
+        // portfolio to retouching or unpublish it later exactly as before.
+        var viewing = await portfolios.MarkInViewingAsync(clientId, retoucherUserId, cancellationToken);
+
+        if (!viewing.Succeeded)
+        {
+            // The checks above make this unreachable in practice — both guards
+            // MarkInViewingAsync applies were just satisfied — but the submission itself
+            // still succeeded and must not be reported as a failure over it.
+            logger.LogWarning(
+                "Portfolio {ClientId} reached ReadyForReview but could not advance to InViewing: {Reason}",
+                clientId, viewing.Error);
+        }
+
         return (true, null);
     }
 
@@ -428,7 +452,10 @@ public class RetoucherService(
     {
         RetoucherQueueTab.Waiting => [PortfolioStatus.ReadyForRetoucher],
         RetoucherQueueTab.InProgress => [PortfolioStatus.Retouching],
-        RetoucherQueueTab.ReadyForReview => [PortfolioStatus.ReadyForReview],
+        // InViewing is included: submitting carries a portfolio straight there now (see
+        // SubmitForReviewAsync), and this tab is still where a retoucher looks to find
+        // what they have sent, right up until it is actually bought.
+        RetoucherQueueTab.ReadyForReview => [PortfolioStatus.ReadyForReview, PortfolioStatus.InViewing],
         RetoucherQueueTab.Completed => CompletedStatuses,
         _ => []
     };
