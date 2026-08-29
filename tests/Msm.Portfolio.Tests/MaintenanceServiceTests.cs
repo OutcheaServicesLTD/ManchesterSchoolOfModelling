@@ -436,6 +436,84 @@ public class MaintenanceServiceTests : IDisposable
         Assert.DoesNotContain("grace", serialised, StringComparison.OrdinalIgnoreCase);
     }
 
+    // ---------- Starting and ending a subscription (specification version 2, item 3) ----------
+
+    private Guid AddClientWithoutSubscription(string name = "Test Model")
+    {
+        var userId = Guid.CreateVersion7();
+        var clientId = Guid.CreateVersion7();
+        var parts = name.Split(' ');
+
+        _db.Users.Add(new ApplicationUser { Id = userId, UserName = $"{clientId:N}@x.com", Email = $"{clientId:N}@x.com" });
+        _db.ClientProfiles.Add(new ClientProfile
+        {
+            Id = clientId, ApplicationUserId = userId,
+            FirstName = parts[0], LastName = parts.Length > 1 ? parts[1] : "Model",
+            DateOfBirth = new DateOnly(1998, 1, 1)
+        });
+        _db.SaveChanges();
+
+        return clientId;
+    }
+
+    [Fact]
+    public async Task Activating_creates_a_subscription_the_first_time_a_client_starts_one()
+    {
+        var clientId = AddClientWithoutSubscription();
+
+        var subscription = await _service.ActivateSubscriptionAsync(
+            clientId, "Stripe", "sub_123", 19.99m, "GBP");
+
+        Assert.Equal(MaintenanceSubscriptionStatus.Active, subscription.Status);
+        Assert.Equal("Stripe", subscription.Provider);
+        Assert.Equal("sub_123", subscription.ProviderSubscriptionId);
+        Assert.Equal(_maintenanceProductId, subscription.ProductId);
+        Assert.Same(subscription, SubscriptionFor(clientId));
+    }
+
+    /// <summary>
+    /// A client who cancelled and starts again is recognised, not duplicated: the same
+    /// row comes back active rather than a second one being created alongside it.
+    /// </summary>
+    [Fact]
+    public async Task Activating_again_reactivates_rather_than_duplicates()
+    {
+        var clientId = AddPublishedClient(MaintenanceSubscriptionStatus.Cancelled);
+
+        await _service.ActivateSubscriptionAsync(clientId, "Stripe", "sub_456", 19.99m, "GBP");
+
+        var subscription = SubscriptionFor(clientId);
+        Assert.Equal(MaintenanceSubscriptionStatus.Active, subscription.Status);
+        Assert.Equal("sub_456", subscription.ProviderSubscriptionId);
+        Assert.Equal(1, _db.MaintenanceSubscriptions.Count(s => s.ClientId == clientId));
+    }
+
+    /// <summary>
+    /// Stripe sends this once the paid period is genuinely over. No extra grace period
+    /// applies on top of one already used, unlike a failed payment.
+    /// </summary>
+    [Fact]
+    public async Task Cancelling_ends_the_subscription_and_takes_the_portfolio_down()
+    {
+        var clientId = AddPublishedClient(MaintenanceSubscriptionStatus.Active);
+
+        var result = await _service.RecordCancelledAsync(clientId);
+
+        Assert.True(result.Succeeded);
+        Assert.Equal(MaintenanceSubscriptionStatus.Cancelled, SubscriptionFor(clientId).Status);
+        Assert.False(PortfolioFor(clientId).IsPublished);
+    }
+
+    [Fact]
+    public async Task Cancelling_fails_for_a_client_with_no_subscription()
+    {
+        var clientId = AddClientWithoutSubscription();
+
+        var result = await _service.RecordCancelledAsync(clientId);
+
+        Assert.False(result.Succeeded);
+    }
+
     /// <summary>These tests are about subscriptions, not about messages leaving.</summary>
     private sealed class SilentEmailSender : IEmailSender
     {

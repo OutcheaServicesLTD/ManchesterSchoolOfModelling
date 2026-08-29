@@ -78,6 +78,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.Property(c => c.InstagramUrl).HasMaxLength(500);
             entity.Property(c => c.TikTokUrl).HasMaxLength(500);
             entity.Property(c => c.GhlContactId).HasMaxLength(100);
+            entity.Property(c => c.StripeCustomerId).HasMaxLength(100);
 
             entity.HasOne(c => c.ApplicationUser)
                 .WithOne(u => u.ClientProfile)
@@ -91,6 +92,13 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             entity.HasIndex(c => c.GhlContactId)
                 .IsUnique()
                 .HasFilter(nullFilter(nameof(ClientProfile.GhlContactId)));
+
+            // One Stripe Customer per client, same reasoning as the CRM link above:
+            // clients who have never started a subscription carry a null and must not
+            // collide with each other.
+            entity.HasIndex(c => c.StripeCustomerId)
+                .IsUnique()
+                .HasFilter(nullFilter(nameof(ClientProfile.StripeCustomerId)));
         });
 
         builder.Entity<ModelMeasurement>(entity =>
@@ -238,6 +246,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
 
         builder.Entity<MaintenanceSubscription>(entity =>
         {
+            entity.Property(s => s.Provider).HasMaxLength(20).IsRequired();
             entity.Property(s => s.ProviderSubscriptionId).HasMaxLength(200);
             entity.Property(s => s.PriceAtCreation).HasPrecision(18, 2);
             entity.Property(s => s.Currency).HasMaxLength(3).IsRequired();

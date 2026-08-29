@@ -87,4 +87,5 @@ public static class AuditActions
     public const string MaintenancePaymentResolved = "MaintenancePaymentResolved";
     public const string MaintenanceGracePeriodExpired = "MaintenanceGracePeriodExpired";
     public const string MaintenanceActivated = "MaintenanceActivated";
+    public const string MaintenanceCancelled = "MaintenanceCancelled";
 }

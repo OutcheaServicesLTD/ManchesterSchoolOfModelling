@@ -113,6 +113,57 @@ else if (Model.ExpiresAt is { } liveUntil && Model.IsPublished)
     </div>
 </div>
 
+@if (Model.SubscriptionAvailable || Model.HasSubscription)
+{
+    @* Optional, and quite separate from the £99 portfolio purchase above — a client
+       starts and manages this themselves, Stripe doing almost all of the work. *@
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">Subscription</h2>
+
+            <p class="card-text mb-1">
+                Status:
+                <span class="badge @(Model.SubscriptionStatus is Msm.Portfolio.Web.Domain.Enums.MaintenanceSubscriptionStatus.Active
+                    ? "text-bg-success"
+                    : Model.SubscriptionStatus is Msm.Portfolio.Web.Domain.Enums.MaintenanceSubscriptionStatus.PaymentIssue
+                        or Msm.Portfolio.Web.Domain.Enums.MaintenanceSubscriptionStatus.GracePeriodExpired
+                        ? "text-bg-warning"
+                        : "text-bg-secondary")">
+                    @Model.SubscriptionStatusLabel
+                </span>
+            </p>
+
+            <p class="card-text mb-3">
+                £@Model.SubscriptionPrice.ToString("0.00") @Model.SubscriptionCurrency / month
+                @if (Model.SubscriptionStatus == Msm.Portfolio.Web.Domain.Enums.MaintenanceSubscriptionStatus.Active
+                     && Model.SubscriptionNextPaymentDate is { } next)
+                {
+                    <text> — next payment @next.ToString("d MMMM yyyy")</text>
+                }
+            </p>
+
+            @if (Model.IsPreview)
+            {
+                <span class="btn btn-outline-primary disabled" aria-disabled="true">
+                    @(Model.SubscriptionCanBeManaged ? "Manage subscription" : "Start subscription")
+                </span>
+            }
+            else if (Model.SubscriptionCanBeManaged)
+            {
+                <form method="post" asp-area="Client" asp-controller="Subscription" asp-action="Manage">
+                    <button type="submit" class="btn btn-outline-primary">Manage subscription</button>
+                </form>
+            }
+            else if (Model.SubscriptionAvailable)
+            {
+                <form method="post" asp-area="Client" asp-controller="Subscription" asp-action="Start">
+                    <button type="submit" class="btn btn-primary">Start subscription</button>
+                </form>
+            }
+        </div>
+    </div>
+}
+
 <div class="card mb-4">
     <div class="card-body">
         <h2 class="h5 card-title">Your profile</h2>

@@ -19,6 +19,7 @@ namespace Msm.Portfolio.Web.Controllers;
 [IgnoreAntiforgeryToken]
 public class WebhookController(
     IPaymentWebhookProcessor processor,
+    IStripeWebhookProcessor stripeProcessor,
     ILogger<WebhookController> logger) : ControllerBase
 {
     [HttpPost("gocardless")]
@@ -45,6 +46,33 @@ public class WebhookController(
 
         // 200 tells the provider to stop retrying. Returned even when every event was a
         // duplicate, because a duplicate means the work is already done.
+        return Ok(new { processed = result.Processed, skipped = result.Skipped });
+    }
+
+    /// <summary>
+    /// The portfolio-maintenance subscription's webhook (specification version 2, item 3).
+    /// </summary>
+    [HttpPost("stripe")]
+    [EnableRateLimiting(RateLimitPolicies.Webhook)]
+    public async Task<IActionResult> Stripe(CancellationToken cancellationToken = default)
+    {
+        using var reader = new StreamReader(Request.Body);
+        var payload = await reader.ReadToEndAsync(cancellationToken);
+
+        var signature = Request.Headers["Stripe-Signature"].FirstOrDefault();
+
+        var result = await stripeProcessor.ProcessAsync(payload, signature, cancellationToken);
+
+        if (!result.Accepted)
+        {
+            // 400 is what Stripe expects for a signature it should not retry.
+            return BadRequest(new { error = result.Error });
+        }
+
+        logger.LogInformation(
+            "Stripe webhook accepted: {Processed} applied, {Skipped} already seen.",
+            result.Processed, result.Skipped);
+
         return Ok(new { processed = result.Processed, skipped = result.Skipped });
     }
 }

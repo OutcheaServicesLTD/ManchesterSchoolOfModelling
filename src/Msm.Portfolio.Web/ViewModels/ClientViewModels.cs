@@ -53,6 +53,40 @@ public class ClientDashboardViewModel
     /// </remarks>
     public bool IsPreview { get; set; }
 
+    // ── Portfolio-maintenance subscription (specification version 2, item 3) ───────
+    // Optional, and started by the client themselves — quite separate from the £99
+    // purchase above, which is why it carries its own null/available checks rather
+    // than folding into ExpiresAt or MaintenanceWarning.
+
+    /// <summary>True once Stripe is configured and a client can actually be sent there.</summary>
+    public bool SubscriptionAvailable { get; set; }
+
+    /// <summary>Null when this client has never started a subscription.</summary>
+    public Domain.Enums.MaintenanceSubscriptionStatus? SubscriptionStatus { get; set; }
+
+    public decimal SubscriptionPrice { get; set; }
+
+    public string SubscriptionCurrency { get; set; } = "GBP";
+
+    public DateTimeOffset? SubscriptionNextPaymentDate { get; set; }
+
+    public bool HasSubscription => SubscriptionStatus is not (null or Domain.Enums.MaintenanceSubscriptionStatus.NotStarted);
+
+    public bool SubscriptionCanBeManaged =>
+        SubscriptionStatus is Domain.Enums.MaintenanceSubscriptionStatus.Active
+            or Domain.Enums.MaintenanceSubscriptionStatus.PaymentIssue
+            or Domain.Enums.MaintenanceSubscriptionStatus.GracePeriodExpired;
+
+    public string SubscriptionStatusLabel => SubscriptionStatus switch
+    {
+        Domain.Enums.MaintenanceSubscriptionStatus.Active => "Active",
+        Domain.Enums.MaintenanceSubscriptionStatus.PaymentIssue => "Payment problem",
+        Domain.Enums.MaintenanceSubscriptionStatus.GracePeriodExpired => "Payment problem",
+        Domain.Enums.MaintenanceSubscriptionStatus.Cancelled => "Ended",
+        Domain.Enums.MaintenanceSubscriptionStatus.Ended => "Ended",
+        _ => "Not started"
+    };
+
     /// <summary>Days left of the purchased year, or null when there is no term.</summary>
     public int? DaysOfTermRemaining =>
         ExpiresAt is { } expires ? (int)Math.Ceiling((expires - DateTimeOffset.UtcNow).TotalDays) : null;

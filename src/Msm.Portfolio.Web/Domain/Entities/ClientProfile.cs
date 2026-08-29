@@ -20,6 +20,14 @@ public class ClientProfile
     /// </summary>
     public string? GhlContactId { get; set; }
 
+    /// <summary>
+    /// The Stripe Customer behind this client's portfolio-maintenance subscription
+    /// (specification version 2, item 3). Set once, the first time a subscription is
+    /// started, so a client who cancels and starts again is recognised as the same
+    /// customer rather than opening a new one at Stripe with every attempt.
+    /// </summary>
+    public string? StripeCustomerId { get; set; }
+
     public string FirstName { get; set; } = string.Empty;
 
     public string LastName { get; set; } = string.Empty;

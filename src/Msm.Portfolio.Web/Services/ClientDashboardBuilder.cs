@@ -26,6 +26,7 @@ public interface IClientDashboardBuilder
 public class ClientDashboardBuilder(
     ApplicationDbContext db,
     IMaintenanceService maintenance,
+    IStripeSubscriptionService subscriptions,
     IOptions<MediaOptions> mediaOptions,
     IOptions<MsmBrandOptions> brandOptions) : IClientDashboardBuilder
 {
@@ -44,6 +45,10 @@ public class ClientDashboardBuilder(
         var selected = counts.FirstOrDefault(c => c.Selected)?.Count ?? 0;
         var total = counts.Sum(c => c.Count);
 
+        var subscription = await maintenance.GetForClientAsync(client.Id, cancellationToken);
+        var maintenanceProduct = await db.Products.FirstOrDefaultAsync(
+            p => p.Code == ProductCodes.PortfolioMaintenance, cancellationToken);
+
         return new ClientDashboardViewModel
         {
             Name = client.PublicName,
@@ -60,7 +65,12 @@ public class ClientDashboardBuilder(
             GuardianApprovalPending = client.IsBlockedPendingGuardianConsent(today),
             MaintenanceWarning = await maintenance.GetWarningAsync(client.Id, cancellationToken),
             ExpiresAt = client.Portfolio?.ExpiresAt,
-            IsPreview = isPreview
+            IsPreview = isPreview,
+            SubscriptionAvailable = subscriptions.IsAvailable,
+            SubscriptionStatus = subscription?.Status,
+            SubscriptionPrice = subscription?.PriceAtCreation ?? maintenanceProduct?.Price ?? 0m,
+            SubscriptionCurrency = subscription?.Currency ?? maintenanceProduct?.Currency ?? "GBP",
+            SubscriptionNextPaymentDate = subscription?.NextPaymentDate
         };
     }
 

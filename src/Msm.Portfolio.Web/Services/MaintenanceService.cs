@@ -38,6 +38,40 @@ public interface IMaintenanceService
 
     Task<MaintenanceSubscription?> FindByProviderIdAsync(
         string providerSubscriptionId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// This client's subscription record, or null when they have never started one —
+    /// the ordinary case, since starting one is the client's choice (specification
+    /// version 2, item 3).
+    /// </summary>
+    Task<MaintenanceSubscription?> GetForClientAsync(
+        Guid clientId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Records a subscription as active, creating the row the first time a client
+    /// subscribes and updating it on a later Checkout completion.
+    /// </summary>
+    /// <remarks>
+    /// Provider-agnostic in shape, but in practice this is always Stripe today: a
+    /// client starts this themselves from their portal, quite separately from the
+    /// £99 digital-portfolio purchase and the auto-provisioned GoCardless arrangement
+    /// <see cref="CommerceOptions.MaintenanceEnabled"/> would otherwise create.
+    /// </remarks>
+    Task<MaintenanceSubscription> ActivateSubscriptionAsync(
+        Guid clientId,
+        string provider,
+        string providerSubscriptionId,
+        decimal price,
+        string currency,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Ends a subscription outright — Stripe's <c>customer.subscription.deleted</c>,
+    /// which arrives once the paid period is genuinely over, so no further grace period
+    /// applies the way a failed payment gets one.
+    /// </summary>
+    Task<OperationResult> RecordCancelledAsync(
+        Guid clientId, CancellationToken cancellationToken = default);
 }
 
 public class MaintenanceService(
@@ -265,4 +299,124 @@ public class MaintenanceService(
         db.MaintenanceSubscriptions
             .Include(s => s.Client)
             .FirstOrDefaultAsync(s => s.ProviderSubscriptionId == providerSubscriptionId, cancellationToken);
+
+    public Task<MaintenanceSubscription?> GetForClientAsync(
+        Guid clientId, CancellationToken cancellationToken = default) =>
+        db.MaintenanceSubscriptions.FirstOrDefaultAsync(s => s.ClientId == clientId, cancellationToken);
+
+    public async Task<MaintenanceSubscription> ActivateSubscriptionAsync(
+        Guid clientId,
+        string provider,
+        string providerSubscriptionId,
+        decimal price,
+        string currency,
+        CancellationToken cancellationToken = default)
+    {
+        var subscription = await db.MaintenanceSubscriptions
+            .FirstOrDefaultAsync(s => s.ClientId == clientId, cancellationToken);
+
+        var now = DateTimeOffset.UtcNow;
+
+        if (subscription is null)
+        {
+            var product = await db.Products.FirstOrDefaultAsync(
+                p => p.Code == Data.ProductCodes.PortfolioMaintenance, cancellationToken);
+
+            subscription = new MaintenanceSubscription
+            {
+                ClientId = clientId,
+                // Falls back to the product row itself only if it is somehow missing —
+                // seeding always creates it, so this only guards a database that was
+                // never seeded rather than a real branch in ordinary operation.
+                ProductId = product?.Id ?? Guid.Empty,
+                StartDate = now
+            };
+
+            db.MaintenanceSubscriptions.Add(subscription);
+        }
+
+        var wasEnded = subscription.Status is MaintenanceSubscriptionStatus.Cancelled
+            or MaintenanceSubscriptionStatus.Ended;
+
+        subscription.Provider = provider;
+        subscription.ProviderSubscriptionId = providerSubscriptionId;
+        subscription.PriceAtCreation = price;
+        subscription.Currency = currency;
+        subscription.Status = MaintenanceSubscriptionStatus.Active;
+        subscription.GracePeriodEndsAt = null;
+        subscription.NextPaymentDate = now.AddMonths(1);
+        subscription.UpdatedAt = now;
+
+        audit.Record(nameof(MaintenanceSubscription), subscription.Id.ToString(),
+            AuditActions.MaintenanceActivated,
+            newValue: $"Subscription active via {provider} at {price:0.00} {currency}/month");
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        var client = await db.ClientProfiles.FindAsync([clientId], cancellationToken);
+
+        if (client is not null)
+        {
+            notifications.NotifyUser(
+                client.ApplicationUserId,
+                NotificationTypes.MaintenancePaymentResolved,
+                wasEnded
+                    ? "Your subscription is active again."
+                    : "Thank you. Your subscription is now active.",
+                "/client");
+        }
+
+        return subscription;
+    }
+
+    public async Task<OperationResult> RecordCancelledAsync(
+        Guid clientId, CancellationToken cancellationToken = default)
+    {
+        var subscription = await db.MaintenanceSubscriptions
+            .Include(s => s.Client)
+            .FirstOrDefaultAsync(s => s.ClientId == clientId, cancellationToken);
+
+        if (subscription is null)
+        {
+            return OperationResult.Fail("That client has no subscription.");
+        }
+
+        subscription.Status = MaintenanceSubscriptionStatus.Cancelled;
+        subscription.GracePeriodEndsAt = null;
+        subscription.UpdatedAt = DateTimeOffset.UtcNow;
+
+        audit.Record(nameof(MaintenanceSubscription), subscription.Id.ToString(),
+            AuditActions.MaintenanceCancelled);
+
+        // Stripe only sends this once the paid period is genuinely over — no further
+        // grace period applies the way a failed payment gets one (specification
+        // section 23; this is the deliberate-cancellation counterpart to it).
+        var portfolio = await db.Portfolios.FirstOrDefaultAsync(p => p.ClientId == clientId, cancellationToken);
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        if (portfolio is { IsPublished: true })
+        {
+            var result = await portfolios.UnpublishAsync(
+                clientId, null, "subscription cancelled", cancellationToken);
+
+            if (result.Succeeded)
+            {
+                await notifications.NotifyStaffAsync(
+                    NotificationTypes.PortfolioUnpublished,
+                    $"{subscription.Client.PublicName}'s subscription ended and their portfolio was "
+                    + "taken down.",
+                    $"/admin/clients/{clientId}",
+                    cancellationToken);
+            }
+        }
+
+        notifications.NotifyUser(
+            subscription.Client.ApplicationUserId,
+            NotificationTypes.PortfolioUnpublished,
+            "Your subscription has ended.",
+            "/client");
+
+        return OperationResult.Ok();
+    }
 }

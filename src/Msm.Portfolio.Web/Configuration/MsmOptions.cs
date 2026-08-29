@@ -198,6 +198,8 @@ public class IntegrationOptions
     public GoCardlessOptions GoCardless { get; set; } = new();
 
     public HighLevelOptions HighLevel { get; set; } = new();
+
+    public StripeOptions Stripe { get; set; } = new();
 }
 
 public class GoCardlessOptions
@@ -218,6 +220,32 @@ public class HighLevelOptions
     public string? LocationId { get; set; }
 
     public string BaseUrl { get; set; } = "https://services.leadconnectorhq.com";
+}
+
+/// <summary>
+/// Credentials for the recurring portfolio-maintenance subscription (specification
+/// version 2, item 3). Separate from GoCardless: the £99 digital portfolio purchase
+/// keeps running exactly as it does today, and this is the ongoing membership a client
+/// can start, manage and cancel for themselves, Stripe Checkout and the Stripe Customer
+/// Portal doing almost all of the work.
+/// </summary>
+public class StripeOptions
+{
+    /// <summary>Server-side only. Never sent to a view or a script.</summary>
+    public string? SecretKey { get; set; }
+
+    /// <summary>
+    /// Secret used to verify inbound webhook signatures. Without one, nothing arriving
+    /// at webhooks/stripe can be trusted (mirrors GoCardlessOptions.WebhookSecret).
+    /// </summary>
+    public string? WebhookSecret { get; set; }
+
+    /// <summary>
+    /// The recurring Price to subscribe a client to, created in the Stripe Dashboard
+    /// against the Portfolio Maintenance product. A Price, not a Product: Stripe prices
+    /// what a Checkout Session sells.
+    /// </summary>
+    public string? PriceId { get; set; }
 }
 
 /// <summary>

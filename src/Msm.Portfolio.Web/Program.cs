@@ -10,6 +10,7 @@ using Msm.Portfolio.Web.Services;
 using Msm.Portfolio.Web.Integrations.GoCardless;
 using Msm.Portfolio.Web.Integrations.Bio;
 using Msm.Portfolio.Web.Integrations.HighLevel;
+using Msm.Portfolio.Web.Integrations.Stripe;
 using Msm.Portfolio.Web.Storage;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -154,6 +155,30 @@ else
     builder.Services.AddHttpClient<IGoCardlessService, GoCardlessService>()
         .SetHandlerLifetime(TimeSpan.FromMinutes(5));
 }
+// ── Portfolio-maintenance subscription (specification version 2, item 3) ───────────
+// A client's own choice, started and managed from the client portal, quite separate
+// from the £99 digital-portfolio purchase above. As with GoCardless, the real client is
+// used only once a secret key is configured, and its calls have not been verified
+// against a live Stripe account.
+builder.Services.AddScoped<IStripeWebhookVerifier, StripeWebhookVerifier>();
+builder.Services.AddScoped<IStripeWebhookProcessor, StripeWebhookProcessor>();
+builder.Services.AddScoped<IStripeSubscriptionService, StripeSubscriptionService>();
+
+var stripeSecretKey = builder.Configuration[$"{IntegrationOptions.SectionName}:Stripe:SecretKey"];
+
+if (string.IsNullOrWhiteSpace(stripeSecretKey))
+{
+    builder.Services.AddScoped<IStripeService, StubStripeService>();
+}
+else
+{
+    // Stripe.net reads its key from this static rather than from a client instance
+    // passed around by DI, which is how the SDK itself is built. Fully qualified: this
+    // file also has a "Stripe" segment of its own namespace in scope.
+    global::Stripe.StripeConfiguration.ApiKey = stripeSecretKey;
+    builder.Services.AddScoped<IStripeService, StripeService>();
+}
+
 builder.Services.AddSingleton<IImageProcessor, ImageProcessor>();
 
 // Local disk for now. Object storage replaces this registration once MSM's hosting is

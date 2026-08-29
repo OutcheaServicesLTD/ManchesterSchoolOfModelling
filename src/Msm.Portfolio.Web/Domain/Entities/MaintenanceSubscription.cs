@@ -18,6 +18,15 @@ public class MaintenanceSubscription
 
     public Product Product { get; set; } = null!;
 
+    /// <summary>
+    /// Which payment provider this subscription runs on. "Stripe" for everything a
+    /// client starts themselves through the client portal (specification version 2,
+    /// item 3); "GoCardless" is left available for the auto-provisioned arrangement
+    /// CommerceOptions.MaintenanceEnabled would create, should MSM ever turn that
+    /// back on.
+    /// </summary>
+    public string Provider { get; set; } = "Stripe";
+
     public string? ProviderSubscriptionId { get; set; }
 
     /// <summary>

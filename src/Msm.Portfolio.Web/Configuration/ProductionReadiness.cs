@@ -112,6 +112,44 @@ public static class ProductionReadiness
                 IsFatal: false));
         }
 
+        // The portfolio-maintenance subscription (specification version 2, item 3) is
+        // optional — nothing breaks with it left off, the client portal simply does not
+        // offer it. Fatal only when it is half configured: a secret key with no webhook
+        // secret would let a client pay Stripe and never be recorded as subscribed,
+        // because nothing could then be trusted to confirm it.
+        var stripeSecretKey = configuration["Integrations:Stripe:SecretKey"];
+        var stripeWebhookSecret = configuration["Integrations:Stripe:WebhookSecret"];
+        var stripePriceId = configuration["Integrations:Stripe:PriceId"];
+        var stripeConfigured = !string.IsNullOrWhiteSpace(stripeSecretKey);
+
+        if (stripeConfigured && string.IsNullOrWhiteSpace(stripeWebhookSecret))
+        {
+            problems.Add(new ReadinessProblem(
+                "Subscriptions",
+                "Integrations:Stripe:SecretKey is set but Integrations:Stripe:WebhookSecret is not, "
+                + "so a subscription payment could never be confirmed. Set both, or neither.",
+                IsFatal: true));
+        }
+        else if (stripeConfigured && string.IsNullOrWhiteSpace(stripePriceId))
+        {
+            problems.Add(new ReadinessProblem(
+                "Subscriptions",
+                "Integrations:Stripe:SecretKey is set but Integrations:Stripe:PriceId is not, so no "
+                + "client could actually be sent to a subscription checkout. Set "
+                + "Integrations:Stripe:PriceId to the recurring Price created for Portfolio "
+                + "Maintenance in the Stripe Dashboard.",
+                IsFatal: true));
+        }
+        else if (!stripeConfigured)
+        {
+            problems.Add(new ReadinessProblem(
+                "Subscriptions",
+                "No Stripe secret key is configured, so the client portal will not offer a "
+                + "subscription. Set Integrations:Stripe:SecretKey, WebhookSecret and PriceId to "
+                + "turn it on.",
+                IsFatal: false));
+        }
+
         // Not fatal: the application works, MSM's CRM simply falls behind, and the
         // integrations page shows it.
         if (!crm.IsLive)

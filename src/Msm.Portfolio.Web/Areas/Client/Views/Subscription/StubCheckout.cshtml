@@ -1,0 +1,26 @@
+@{
+    ViewData["Title"] = "Subscription (stub)";
+    var clientId = (Guid)ViewData["ClientId"]!;
+    var price = (decimal)ViewData["Price"]!;
+    var currency = (string)ViewData["Currency"]!;
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="alert alert-warning" role="alert">
+            <strong>This is not a real payment page.</strong>
+            It stands in for Stripe Checkout so the subscription journey can be tested.
+            No money will move.
+        </div>
+
+        <h1>Portfolio Maintenance</h1>
+        <p class="lead">£@price.ToString("0.00") @currency / month</p>
+
+        <form method="post" asp-action="StubComplete" asp-route-clientId="@clientId">
+            <button type="submit" class="btn btn-success btn-lg">Simulate a successful subscription</button>
+            <a class="btn btn-outline-secondary btn-lg" asp-area="Client" asp-controller="Home" asp-action="Index">
+                Cancel
+            </a>
+        </form>
+    </div>
+</div>

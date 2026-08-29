@@ -21,14 +21,20 @@ public class ProductionReadinessTests
         string? webhookSecret = "a-secret",
         string? contactEmail = "hello@example.com",
         string? publicDomain = LiveDomain,
-        string? biographyKey = "sk-ant-test")
+        string? biographyKey = "sk-ant-test",
+        string? stripeSecretKey = "sk_test_x",
+        string? stripeWebhookSecret = "whsec_x",
+        string? stripePriceId = "price_x")
     {
         var values = new Dictionary<string, string?>
         {
             ["Integrations:GoCardless:WebhookSecret"] = webhookSecret,
             ["Msm:ContactEmail"] = contactEmail,
             ["Msm:PublicDomain"] = publicDomain,
-            ["Biography:ApiKey"] = biographyKey
+            ["Biography:ApiKey"] = biographyKey,
+            ["Integrations:Stripe:SecretKey"] = stripeSecretKey,
+            ["Integrations:Stripe:WebhookSecret"] = stripeWebhookSecret,
+            ["Integrations:Stripe:PriceId"] = stripePriceId
         };
 
         return new ConfigurationBuilder().AddInMemoryCollection(values).Build();
@@ -43,9 +49,14 @@ public class ProductionReadinessTests
         string? webhookSecret = "a-secret",
         string? contactEmail = "hello@example.com",
         string? publicDomain = LiveDomain,
-        string? biographyKey = "sk-ant-test") =>
+        string? biographyKey = "sk-ant-test",
+        string? stripeSecretKey = "sk_test_x",
+        string? stripeWebhookSecret = "whsec_x",
+        string? stripePriceId = "price_x") =>
         ProductionReadiness.Check(
-            Configuration(webhookSecret, contactEmail, publicDomain, biographyKey),
+            Configuration(
+                webhookSecret, contactEmail, publicDomain, biographyKey,
+                stripeSecretKey, stripeWebhookSecret, stripePriceId),
             new FakePayments(paymentsLive),
             new FakeCrm(crmLive),
             emailSenderIsStub,
@@ -86,6 +97,38 @@ public class ProductionReadinessTests
         var problem = Assert.Single(Check(webhookSecret: null));
 
         Assert.Equal("Payments", problem.Area);
+        Assert.True(problem.IsFatal);
+    }
+
+    [Fact]
+    public void No_stripe_configuration_is_a_non_fatal_warning()
+    {
+        // Optional: the client portal simply does not offer a subscription until it is
+        // configured, unlike GoCardless, which the £99 purchase already depends on.
+        var problem = Assert.Single(Check(stripeSecretKey: null, stripeWebhookSecret: null, stripePriceId: null));
+
+        Assert.Equal("Subscriptions", problem.Area);
+        Assert.False(problem.IsFatal);
+    }
+
+    [Fact]
+    public void A_stripe_secret_key_with_no_webhook_secret_is_fatal()
+    {
+        // Without it a subscription payment could never be confirmed — the same reasoning
+        // as GoCardless's own missing webhook secret above.
+        var problem = Assert.Single(Check(stripeWebhookSecret: null));
+
+        Assert.Equal("Subscriptions", problem.Area);
+        Assert.True(problem.IsFatal);
+    }
+
+    [Fact]
+    public void A_stripe_secret_key_with_no_price_id_is_fatal()
+    {
+        // Without it no client could actually be sent to a subscription checkout.
+        var problem = Assert.Single(Check(stripePriceId: null));
+
+        Assert.Equal("Subscriptions", problem.Area);
         Assert.True(problem.IsFatal);
     }
 
