@@ -7,6 +7,7 @@ using Msm.Portfolio.Web.Domain.Enums;
 using Msm.Portfolio.Web.Integrations.Bio;
 using Msm.Portfolio.Web.Integrations.GoCardless;
 using Msm.Portfolio.Web.Integrations.HighLevel;
+using Msm.Portfolio.Web.Integrations.Stripe;
 using Msm.Portfolio.Web.Services;
 using Msm.Portfolio.Web.ViewModels;
 
@@ -23,6 +24,7 @@ public class IntegrationsController(
     ICrmSyncService crmSync,
     IHighLevelService crm,
     IGoCardlessService payments,
+    IStripeService subscriptions,
     IBiographyWriter biographies) : Controller
 {
     [HttpGet("")]
@@ -47,6 +49,7 @@ public class IntegrationsController(
         {
             CrmIsLive = crm.IsLive,
             PaymentsIsLive = payments.IsLive,
+            SubscriptionsAreLive = subscriptions.IsLive,
             BiographiesAreOn = biographies.IsEnabled,
             BiographiesPending = await db.ClientProfiles.CountAsync(
                 c => c.BiographyDraftStatus == BiographyDraftStatus.Pending, cancellationToken),
@@ -54,9 +57,19 @@ public class IntegrationsController(
                 c => c.BiographyDraftStatus == BiographyDraftStatus.Failed, cancellationToken),
             CrmStates = states,
             RecentCrmFailures = failing,
-            WebhookEventsReceived = await db.PaymentWebhookEvents.CountAsync(cancellationToken),
+            // Scoped to GoCardless: Stripe's own webhook events land in the same table
+            // and are counted separately below, so this card's numbers are not quietly
+            // inflated by a second provider's traffic.
+            WebhookEventsReceived = await db.PaymentWebhookEvents
+                .CountAsync(e => e.Provider == "GoCardless", cancellationToken),
             WebhookEventsFailed = await db.PaymentWebhookEvents
-                .CountAsync(e => e.ProcessingStatus == WebhookProcessingStatus.Failed, cancellationToken)
+                .CountAsync(e => e.Provider == "GoCardless"
+                    && e.ProcessingStatus == WebhookProcessingStatus.Failed, cancellationToken),
+            SubscriptionWebhookEventsReceived = await db.PaymentWebhookEvents
+                .CountAsync(e => e.Provider == "Stripe", cancellationToken),
+            SubscriptionWebhookEventsFailed = await db.PaymentWebhookEvents
+                .CountAsync(e => e.Provider == "Stripe"
+                    && e.ProcessingStatus == WebhookProcessingStatus.Failed, cancellationToken)
         });
     }
 

@@ -60,6 +60,30 @@
     <div class="col-md-6">
         <div class="card h-100">
             <div class="card-body">
+                <h2 class="h6 card-title">Stripe subscriptions</h2>
+                @if (Model.SubscriptionsAreLive)
+                {
+                    <span class="badge text-bg-success">Connected</span>
+                }
+                else
+                {
+                    <span class="badge text-bg-warning">Stub — no money is taken</span>
+                    <p class="small text-muted mt-2 mb-0">
+                        The client portal does not offer a subscription until
+                        <code>Integrations:Stripe:SecretKey</code>, <code>WebhookSecret</code>
+                        and <code>PriceId</code> are all set.
+                    </p>
+                }
+                <p class="small mb-0 mt-2">
+                    @Model.SubscriptionWebhookEventsReceived webhook event(s) received,
+                    @Model.SubscriptionWebhookEventsFailed failed.
+                </p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100">
+            <div class="card-body">
                 <h2 class="h6 card-title">Biographies</h2>
                 @if (Model.BiographiesAreOn)
                 {

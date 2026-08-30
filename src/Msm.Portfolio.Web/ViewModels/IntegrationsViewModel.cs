@@ -16,6 +16,9 @@ public class IntegrationsViewModel
 
     public bool PaymentsIsLive { get; set; }
 
+    /// <summary>Whether Stripe is configured for the portfolio-maintenance subscription.</summary>
+    public bool SubscriptionsAreLive { get; set; }
+
     /// <summary>Whether a biography provider is configured, so the page can say.</summary>
     public bool BiographiesAreOn { get; set; }
 
@@ -32,6 +35,10 @@ public class IntegrationsViewModel
     public int WebhookEventsReceived { get; set; }
 
     public int WebhookEventsFailed { get; set; }
+
+    public int SubscriptionWebhookEventsReceived { get; set; }
+
+    public int SubscriptionWebhookEventsFailed { get; set; }
 
     public int CountFor(CrmSyncStatus status) =>
         CrmStates.TryGetValue(status, out var count) ? count : 0;
