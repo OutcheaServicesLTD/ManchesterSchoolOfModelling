@@ -34,6 +34,17 @@
             </a>
 
             <div class="header-utility">
+                @* Deliberately unlabelled: a small control among others, not a
+                   "staff/model sign in" banner an agency would notice while browsing
+                   the board. Present on every public page because it lives in the
+                   shared layout, not just here. *@
+                <a class="theme-toggle" href="/account/login" aria-label="Sign in">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="8" r="3.5" />
+                        <path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7" />
+                    </svg>
+                </a>
                 <partial name="_ThemeToggle" />
             </div>
         </div>
