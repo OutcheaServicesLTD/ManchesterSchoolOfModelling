@@ -75,6 +75,15 @@ services:
       - key: Seed__SuperAdmin__Password
         sync: false
 
+      # Optional: connects the preview to the real GoHighLevel account instead of the
+      # stub that only logs. Both marked sync:false for the same reason as the owner
+      # login above — set them directly in the Render dashboard, never here. See
+      # "Optional: connect the CRM" in docs/preview-deployment.md.
+      - key: Integrations__HighLevel__ApiKey
+        sync: false
+      - key: Integrations__HighLevel__LocationId
+        sync: false
+
       # SQLite on the mounted disk. Adequate for a preview and for a single instance;
       # the live system should use PostgreSQL, which needs the migrations regenerating
       # for that provider first.

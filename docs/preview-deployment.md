@@ -147,6 +147,28 @@ Consider whether the preview should use the real subdomain at all. Anything show
 is associated with MSM's brand, and the site is configured to ask search engines to
 ignore it precisely because the models on it are invented.
 
+## 5. Optional: connect the CRM
+
+Without this, `/admin/integrations` shows GoHighLevel as **not configured** and every
+portfolio change is recorded but never sent — the rest of the preview works normally.
+
+In Render, **Environment**, set:
+
+| Setting | What to enter |
+| ------- | ------------- |
+| `Integrations__HighLevel__ApiKey` | The Private Integration Token from GoHighLevel |
+| `Integrations__HighLevel__LocationId` | The GoHighLevel location id |
+
+Both are already listed in `render.yaml` as values Render will ask for but never store
+in the repository — the same treatment as the owner login in step 1. Save, then
+**Manual Deploy** → *Deploy latest commit* to pick them up.
+
+Check it took by opening `/admin/integrations` — GoHighLevel should show **connected**.
+
+The HTTP calls to GoHighLevel are written but were unverified against a real account at
+build time; see [`docs/gohighlevel-verification.md`](docs/gohighlevel-verification.md)
+before relying on the sync.
+
 ## What this preview is not
 
 It runs in **Development** mode. That is what makes a demonstration possible, and it is
