@@ -29,6 +29,13 @@
     // it always shows its plain number rather than a checkmark.
     steps.Add((WorkspaceSection.Library, $"{baseUrl}/library", $"Library ({Model.Unselected.Count})", false));
     steps.Add((WorkspaceSection.Submit, $"{baseUrl}/submit", "Submit", Model.AlreadySubmitted));
+
+    // Back/Next walk the same ordered list the stepper does, so a cover that does not
+    // exist yet is skipped by both exactly the same way rather than two separate ideas
+    // of what order the pages come in.
+    var currentIndex = steps.FindIndex(s => s.Section == Model.CurrentSection);
+    var previousStep = currentIndex > 0 ? steps[currentIndex - 1] : default;
+    var nextStep = currentIndex >= 0 && currentIndex < steps.Count - 1 ? steps[currentIndex + 1] : default;
 }
 
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
@@ -388,6 +395,10 @@
     </p>
 
     <div class="border-top pt-3 d-flex gap-2 flex-wrap align-items-center">
+        @if (previousStep.Url is not null)
+        {
+            <a class="btn btn-outline-secondary btn-lg" href="@previousStep.Url">&larr; Back</a>
+        }
         @* Sent without reloading, so the answer appears where the retoucher is standing
            rather than throwing them to the top of a fresh page. Falls back to an ordinary
            post with no script — the data attribute is all that changes. *@
@@ -413,6 +424,28 @@
     {
         <p class="form-text">Your changes are saved as you make them.</p>
     }
+}
+
+@if (Model.CurrentSection != WorkspaceSection.Submit)
+{
+    @* Submit has its own action row above, with Back already built into it — this is
+       for the other four pages, which otherwise have nothing but the stepper at the
+       top for moving on. *@
+    <div class="border-top pt-3 mt-4 d-flex justify-content-between gap-2 flex-wrap">
+        @if (previousStep.Url is not null)
+        {
+            <a class="btn btn-outline-secondary" href="@previousStep.Url">&larr; Back: @previousStep.Label</a>
+        }
+        else
+        {
+            <span></span>
+        }
+
+        @if (nextStep.Url is not null)
+        {
+            <a class="btn btn-primary" href="@nextStep.Url">Next: @nextStep.Label &rarr;</a>
+        }
+    </div>
 }
 
 @section Scripts {
