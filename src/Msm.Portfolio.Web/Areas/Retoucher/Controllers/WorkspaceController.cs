@@ -51,12 +51,12 @@ public class WorkspaceController(
     public IActionResult Library(Guid clientId) => RedirectToAction(nameof(Upload), new { clientId });
 
     /// <summary>
-    /// Named Review rather than Submit in C#, which the action below already is — the
+    /// Sending for review is no longer its own stop — it lives on Portfolio. Named
+    /// Review rather than Submit in C#, which the POST action below already is — the
     /// two share the one "submit" route, split by HTTP verb instead.
     /// </summary>
     [HttpGet("submit")]
-    public Task<IActionResult> Review(Guid clientId, CancellationToken cancellationToken = default) =>
-        RenderAsync(clientId, WorkspaceSection.Submit, cancellationToken);
+    public IActionResult Review(Guid clientId) => RedirectToAction(nameof(Portfolio), new { clientId });
 
     private async Task<IActionResult> RenderAsync(
         Guid clientId, WorkspaceSection section, CancellationToken cancellationToken)
@@ -374,7 +374,7 @@ public class WorkspaceController(
             }
 
             TempData["Error"] = error;
-            return RedirectToAction(nameof(Review), new { clientId });
+            return RedirectToAction(nameof(Portfolio), new { clientId });
         }
 
         if (wantsJson)

@@ -11,8 +11,9 @@
 
     // Each stop the retoucher can jump to, in order. Nothing here is ever locked —
     // the retoucher can open any of them in any order and the page saves as they go.
-    // The library lives inside the Upload stop rather than being a stop of its own:
-    // it is the uploaded photographs, so it belongs where they land.
+    // The library lives inside the Upload stop, and sending for review lives inside
+    // the Portfolio stop — neither is a destination of its own, just the natural next
+    // action once the photographs it works on are in front of you.
     var steps = new List<(WorkspaceSection Section, string Url, string Label)>
     {
         (WorkspaceSection.Upload, $"{baseUrl}/upload", "Upload")
@@ -24,7 +25,6 @@
     }
 
     steps.Add((WorkspaceSection.Portfolio, $"{baseUrl}/portfolio", $"Portfolio ({Model.Selected.Count})"));
-    steps.Add((WorkspaceSection.Submit, $"{baseUrl}/submit", "Submit"));
 
     // Back/Next walk the same ordered list the stepper does, so a cover that does not
     // exist yet is skipped by both exactly the same way rather than two separate ideas
@@ -431,43 +431,11 @@
             }
         </ol>
     }
-}
 
-@if (Model.CurrentSection == WorkspaceSection.Submit)
-{
-    <h2 class="h5">Submit</h2>
-
-    @if (Model.Selected.Count > 0)
-    {
-        @* A last look before sending, so the retoucher recognises what they chose rather
-           than having to recall it from the pages already left behind. Hidden from
-           screen readers: the text summary right below says the same thing in words. *@
-        <div class="submit-recap mb-3" aria-hidden="true">
-            @if (Model.Cover is { } coverAsset)
-            {
-                <figure class="submit-recap-cover">
-                    <img src="/media/@coverAsset.Id/thumbnail" alt="" />
-                    <figcaption>Main photo</figcaption>
-                </figure>
-            }
-            <div class="submit-recap-strip">
-                @foreach (var asset in Model.Selected.Take(10))
-                {
-                    <img src="/media/@asset.Id/thumbnail" alt="" />
-                }
-                @if (Model.Selected.Count > 10)
-                {
-                    <span class="submit-recap-more">+@(Model.Selected.Count - 10)</span>
-                }
-            </div>
-        </div>
-    }
-
-    <p class="text-muted">
-        @Model.Selected.Count photograph@(Model.Selected.Count == 1 ? "" : "s") on the portfolio,
-        @(Model.Cover is null ? "no main image chosen yet" : "a main image chosen").
-    </p>
-
+    @* Sending for review was its own stop; folded in here since it is the natural next
+       action once the portfolio in front of you looks right, not a separate
+       destination to click through to. No recap of the choice is needed — the grid
+       above already is one. *@
     <div class="border-top pt-3 d-flex gap-2 flex-wrap align-items-center">
         @* Sent without reloading, so the answer appears where the retoucher is standing
            rather than throwing them to the top of a fresh page. Falls back to an ordinary
