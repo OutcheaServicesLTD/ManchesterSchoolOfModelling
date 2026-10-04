@@ -116,14 +116,22 @@
     </div>
 }
 
+@{
+    // On the Upload page the library grid right below already says how many
+    // photographs are there — the portfolio count is a different page's news.
+    var showPortfolioCount = Model.CurrentSection != WorkspaceSection.Upload;
+}
 <div class="row g-3 mb-4">
-    <div class="col-sm-6">
-        <div class="card h-100"><div class="card-body">
-            <h2 class="h6 card-title">On the portfolio</h2>
-            <p class="h4 mb-0">@Model.Selected.Count <small class="text-muted">of @Model.PortfolioLimit</small></p>
-        </div></div>
-    </div>
-    <div class="col-sm-6">
+    @if (showPortfolioCount)
+    {
+        <div class="col-sm-6">
+            <div class="card h-100"><div class="card-body">
+                <h2 class="h6 card-title">On the portfolio</h2>
+                <p class="h4 mb-0">@Model.Selected.Count <small class="text-muted">of @Model.PortfolioLimit</small></p>
+            </div></div>
+        </div>
+    }
+    <div class="@(showPortfolioCount ? "col-sm-6" : "col-sm-6 col-md-4")">
         <div class="card h-100"><div class="card-body">
             <h2 class="h6 card-title">In the library</h2>
             <p class="h4 mb-0">@Model.Assets.Count <small class="text-muted">of @Model.PoolLimit</small></p>
