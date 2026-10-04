@@ -5,6 +5,7 @@
 @{
     ViewData["Title"] = Model.ClientName;
     var error = TempData["Error"] as string;
+    var saved = TempData["Saved"] as string;
     var token = Antiforgery.GetAndStoreTokens(Context).RequestToken;
     var baseUrl = $"/retoucher/client/{Model.ClientId}";
 
@@ -86,6 +87,11 @@
         <span class="stepper-arrow is-disabled" aria-hidden="true">Next &rarr;</span>
     }
 </div>
+
+@if (saved is not null)
+{
+    <div class="alert alert-success" role="alert">@saved</div>
+}
 
 @if (error is not null)
 {
@@ -275,27 +281,41 @@
                                 </form>
                             </div>
 
-                            @if (!asset.IsFeatured)
-                            {
-                                <form method="post" asp-action="Featured" asp-route-clientId="@Model.ClientId"
-                                      asp-route-assetId="@asset.Id" class="d-grid mb-1">
-                                    <button type="submit" class="btn btn-sm btn-outline-primary">Make main</button>
+                            @* One compact row of icon buttons instead of three stacked
+                               full-width text buttons — a grid of up to 30 of these
+                               otherwise meant a lot of button text to read past just to see
+                               the next photograph. Each icon is a standard, widely
+                               recognised one (star, eye, bin); the visible title tooltip and
+                               the screen-reader label still spell it out in full. *@
+                            <div class="btn-group btn-group-sm w-100" role="group"
+                                 aria-label="Actions for photograph @(i + 1)">
+                                @if (!asset.IsFeatured)
+                                {
+                                    <form method="post" asp-action="Featured" asp-route-clientId="@Model.ClientId"
+                                          asp-route-assetId="@asset.Id">
+                                        <button type="submit" class="btn btn-outline-primary" title="Make main photo">
+                                            <partial name="_Icon" model="@("star")" />
+                                            <span class="visually-hidden">Make main photo</span>
+                                        </button>
+                                    </form>
+                                }
+                                @* The archived original, exactly as it came off the camera. A
+                                   rendition is re-encoded, and re-encoding is precisely what
+                                   removes the detail a retoucher is judging. *@
+                                <a class="btn btn-outline-secondary" href="/media/@asset.Id/original"
+                                   target="_blank" rel="noopener" title="View full size">
+                                    <partial name="_Icon" model="@("eye")" />
+                                    <span class="visually-hidden">View full size</span>
+                                </a>
+                                <form method="post" asp-action="Select" asp-route-clientId="@Model.ClientId"
+                                      asp-route-assetId="@asset.Id">
+                                    <input type="hidden" name="selected" value="false" />
+                                    <button type="submit" class="btn btn-outline-secondary" title="Remove from portfolio">
+                                        <partial name="_Icon" model="@("trash")" />
+                                        <span class="visually-hidden">Remove from portfolio</span>
+                                    </button>
                                 </form>
-                            }
-
-                            @* The archived original, exactly as it came off the camera. A
-                               rendition is re-encoded, and re-encoding is precisely what
-                               removes the detail a retoucher is judging. *@
-                            <a class="btn btn-sm btn-outline-secondary w-100 mb-1"
-                               href="/media/@asset.Id/original" target="_blank" rel="noopener">
-                                View full size
-                            </a>
-
-                            <form method="post" asp-action="Select" asp-route-clientId="@Model.ClientId"
-                                  asp-route-assetId="@asset.Id" class="d-grid">
-                                <input type="hidden" name="selected" value="false" />
-                                <button type="submit" class="btn btn-sm btn-outline-secondary">Remove from portfolio</button>
-                            </form>
+                            </div>
                         </div>
                     </div>
                 </li>
@@ -374,17 +394,23 @@
                             <div class="card-body p-2">
                                 <p class="small text-muted mb-1">@asset.Orientation</p>
 
-                                @* Opens in its own tab so the tab this is in keeps whatever
-                                   has been ticked so far. *@
-                                <a class="btn btn-sm btn-outline-secondary w-100 mb-1"
-                                   href="/media/@asset.Id/original" target="_blank" rel="noopener">
-                                    View full size
-                                </a>
+                                <div class="btn-group btn-group-sm w-100" role="group" aria-label="Actions">
+                                    @* Opens in its own tab so the tab this is in keeps whatever
+                                       has been ticked so far. *@
+                                    <a class="btn btn-outline-secondary" href="/media/@asset.Id/original"
+                                       target="_blank" rel="noopener" title="View full size">
+                                        <partial name="_Icon" model="@("eye")" />
+                                        <span class="visually-hidden">View full size</span>
+                                    </a>
 
-                                @* Deliberately not in the picker form: removal is destructive
-                                   and should never ride along with a bulk add. *@
-                                <button type="submit" class="btn btn-sm btn-outline-danger w-100"
-                                        form="remove-@asset.Id">Remove</button>
+                                    @* Deliberately not in the picker form: removal is destructive
+                                       and should never ride along with a bulk add. *@
+                                    <button type="submit" class="btn btn-outline-danger" form="remove-@asset.Id"
+                                            title="Remove this photograph">
+                                        <partial name="_Icon" model="@("trash")" />
+                                        <span class="visually-hidden">Remove this photograph</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </div>

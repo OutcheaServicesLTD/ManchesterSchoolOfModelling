@@ -1325,6 +1325,17 @@ img.wordmark-paper { display: none; }
     height: 15px;
 }
 
+/* An icon standing in for a button's label, with the label itself kept for a screen
+   reader (visually-hidden) and for a mouse as the title tooltip. Used on the
+   photograph tiles in the retoucher workspace — up to 30 or 60 of them on a page, so
+   three buttons' worth of text per tile added up fast; three widely recognised icons
+   (star, eye, bin) read in a glance instead. */
+.btn-icon {
+    width: 16px;
+    height: 16px;
+    vertical-align: -3px;
+}
+
 /* Only one of the two icons is ever shown, so the control always depicts the theme
    it switches to rather than the one already in use. */
 .theme-toggle .icon-dark { display: none; }
