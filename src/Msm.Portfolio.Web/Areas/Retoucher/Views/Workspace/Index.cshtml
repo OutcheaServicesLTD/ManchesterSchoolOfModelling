@@ -1,32 +1,34 @@
 @model Msm.Portfolio.Web.ViewModels.RetoucherWorkspaceViewModel
 @using Msm.Portfolio.Web.Domain.Enums
+@using Msm.Portfolio.Web.ViewModels
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
     ViewData["Title"] = Model.ClientName;
     var error = TempData["Error"] as string;
     var token = Antiforgery.GetAndStoreTokens(Context).RequestToken;
-    var cover = Model.Selected.FirstOrDefault(a => a.IsFeatured);
+    var baseUrl = $"/retoucher/client/{Model.ClientId}";
 
     // Each stop the retoucher can jump to, in order, and whether it already has
     // something in it. Nothing here is ever locked — the retoucher can open any of
-    // them in any order and the page saves as they go — so "done" only draws the
-    // checkmark and fills the line before it; it never gates a later stop the way a
-    // sign-up wizard's steps would.
-    var steps = new List<(string Id, string Label, bool Done)>
+    // them in any order, the URL goes with it, and the page saves as they go — so
+    // "done" only draws the checkmark and fills the line before it; it never gates a
+    // later stop the way a sign-up wizard's steps would.
+    var steps = new List<(WorkspaceSection Section, string Url, string Label, bool Done)>
     {
-        ("upload", "Upload", Model.Assets.Count > 0)
+        (WorkspaceSection.Upload, $"{baseUrl}/upload", "Upload", Model.Assets.Count > 0)
     };
 
-    if (cover is not null)
+    if (Model.Cover is not null)
     {
-        steps.Add(("cover", "Cover photo", true));
+        steps.Add((WorkspaceSection.Cover, $"{baseUrl}/cover", "Cover photo", true));
     }
 
-    steps.Add(("portfolio", $"Portfolio ({Model.Selected.Count})", Model.Selected.Count > 0));
+    steps.Add((WorkspaceSection.Portfolio, $"{baseUrl}/portfolio",
+        $"Portfolio ({Model.Selected.Count})", Model.Selected.Count > 0));
     // The library has no "done" state of its own — it is reviewed, not completed — so
     // it always shows its plain number rather than a checkmark.
-    steps.Add(("library", $"Library ({Model.Unselected.Count})", false));
-    steps.Add(("submit", "Submit", Model.AlreadySubmitted));
+    steps.Add((WorkspaceSection.Library, $"{baseUrl}/library", $"Library ({Model.Unselected.Count})", false));
+    steps.Add((WorkspaceSection.Submit, $"{baseUrl}/submit", "Submit", Model.AlreadySubmitted));
 }
 
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
@@ -37,16 +39,18 @@
     <a class="btn btn-outline-secondary" href="/retoucher">Back to queue</a>
 </div>
 
-@* A long page — up to 60 library photographs plus 30 on the portfolio — so jumping
-   straight to a section beats scrolling past all of them to find it. Sticks under the
-   portal header on the way down, the same way the header itself stays put; no
-   scroll-spy highlighting a current section, which would need script this does not
-   otherwise need — only whether a stop already has something in it. *@
-<nav class="stepper" aria-label="Jump to a section">
+@* Five separate pages rather than sections of one long scroll — up to 60 library
+   photographs plus 30 on the portfolio made that scroll too long to work through
+   blind. Sticks under the portal header on the way down, the same way the header
+   itself stays put. The current page is known from the request itself, with no
+   script needed to track it the way scroll-spying a single page would. *@
+<nav class="stepper" aria-label="Go to a page">
     @for (var i = 0; i < steps.Count; i++)
     {
         var step = steps[i];
-        <a href="#@step.Id" class="stepper-step @(step.Done ? "is-done" : "")">
+        var isCurrent = step.Section == Model.CurrentSection;
+        <a href="@step.Url" class="stepper-step @(step.Done ? "is-done" : "") @(isCurrent ? "is-current" : "")"
+           aria-current="@(isCurrent ? "page" : null)">
             <span class="stepper-circle" aria-hidden="true">
                 @if (step.Done)
                 {
@@ -104,286 +108,307 @@
     </div>
 </div>
 
-<div id="upload" class="card mb-4">
-    <div class="card-body">
-        <h2 class="h5 card-title">Upload photographs</h2>
-
-        @* The uploader is rendered even when the library is full, rather than being
-           replaced by a line of text. A page with nothing listening is a page where
-           dropping photographs does nothing at all and gives no reason — the retoucher
-           is left to work out for themselves that the limit is why. Rendered, every
-           dropped file gets a row saying the library is full. *@
-        <div id="uploader"
-             data-upload-url="/retoucher/client/@Model.ClientId/upload"
-             data-token="@token"
-             data-max-bytes="@Model.MaxImageBytes"
-             data-accept="@Model.AcceptAttribute"
-             data-remaining="@(Model.PoolLimit - Model.Assets.Count)">
-
-            <div id="drop-zone" class="border border-2 border-dashed rounded p-4 text-center mb-3">
-                @if (Model.PoolIsFull)
-                {
-                    <p class="mb-2"><strong>The library is full at @Model.PoolLimit photographs.</strong></p>
-                    <p class="form-text mb-0">
-                        Remove some from the library below before uploading any more.
-                    </p>
-                }
-                else
-                {
-                    <p class="mb-2">Drop photographs anywhere on this page</p>
-                    <label for="file-input" class="btn btn-primary mb-0">Choose files</label>
-                    @* Also a plain file input, so the workspace still works without drag and drop. *@
-                    <input id="file-input" type="file" class="visually-hidden"
-                           multiple accept="@Model.AcceptAttribute" />
-                    <p class="form-text mb-0">
-                        Up to @Model.MaxImageMegabytes MB each. Portrait and landscape both supported.
-                    </p>
-                }
-            </div>
-
-            @* One bar for the whole batch rather than a row per photograph. Sixty rows
-               each saying Waiting, then Uploading, then Uploaded was sixty things to read
-               to learn one thing: how much is left. Hidden until there is a batch to show. *@
-            <div id="upload-progress" class="upload-progress d-none">
-                <div class="d-flex justify-content-between align-items-baseline mb-1">
-                    <span id="upload-progress-label">Uploading</span>
-                    <span id="upload-progress-count" class="text-muted small"></span>
-                </div>
-                <div class="progress" role="progressbar" aria-label="Upload progress"
-                     aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-                    <div id="upload-progress-bar" class="progress-bar"></div>
-                </div>
-            </div>
-
-            <p id="upload-summary" class="visually-hidden" aria-live="polite"></p>
-
-            @* Only photographs that need attention appear here: a rejected format, a file
-               too large, or one the server refused. A successful upload has nothing to
-               show and nothing to say — the bar above already said it. *@
-            <ul id="upload-list" class="list-group mt-2"></ul>
-
-            @* Only offered when a file failed: a clean batch reloads on its own.
-               Reloading with failures showing would discard their Retry buttons. *@
-            <div id="refresh-after-upload" class="mt-3 d-none">
-                <a class="btn btn-outline-primary" href="/retoucher/client/@Model.ClientId">
-                    Refresh to see the uploaded photographs
-                </a>
-            </div>
-        </div>
-    </div>
-</div>
-
-@if (cover is not null)
+@if (Model.CurrentSection == WorkspaceSection.Upload)
 {
-    @* Only ever the main image: it is the only photograph the site crops. *@
-    <div id="cover">
-        <partial name="_CoverFocus" model="@(new Msm.Portfolio.Web.ViewModels.CoverFocusViewModel
-        {
-            AssetId = cover.Id,
-            Filename = cover.Filename,
-            PostUrl = $"/retoucher/client/{Model.ClientId}/focal/{cover.Id}",
-            X = cover.FocalPointX,
-            Y = cover.FocalPointY
-        })" />
-    </div>
-}
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">Upload photographs</h2>
 
-<h2 id="portfolio" class="h5">Portfolio (@Model.Selected.Count)</h2>
-@if (Model.Selected.Count == 0)
-{
-    <p class="text-muted">No photographs chosen yet.</p>
-}
-else
-{
-    @* Dragging is an addition, not a replacement: the arrows below stay, because
-       specification section 41 requires the order to be changeable from a keyboard and
-       a drag-only control cannot be. The new order posts to Reorder. *@
-    @* The reorder form is deliberately outside the list: each tile already contains
-       forms for the arrows, "Make main" and removal, and HTML forbids nesting one form
-       inside another — the browser would silently drop the inner ones. Script fills this
-       in with the new order and submits it. *@
-    <form method="post" asp-action="Reorder" asp-route-clientId="@Model.ClientId"
-          id="reorder-form" class="d-none"></form>
+            @* The uploader is rendered even when the library is full, rather than being
+               replaced by a line of text. A page with nothing listening is a page where
+               dropping photographs does nothing at all and gives no reason — the retoucher
+               is left to work out for themselves that the limit is why. Rendered, every
+               dropped file gets a row saying the library is full. *@
+            <div id="uploader"
+                 data-upload-url="@baseUrl/upload"
+                 data-token="@token"
+                 data-max-bytes="@Model.MaxImageBytes"
+                 data-accept="@Model.AcceptAttribute"
+                 data-remaining="@(Model.PoolLimit - Model.Assets.Count)">
 
-    <p class="eyebrow mb-2" data-reorder-hint>Drag a photograph to change its place</p>
-
-    <ol class="row row-cols-2 row-cols-md-4 g-3 list-unstyled mb-4" data-reorder-list>
-        @for (var i = 0; i < Model.Selected.Count; i++)
-        {
-            var asset = Model.Selected[i];
-            <li class="col" data-reorder-item data-asset-id="@asset.Id">
-                <div class="card h-100 @(asset.IsFeatured ? "border-primary" : "")">
-                    <img src="/media/@asset.Id/thumbnail" class="card-img-top drag-handle" loading="lazy"
-                         draggable="true"
-                         style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
-                         alt="@asset.Filename" />
-                    <div class="card-body p-2">
-                        <p class="small text-muted mb-1">
-                            @(i + 1). @asset.Orientation
-                            @if (asset.IsFeatured)
-                            {
-                                <span class="badge text-bg-primary">Main</span>
-                            }
+                <div id="drop-zone" class="border border-2 border-dashed rounded p-4 text-center mb-3">
+                    @if (Model.PoolIsFull)
+                    {
+                        <p class="mb-2"><strong>The library is full at @Model.PoolLimit photographs.</strong></p>
+                        <p class="form-text mb-0">
+                            Remove some from the library below before uploading any more.
                         </p>
+                    }
+                    else
+                    {
+                        <p class="mb-2">Drop photographs anywhere on this page</p>
+                        <label for="file-input" class="btn btn-primary mb-0">Choose files</label>
+                        @* Also a plain file input, so the workspace still works without drag and drop. *@
+                        <input id="file-input" type="file" class="visually-hidden"
+                               multiple accept="@Model.AcceptAttribute" />
+                        <p class="form-text mb-0">
+                            Up to @Model.MaxImageMegabytes MB each. Portrait and landscape both supported.
+                        </p>
+                    }
+                </div>
 
-                        <div class="btn-group btn-group-sm w-100 mb-1" role="group" aria-label="Reorder">
-                            <form method="post" asp-action="Move" asp-route-clientId="@Model.ClientId"
-                                  asp-route-assetId="@asset.Id" class="d-grid">
-                                <input type="hidden" name="direction" value="-1" />
-                                <button type="submit" class="btn btn-outline-secondary"
-                                        aria-label="Move @asset.Filename earlier" @(i == 0 ? "disabled" : "")>&larr;</button>
-                            </form>
-                            <form method="post" asp-action="Move" asp-route-clientId="@Model.ClientId"
-                                  asp-route-assetId="@asset.Id" class="d-grid">
-                                <input type="hidden" name="direction" value="1" />
-                                <button type="submit" class="btn btn-outline-secondary"
-                                        aria-label="Move @asset.Filename later"
-                                        @(i == Model.Selected.Count - 1 ? "disabled" : "")>&rarr;</button>
-                            </form>
-                        </div>
-
-                        @if (!asset.IsFeatured)
-                        {
-                            <form method="post" asp-action="Featured" asp-route-clientId="@Model.ClientId"
-                                  asp-route-assetId="@asset.Id" class="d-grid mb-1">
-                                <button type="submit" class="btn btn-sm btn-outline-primary">Make main</button>
-                            </form>
-                        }
-
-                        @* The archived original, exactly as it came off the camera. A
-                           rendition is re-encoded, and re-encoding is precisely what
-                           removes the detail a retoucher is judging. *@
-                        <a class="btn btn-sm btn-outline-secondary w-100 mb-1"
-                           href="/media/@asset.Id/original" target="_blank" rel="noopener">
-                            View full size
-                        </a>
-
-                        <form method="post" asp-action="Select" asp-route-clientId="@Model.ClientId"
-                              asp-route-assetId="@asset.Id" class="d-grid">
-                            <input type="hidden" name="selected" value="false" />
-                            <button type="submit" class="btn btn-sm btn-outline-secondary">Remove from portfolio</button>
-                        </form>
+                @* One bar for the whole batch rather than a row per photograph. Sixty rows
+                   each saying Waiting, then Uploading, then Uploaded was sixty things to read
+                   to learn one thing: how much is left. Hidden until there is a batch to show. *@
+                <div id="upload-progress" class="upload-progress d-none">
+                    <div class="d-flex justify-content-between align-items-baseline mb-1">
+                        <span id="upload-progress-label">Uploading</span>
+                        <span id="upload-progress-count" class="text-muted small"></span>
+                    </div>
+                    <div class="progress" role="progressbar" aria-label="Upload progress"
+                         aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                        <div id="upload-progress-bar" class="progress-bar"></div>
                     </div>
                 </div>
-            </li>
-        }
-    </ol>
-}
 
-<h2 id="library" class="h5">Library (@Model.Unselected.Count not on the portfolio)</h2>
-@if (Model.Unselected.Count == 0)
-{
-    <p class="text-muted">Every photograph is on the portfolio.</p>
-}
-else
-{
-    @* Tick the ones wanted and add them together. Choosing a shoot's worth one button
-       at a time was the slowest part of the job. *@
-    <form method="post" asp-action="SelectMany" asp-route-clientId="@Model.ClientId" id="picker">
-        <div class="picker-bar">
-            <div class="form-check mb-0">
-                <input class="form-check-input" type="checkbox" id="pick-all" data-pick-all />
-                <label class="form-check-label" for="pick-all">Select all</label>
+                <p id="upload-summary" class="visually-hidden" aria-live="polite"></p>
+
+                @* Only photographs that need attention appear here: a rejected format, a file
+                   too large, or one the server refused. A successful upload has nothing to
+                   show and nothing to say — the bar above already said it. *@
+                <ul id="upload-list" class="list-group mt-2"></ul>
+
+                @* Only offered when a file failed: a clean batch reloads on its own.
+                   Reloading with failures showing would discard their Retry buttons. New
+                   uploads land in the library unselected, which is where to go look. *@
+                <div id="refresh-after-upload" class="mt-3 d-none">
+                    <a class="btn btn-outline-primary" href="@baseUrl/library">
+                        Go to the library to see the uploaded photographs
+                    </a>
+                </div>
             </div>
-
-            @* Ticks a suggested set rather than adding it. Nothing is saved until the
-               retoucher looks at the choice and presses the button themselves. *@
-            @* Hidden until script reveals it: without script it could not do anything,
-               and an inert button is worse than no button. The picker itself works
-               either way. *@
-            <button type="button" class="btn btn-outline-secondary d-none" data-pick-suggest
-                    @(Model.PortfolioIsFull ? "disabled" : "")>
-                Suggest a selection
-            </button>
-
-            <span class="eyebrow" data-pick-count aria-live="polite">None chosen</span>
-
-            <button type="submit" class="btn btn-primary" data-pick-submit disabled
-                    @(Model.PortfolioIsFull ? "disabled" : "")>
-                Add to portfolio
-            </button>
         </div>
+    </div>
+}
 
-        <p class="form-text mt-2">
-            <strong>Suggest a selection</strong> ticks the best
-            @(Model.PortfolioLimit - Model.Selected.Count) photographs to fill the
-            portfolio — sharpest first, well exposed, with nothing lost to pure black or
-            pure white. It judges the picture, never the person in it, so look through the
-            choice and untick whatever you do not want. Press the button again to clear
-            everything and start over.
+@if (Model.CurrentSection == WorkspaceSection.Cover && Model.Cover is { } cover)
+{
+    @* Only ever the main image: it is the only photograph the site crops. *@
+    <partial name="_CoverFocus" model="@(new CoverFocusViewModel
+    {
+        AssetId = cover.Id,
+        Filename = cover.Filename,
+        PostUrl = $"{baseUrl}/focal/{cover.Id}",
+        X = cover.FocalPointX,
+        Y = cover.FocalPointY
+    })" />
+}
+
+@if (Model.CurrentSection == WorkspaceSection.Portfolio)
+{
+    <h2 class="h5">Portfolio (@Model.Selected.Count)</h2>
+    @if (Model.Selected.Count == 0)
+    {
+        <p class="text-muted">
+            No photographs chosen yet. Add some from the
+            <a href="@baseUrl/library">library</a>.
         </p>
+    }
+    else
+    {
+        @* Dragging is an addition, not a replacement: the arrows below stay, because
+           specification section 41 requires the order to be changeable from a keyboard and
+           a drag-only control cannot be. The new order posts to Reorder. *@
+        @* The reorder form is deliberately outside the list: each tile already contains
+           forms for the arrows, "Make main" and removal, and HTML forbids nesting one form
+           inside another — the browser would silently drop the inner ones. Script fills this
+           in with the new order and submits it. *@
+        <form method="post" asp-action="Reorder" asp-route-clientId="@Model.ClientId"
+              id="reorder-form" class="d-none"></form>
 
-        <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
-            @foreach (var asset in Model.Unselected)
+        <p class="eyebrow mb-2" data-reorder-hint>Drag a photograph to change its place</p>
+
+        <ol class="row row-cols-2 row-cols-md-4 g-3 list-unstyled mb-4" data-reorder-list>
+            @for (var i = 0; i < Model.Selected.Count; i++)
             {
-                <div class="col">
-                    <div class="card h-100">
-                        @* The whole tile is the label, so clicking anywhere on the
-                           photograph ticks it rather than only the small box. *@
-                        <label class="pick-tile">
-                            <input class="form-check-input pick" type="checkbox"
-                                   name="assetIds" value="@asset.Id" data-pick
-                                   @(asset.IsSuggested ? "data-pick-suggested" : "")
-                                   @(Model.PortfolioIsFull ? "disabled" : "") />
-                            <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
-                                 style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
-                                 alt="@asset.Filename" />
-                        </label>
-
+                var asset = Model.Selected[i];
+                <li class="col" data-reorder-item data-asset-id="@asset.Id">
+                    <div class="card h-100 @(asset.IsFeatured ? "border-primary" : "")">
+                        <img src="/media/@asset.Id/thumbnail" class="card-img-top drag-handle" loading="lazy"
+                             draggable="true"
+                             style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
+                             alt="@asset.Filename" />
                         <div class="card-body p-2">
-                            <p class="small text-muted mb-1">@asset.Orientation</p>
+                            <p class="small text-muted mb-1">
+                                @(i + 1). @asset.Orientation
+                                @if (asset.IsFeatured)
+                                {
+                                    <span class="badge text-bg-primary">Main</span>
+                                }
+                            </p>
 
-                            @* Opens in its own tab so the tab this is in keeps whatever
-                               has been ticked so far. *@
+                            <div class="btn-group btn-group-sm w-100 mb-1" role="group" aria-label="Reorder">
+                                <form method="post" asp-action="Move" asp-route-clientId="@Model.ClientId"
+                                      asp-route-assetId="@asset.Id" class="d-grid">
+                                    <input type="hidden" name="direction" value="-1" />
+                                    <button type="submit" class="btn btn-outline-secondary"
+                                            aria-label="Move @asset.Filename earlier" @(i == 0 ? "disabled" : "")>&larr;</button>
+                                </form>
+                                <form method="post" asp-action="Move" asp-route-clientId="@Model.ClientId"
+                                      asp-route-assetId="@asset.Id" class="d-grid">
+                                    <input type="hidden" name="direction" value="1" />
+                                    <button type="submit" class="btn btn-outline-secondary"
+                                            aria-label="Move @asset.Filename later"
+                                            @(i == Model.Selected.Count - 1 ? "disabled" : "")>&rarr;</button>
+                                </form>
+                            </div>
+
+                            @if (!asset.IsFeatured)
+                            {
+                                <form method="post" asp-action="Featured" asp-route-clientId="@Model.ClientId"
+                                      asp-route-assetId="@asset.Id" class="d-grid mb-1">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">Make main</button>
+                                </form>
+                            }
+
+                            @* The archived original, exactly as it came off the camera. A
+                               rendition is re-encoded, and re-encoding is precisely what
+                               removes the detail a retoucher is judging. *@
                             <a class="btn btn-sm btn-outline-secondary w-100 mb-1"
                                href="/media/@asset.Id/original" target="_blank" rel="noopener">
                                 View full size
                             </a>
 
-                            @* Deliberately not in the picker form: removal is destructive
-                               and should never ride along with a bulk add. *@
-                            <button type="submit" class="btn btn-sm btn-outline-danger w-100"
-                                    form="remove-@asset.Id">Remove</button>
+                            <form method="post" asp-action="Select" asp-route-clientId="@Model.ClientId"
+                                  asp-route-assetId="@asset.Id" class="d-grid">
+                                <input type="hidden" name="selected" value="false" />
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">Remove from portfolio</button>
+                            </form>
                         </div>
                     </div>
-                </div>
+                </li>
             }
-        </div>
-    </form>
-
-    @foreach (var asset in Model.Unselected)
-    {
-        <form method="post" asp-action="Remove" asp-route-clientId="@Model.ClientId"
-              asp-route-assetId="@asset.Id" id="remove-@asset.Id" class="d-none"
-              data-confirm="Remove this photograph?"></form>
+        </ol>
     }
 }
 
-<div id="submit" class="border-top pt-3 d-flex gap-2 flex-wrap align-items-center">
-    @* Sent without reloading, so the answer appears where the retoucher is standing
-       rather than throwing them to the top of a fresh page. Falls back to an ordinary
-       post with no script — the data attribute is all that changes. *@
-    <form method="post" asp-action="Submit" asp-route-clientId="@Model.ClientId"
-          data-submit-review>
-        <button type="submit" class="btn btn-primary btn-lg" @(Model.CanSubmit ? "" : "disabled")>
-            Send for review
-        </button>
-    </form>
-    <a class="btn btn-outline-secondary btn-lg" href="/retoucher">Save and close</a>
-    <span class="form-text mb-0" data-submit-status role="status" aria-live="polite"></span>
-</div>
+@if (Model.CurrentSection == WorkspaceSection.Library)
+{
+    <h2 class="h5">Library (@Model.Unselected.Count not on the portfolio)</h2>
+    @if (Model.Unselected.Count == 0)
+    {
+        <p class="text-muted">Every photograph is on the portfolio.</p>
+    }
+    else
+    {
+        @* Tick the ones wanted and add them together. Choosing a shoot's worth one button
+           at a time was the slowest part of the job. *@
+        <form method="post" asp-action="SelectMany" asp-route-clientId="@Model.ClientId" id="picker">
+            <div class="picker-bar">
+                <div class="form-check mb-0">
+                    <input class="form-check-input" type="checkbox" id="pick-all" data-pick-all />
+                    <label class="form-check-label" for="pick-all">Select all</label>
+                </div>
 
-@if (!Model.CanSubmit)
-{
-    <p class="form-text">
-        @(Model.Selected.Count == 0
-            ? "Choose at least one photograph before sending for review."
-            : "Choose a main image before sending for review.")
-    </p>
+                @* Ticks a suggested set rather than adding it. Nothing is saved until the
+                   retoucher looks at the choice and presses the button themselves. *@
+                @* Hidden until script reveals it: without script it could not do anything,
+                   and an inert button is worse than no button. The picker itself works
+                   either way. *@
+                <button type="button" class="btn btn-outline-secondary d-none" data-pick-suggest
+                        @(Model.PortfolioIsFull ? "disabled" : "")>
+                    Suggest a selection
+                </button>
+
+                <span class="eyebrow" data-pick-count aria-live="polite">None chosen</span>
+
+                <button type="submit" class="btn btn-primary" data-pick-submit disabled
+                        @(Model.PortfolioIsFull ? "disabled" : "")>
+                    Add to portfolio
+                </button>
+            </div>
+
+            <p class="form-text mt-2">
+                <strong>Suggest a selection</strong> ticks the best
+                @(Model.PortfolioLimit - Model.Selected.Count) photographs to fill the
+                portfolio — sharpest first, well exposed, with nothing lost to pure black or
+                pure white. It judges the picture, never the person in it, so look through the
+                choice and untick whatever you do not want. Press the button again to clear
+                everything and start over.
+            </p>
+
+            <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
+                @foreach (var asset in Model.Unselected)
+                {
+                    <div class="col">
+                        <div class="card h-100">
+                            @* The whole tile is the label, so clicking anywhere on the
+                               photograph ticks it rather than only the small box. *@
+                            <label class="pick-tile">
+                                <input class="form-check-input pick" type="checkbox"
+                                       name="assetIds" value="@asset.Id" data-pick
+                                       @(asset.IsSuggested ? "data-pick-suggested" : "")
+                                       @(Model.PortfolioIsFull ? "disabled" : "") />
+                                <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
+                                     style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
+                                     alt="@asset.Filename" />
+                            </label>
+
+                            <div class="card-body p-2">
+                                <p class="small text-muted mb-1">@asset.Orientation</p>
+
+                                @* Opens in its own tab so the tab this is in keeps whatever
+                                   has been ticked so far. *@
+                                <a class="btn btn-sm btn-outline-secondary w-100 mb-1"
+                                   href="/media/@asset.Id/original" target="_blank" rel="noopener">
+                                    View full size
+                                </a>
+
+                                @* Deliberately not in the picker form: removal is destructive
+                                   and should never ride along with a bulk add. *@
+                                <button type="submit" class="btn btn-sm btn-outline-danger w-100"
+                                        form="remove-@asset.Id">Remove</button>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </form>
+
+        @foreach (var asset in Model.Unselected)
+        {
+            <form method="post" asp-action="Remove" asp-route-clientId="@Model.ClientId"
+                  asp-route-assetId="@asset.Id" id="remove-@asset.Id" class="d-none"
+                  data-confirm="Remove this photograph?"></form>
+        }
+    }
 }
-else
+
+@if (Model.CurrentSection == WorkspaceSection.Submit)
 {
-    <p class="form-text">Your changes are saved as you make them.</p>
+    <h2 class="h5">Submit</h2>
+
+    <p class="text-muted">
+        @Model.Selected.Count photograph@(Model.Selected.Count == 1 ? "" : "s") on the portfolio,
+        @(Model.Cover is null ? "no main image chosen yet" : "a main image chosen").
+    </p>
+
+    <div class="border-top pt-3 d-flex gap-2 flex-wrap align-items-center">
+        @* Sent without reloading, so the answer appears where the retoucher is standing
+           rather than throwing them to the top of a fresh page. Falls back to an ordinary
+           post with no script — the data attribute is all that changes. *@
+        <form method="post" asp-action="Submit" asp-route-clientId="@Model.ClientId"
+              data-submit-review>
+            <button type="submit" class="btn btn-primary btn-lg" @(Model.CanSubmit ? "" : "disabled")>
+                Send for review
+            </button>
+        </form>
+        <a class="btn btn-outline-secondary btn-lg" href="/retoucher">Save and close</a>
+        <span class="form-text mb-0" data-submit-status role="status" aria-live="polite"></span>
+    </div>
+
+    @if (!Model.CanSubmit)
+    {
+        <p class="form-text">
+            @(Model.Selected.Count == 0
+                ? "Choose at least one photograph before sending for review."
+                : "Choose a main image before sending for review.")
+        </p>
+    }
+    else
+    {
+        <p class="form-text">Your changes are saved as you make them.</p>
+    }
 }
 
 @section Scripts {

@@ -2133,15 +2133,16 @@ body.viewer-open {
     flex-wrap: wrap;
 }
 
-/* A numbered jump nav for a page too long to scroll blind through — the retoucher
-   workspace, up to 30 portfolio photographs and 60 in the library below them. Sticks
-   directly under the portal header, 76px being that header's own min-height, so the
-   two sit flush with no gap and no overlap. One below the header's z-index of 50: the
-   header must still win if either were ever tall enough to touch.
+/* A numbered nav between the retoucher workspace's five pages — Upload, Cover photo,
+   Portfolio, Library and Submit — in place of one long scroll through up to 30
+   portfolio photographs and 60 in the library. Sticks directly under the portal
+   header, 76px being that header's own min-height, so the two sit flush with no gap
+   and no overlap. One below the header's z-index of 50: the header must still win if
+   either were ever tall enough to touch.
 
    Nothing here is ever locked the way a sign-up wizard's steps would be — the
-   retoucher can open any stop in any order, and the page saves as they go. "Done"
-   only fills the circle and the line leading to it; it never disables a later one. */
+   retoucher can open any page in any order, and each one saves as they go. "Done"
+   only fills the circle and the line leading to it; it never disables a later page. */
 .stepper {
     position: sticky;
     top: 76px;
@@ -2201,6 +2202,19 @@ body.viewer-open {
 
 .stepper-step.is-done .stepper-label {
     color: var(--fg);
+}
+
+/* The page actually open right now — independent of is-done, since a page can be the
+   current one without having anything in it yet (Library, say, with nothing picked).
+   A ring around the circle rather than a colour change, so it reads whether or not
+   is-done has already filled the circle solid. */
+.stepper-step.is-current .stepper-circle {
+    box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--fg);
+}
+
+.stepper-step.is-current .stepper-label {
+    color: var(--fg);
+    font-weight: 700;
 }
 
 /* Drawn with the same tick used for a checked checkbox, in the page background colour

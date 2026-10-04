@@ -31,9 +31,25 @@ public class RetoucherQueueViewModel
     };
 }
 
+/// <summary>
+/// The workspace's five stops, each its own page and URL rather than sections of one
+/// long scroll — up to 30 portfolio photographs and 60 in the library made that scroll
+/// too long to work through blind.
+/// </summary>
+public enum WorkspaceSection
+{
+    Upload,
+    Cover,
+    Portfolio,
+    Library,
+    Submit
+}
+
 /// <summary>The workspace for one client (specification section 6).</summary>
 public class RetoucherWorkspaceViewModel
 {
+    /// <summary>Which of the five pages this request rendered.</summary>
+    public WorkspaceSection CurrentSection { get; set; }
     public Guid ClientId { get; set; }
 
     public string ClientName { get; set; } = string.Empty;
@@ -61,6 +77,13 @@ public class RetoucherWorkspaceViewModel
     public List<MediaAssetViewModel> Selected => [.. Assets.Where(a => a.IsSelected)];
 
     public List<MediaAssetViewModel> Unselected => [.. Assets.Where(a => !a.IsSelected)];
+
+    /// <summary>
+    /// The one photograph cropped for the top of the portfolio and the Model Board
+    /// card, chosen with "Make main" on the Portfolio page. Null until then — the
+    /// Cover page has nothing to show before that choice is made.
+    /// </summary>
+    public MediaAssetViewModel? Cover => Selected.FirstOrDefault(a => a.IsFeatured);
 
     public bool PoolIsFull => Assets.Count >= PoolLimit;
 

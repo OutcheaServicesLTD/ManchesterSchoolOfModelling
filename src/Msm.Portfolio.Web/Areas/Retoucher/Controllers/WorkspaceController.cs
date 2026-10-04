@@ -30,8 +30,36 @@ public class WorkspaceController(
     UserManager<ApplicationUser> userManager,
     IOptions<MediaOptions> mediaOptions) : Controller
 {
+    /// <summary>Opening a client with no page named goes to the first stop.</summary>
     [HttpGet("")]
-    public async Task<IActionResult> Index(Guid clientId, CancellationToken cancellationToken = default)
+    public IActionResult Index(Guid clientId) => RedirectToAction(nameof(Upload), new { clientId });
+
+    [HttpGet("upload")]
+    public Task<IActionResult> Upload(Guid clientId, CancellationToken cancellationToken = default) =>
+        RenderAsync(clientId, WorkspaceSection.Upload, cancellationToken);
+
+    [HttpGet("cover")]
+    public Task<IActionResult> Cover(Guid clientId, CancellationToken cancellationToken = default) =>
+        RenderAsync(clientId, WorkspaceSection.Cover, cancellationToken);
+
+    [HttpGet("portfolio")]
+    public Task<IActionResult> Portfolio(Guid clientId, CancellationToken cancellationToken = default) =>
+        RenderAsync(clientId, WorkspaceSection.Portfolio, cancellationToken);
+
+    [HttpGet("library")]
+    public Task<IActionResult> Library(Guid clientId, CancellationToken cancellationToken = default) =>
+        RenderAsync(clientId, WorkspaceSection.Library, cancellationToken);
+
+    /// <summary>
+    /// Named Review rather than Submit in C#, which the action below already is — the
+    /// two share the one "submit" route, split by HTTP verb instead.
+    /// </summary>
+    [HttpGet("submit")]
+    public Task<IActionResult> Review(Guid clientId, CancellationToken cancellationToken = default) =>
+        RenderAsync(clientId, WorkspaceSection.Submit, cancellationToken);
+
+    private async Task<IActionResult> RenderAsync(
+        Guid clientId, WorkspaceSection section, CancellationToken cancellationToken)
     {
         if (!await IsAllowedAsync(clientId, cancellationToken))
         {
@@ -40,7 +68,21 @@ public class WorkspaceController(
 
         var model = await BuildAsync(clientId, cancellationToken);
 
-        return model is null ? NotFound() : View(model);
+        if (model is null)
+        {
+            return NotFound();
+        }
+
+        model.CurrentSection = section;
+
+        // Choosing a cover happens on the Portfolio page's "Make main" button, not
+        // here — before that, this page has nothing to show.
+        if (section == WorkspaceSection.Cover && model.Cover is null)
+        {
+            return RedirectToAction(nameof(Portfolio), new { clientId });
+        }
+
+        return View("Index", model);
     }
 
     /// <summary>
@@ -100,7 +142,7 @@ public class WorkspaceController(
             TempData["Error"] = error;
         }
 
-        return RedirectToAction(nameof(Index), new { clientId });
+        return RedirectToAction(nameof(Portfolio), new { clientId });
     }
 
     /// <summary>
@@ -135,7 +177,7 @@ public class WorkspaceController(
                 : $"{added} photographs added to the portfolio.";
         }
 
-        return RedirectToAction(nameof(Index), new { clientId });
+        return RedirectToAction(nameof(Library), new { clientId });
     }
 
     [HttpPost("featured/{assetId:guid}")]
@@ -155,7 +197,7 @@ public class WorkspaceController(
             TempData["Error"] = error;
         }
 
-        return RedirectToAction(nameof(Index), new { clientId });
+        return RedirectToAction(nameof(Portfolio), new { clientId });
     }
 
     /// <summary>
@@ -188,7 +230,7 @@ public class WorkspaceController(
             TempData["Error"] = error;
         }
 
-        return RedirectToAction(nameof(Index), new { clientId });
+        return RedirectToAction(nameof(Cover), new { clientId });
     }
 
     [HttpPost("remove/{assetId:guid}")]
@@ -202,7 +244,7 @@ public class WorkspaceController(
 
         await media.SoftDeleteAsync(clientId, assetId, CurrentUserId(), cancellationToken);
 
-        return RedirectToAction(nameof(Index), new { clientId });
+        return RedirectToAction(nameof(Library), new { clientId });
     }
 
     /// <summary>
@@ -242,7 +284,7 @@ public class WorkspaceController(
             await media.ReorderAsync(clientId, [.. ordered, .. rest], CurrentUserId(), cancellationToken);
         }
 
-        return RedirectToAction(nameof(Index), new { clientId });
+        return RedirectToAction(nameof(Portfolio), new { clientId });
     }
 
     /// <summary>
@@ -267,7 +309,7 @@ public class WorkspaceController(
 
         if (order is null || order.Length == 0)
         {
-            return RedirectToAction(nameof(Index), new { clientId });
+            return RedirectToAction(nameof(Portfolio), new { clientId });
         }
 
         var pool = await media.GetPoolAsync(clientId, cancellationToken);
@@ -278,7 +320,7 @@ public class WorkspaceController(
 
         await media.ReorderAsync(clientId, [.. reordered, .. rest], CurrentUserId(), cancellationToken);
 
-        return RedirectToAction(nameof(Index), new { clientId });
+        return RedirectToAction(nameof(Portfolio), new { clientId });
     }
 
     /// <summary>
@@ -332,7 +374,7 @@ public class WorkspaceController(
             }
 
             TempData["Error"] = error;
-            return RedirectToAction(nameof(Index), new { clientId });
+            return RedirectToAction(nameof(Review), new { clientId });
         }
 
         if (wantsJson)
