@@ -83,7 +83,16 @@ public class ClientOnboardingService(
                 var error = string.Join("; ", created.Errors.Select(e => e.Description));
                 logger.LogWarning("Onboarding could not create an account: {Error}", error);
                 await transaction.RollbackAsync(cancellationToken);
-                return new OnboardingResult(false, Error: "We could not create your account. Please contact us.");
+
+                // Self-registration chose this password moments ago, so a rejection here
+                // is almost always the password policy — shown directly rather than as a
+                // generic failure, or there is nothing for the visitor to act on. The
+                // staff-mediated form passes no password, so this branch is unreachable
+                // there; its failures stay generic.
+                return new OnboardingResult(false,
+                    Error: model.IsSelfRegistration
+                        ? error
+                        : "We could not create your account. Please contact us.");
             }
 
             await userManager.AddToRoleAsync(user, Roles.Client);

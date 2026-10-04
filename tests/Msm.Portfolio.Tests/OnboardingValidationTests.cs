@@ -169,8 +169,29 @@ public class OnboardingValidationTests
     {
         var model = ValidAdult();
         model.IsSelfRegistration = true;
-        model.Password = "short1";
-        model.ConfirmPassword = "short1";
+        model.Password = "Short1!";
+        model.ConfirmPassword = "Short1!";
+
+        Assert.True(HasErrorFor(Validate(model), nameof(model.Password)));
+    }
+
+    /// <summary>
+    /// The password field must enforce exactly what Identity's own policy
+    /// (Program.cs: RequiredLength 10, digit, uppercase, lowercase, non-alphanumeric)
+    /// will enforce a step later — otherwise a password that passes here is silently
+    /// rejected by UserManager.CreateAsync with no useful message for the visitor.
+    /// </summary>
+    [Theory]
+    [InlineData("alllowercase123!")] // no uppercase
+    [InlineData("ALLUPPERCASE123!")] // no lowercase
+    [InlineData("NoDigitsHere!!!!")] // no digit
+    [InlineData("NoSymbolsHere1234")] // no symbol
+    public void A_password_missing_a_required_character_class_is_rejected(string password)
+    {
+        var model = ValidAdult();
+        model.IsSelfRegistration = true;
+        model.Password = password;
+        model.ConfirmPassword = password;
 
         Assert.True(HasErrorFor(Validate(model), nameof(model.Password)));
     }
@@ -180,19 +201,19 @@ public class OnboardingValidationTests
     {
         var model = ValidAdult();
         model.IsSelfRegistration = true;
-        model.Password = "a-genuine-password";
-        model.ConfirmPassword = "a-different-password";
+        model.Password = "Testing!2345";
+        model.ConfirmPassword = "Testing!2346";
 
         Assert.True(HasErrorFor(Validate(model), nameof(model.ConfirmPassword)));
     }
 
     [Fact]
-    public void A_matching_password_of_sufficient_length_passes()
+    public void A_matching_password_meeting_every_rule_passes()
     {
         var model = ValidAdult();
         model.IsSelfRegistration = true;
-        model.Password = "a-genuine-password";
-        model.ConfirmPassword = "a-genuine-password";
+        model.Password = "Testing!2345";
+        model.ConfirmPassword = "Testing!2345";
 
         Assert.Empty(Validate(model));
     }

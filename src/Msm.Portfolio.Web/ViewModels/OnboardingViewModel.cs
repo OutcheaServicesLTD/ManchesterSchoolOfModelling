@@ -189,10 +189,20 @@ public class OnboardingViewModel : IValidatableObject
 
         if (IsSelfRegistration)
         {
-            if (string.IsNullOrWhiteSpace(Password) || Password.Length < 8)
+            // Mirrors the Identity password policy configured in Program.cs exactly
+            // (RequiredLength 10, digit, uppercase, lowercase, non-alphanumeric), so a
+            // password that passes here is never silently rejected a step later by
+            // UserManager.CreateAsync — the two must not drift apart.
+            if (string.IsNullOrWhiteSpace(Password)
+                || Password.Length < 10
+                || !Password.Any(char.IsDigit)
+                || !Password.Any(char.IsUpper)
+                || !Password.Any(char.IsLower)
+                || Password.All(char.IsLetterOrDigit))
             {
                 yield return new ValidationResult(
-                    "Please choose a password of at least 8 characters.", [nameof(Password)]);
+                    "Password must be at least 10 characters and include an uppercase letter, "
+                    + "a lowercase letter, a digit and a symbol.", [nameof(Password)]);
             }
             else if (Password != ConfirmPassword)
             {
