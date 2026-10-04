@@ -6,6 +6,27 @@
     var error = TempData["Error"] as string;
     var token = Antiforgery.GetAndStoreTokens(Context).RequestToken;
     var cover = Model.Selected.FirstOrDefault(a => a.IsFeatured);
+
+    // Each stop the retoucher can jump to, in order, and whether it already has
+    // something in it. Nothing here is ever locked — the retoucher can open any of
+    // them in any order and the page saves as they go — so "done" only draws the
+    // checkmark and fills the line before it; it never gates a later stop the way a
+    // sign-up wizard's steps would.
+    var steps = new List<(string Id, string Label, bool Done)>
+    {
+        ("upload", "Upload", Model.Assets.Count > 0)
+    };
+
+    if (cover is not null)
+    {
+        steps.Add(("cover", "Cover photo", true));
+    }
+
+    steps.Add(("portfolio", $"Portfolio ({Model.Selected.Count})", Model.Selected.Count > 0));
+    // The library has no "done" state of its own — it is reviewed, not completed — so
+    // it always shows its plain number rather than a checkmark.
+    steps.Add(("library", $"Library ({Model.Unselected.Count})", false));
+    steps.Add(("submit", "Submit", Model.AlreadySubmitted));
 }
 
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
@@ -20,18 +41,30 @@
    straight to a section beats scrolling past all of them to find it. Sticks under the
    portal header on the way down, the same way the header itself stays put; no
    scroll-spy highlighting a current section, which would need script this does not
-   otherwise need. *@
-<nav class="section-nav" aria-label="Jump to a section">
-    <ul class="nav nav-tabs">
-        <li class="nav-item"><a class="nav-link" href="#upload">Upload</a></li>
-        @if (cover is not null)
+   otherwise need — only whether a stop already has something in it. *@
+<nav class="stepper" aria-label="Jump to a section">
+    @for (var i = 0; i < steps.Count; i++)
+    {
+        var step = steps[i];
+        <a href="#@step.Id" class="stepper-step @(step.Done ? "is-done" : "")">
+            <span class="stepper-circle" aria-hidden="true">
+                @if (step.Done)
+                {
+                    <span class="stepper-tick"></span>
+                }
+                else
+                {
+                    @(i + 1)
+                }
+            </span>
+            <span class="stepper-label">@step.Label</span>
+        </a>
+
+        if (i < steps.Count - 1)
         {
-            <li class="nav-item"><a class="nav-link" href="#cover">Cover photo</a></li>
+            <span class="stepper-line @(step.Done ? "is-done" : "")" aria-hidden="true"></span>
         }
-        <li class="nav-item"><a class="nav-link" href="#portfolio">Portfolio (@Model.Selected.Count)</a></li>
-        <li class="nav-item"><a class="nav-link" href="#library">Library (@Model.Unselected.Count)</a></li>
-        <li class="nav-item"><a class="nav-link" href="#submit">Submit</a></li>
-    </ul>
+    }
 </nav>
 
 @if (error is not null)

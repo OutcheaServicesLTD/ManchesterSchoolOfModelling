@@ -2133,20 +2133,99 @@ body.viewer-open {
     flex-wrap: wrap;
 }
 
-/* A jump nav for a page too long to scroll blind through — the retoucher workspace,
-   up to 30 portfolio photographs and 60 in the library below them. Sticks directly
-   under the portal header, 76px being that header's own min-height, so the two sit
-   flush with no gap and no overlap. One below the header's z-index of 50: the header
-   must still win if either were ever tall enough to touch. */
-.section-nav {
+/* A numbered jump nav for a page too long to scroll blind through — the retoucher
+   workspace, up to 30 portfolio photographs and 60 in the library below them. Sticks
+   directly under the portal header, 76px being that header's own min-height, so the
+   two sit flush with no gap and no overlap. One below the header's z-index of 50: the
+   header must still win if either were ever tall enough to touch.
+
+   Nothing here is ever locked the way a sign-up wizard's steps would be — the
+   retoucher can open any stop in any order, and the page saves as they go. "Done"
+   only fills the circle and the line leading to it; it never disables a later one. */
+.stepper {
     position: sticky;
     top: 76px;
     z-index: 40;
+    display: flex;
+    align-items: flex-start;
     background: var(--bg);
+    padding: 1rem 0 1.5rem;
 }
 
-.section-nav .nav-tabs {
-    margin-bottom: 1.5rem;
+.stepper-step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    color: var(--fg-md);
+    flex-shrink: 0;
+}
+
+.stepper-circle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--fg-md);
+    background: var(--bg);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--fg-md);
+    transition: background-color 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.stepper-step:hover .stepper-circle {
+    border-color: var(--fg);
+    color: var(--fg);
+}
+
+.stepper-label {
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.stepper-step:hover .stepper-label {
+    color: var(--fg);
+}
+
+.stepper-step.is-done .stepper-circle {
+    background: var(--fg);
+    border-color: var(--fg);
+}
+
+.stepper-step.is-done .stepper-label {
+    color: var(--fg);
+}
+
+/* Drawn with the same tick used for a checked checkbox, in the page background colour
+   so it reads against the filled circle exactly as it does there. */
+.stepper-tick {
+    width: 11px;
+    height: 11px;
+    background-image: var(--tick);
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 11px 11px;
+}
+
+.stepper-line {
+    width: clamp(20px, 4vw, 56px);
+    height: 1px;
+    background: var(--line);
+    /* Lines up with the centre of a 28px circle sitting above an 11px label, not the
+       top of the step. */
+    margin-top: 14px;
+    flex-shrink: 1;
+}
+
+.stepper-line.is-done {
+    background: var(--fg-md);
 }
 
 .portal-brand {
