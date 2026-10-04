@@ -68,6 +68,7 @@ public class DemoDataSeeder(
         }
 
         var retoucherUserId = await EnsureDemoRetoucherAsync();
+        await EnsureDemoViewerAsync();
 
         // ── The real models whose photographs MSM will upload ────────────────────────
         // Created empty and waiting in the retoucher queue: a member of staff claims
@@ -251,6 +252,24 @@ public class DemoDataSeeder(
 
         var clientId = result.Client.Id;
 
+        // Staff-mediated onboarding deliberately creates the account without a password —
+        // real access waits for purchase. A demonstration client needs to be signed into
+        // directly, so one is set here, the same way EnsureDemoRetoucherAsync gives the
+        // demo retoucher one: shared with the owner's password, so the preview needs only
+        // one credential, not several.
+        if (result.Client.ApplicationUser is { } demoUser)
+        {
+            var password = configuration["Seed:SuperAdmin:Password"] ?? "Dev!Passw0rd";
+            var added = await userManager.AddPasswordAsync(demoUser, password);
+
+            if (!added.Succeeded)
+            {
+                logger.LogError(
+                    "Could not set a sign-in password for demonstration client {Name}: {Errors}",
+                    demo.LastName, string.Join("; ", added.Errors.Select(e => e.Description)));
+            }
+        }
+
         if (stage == Stage.Waiting)
         {
             return;
@@ -357,6 +376,44 @@ public class DemoDataSeeder(
         await userManager.AddToRoleAsync(user, Roles.Retoucher);
 
         return user.Id;
+    }
+
+    /// <summary>
+    /// A Viewer account, so the restricted, view-only staff role can be demonstrated
+    /// too, the same way <see cref="EnsureDemoRetoucherAsync"/> does for Retoucher.
+    /// </summary>
+    private async Task EnsureDemoViewerAsync()
+    {
+        const string email = "viewer@msm.local";
+
+        if (await userManager.FindByEmailAsync(email) is not null)
+        {
+            return;
+        }
+
+        var password = configuration["Seed:SuperAdmin:Password"] ?? "Dev!Passw0rd";
+
+        var user = new ApplicationUser
+        {
+            UserName = email,
+            Email = email,
+            EmailConfirmed = true,
+            FirstName = "Demo",
+            LastName = "Viewer",
+            IsActive = true
+        };
+
+        var created = await userManager.CreateAsync(user, password);
+
+        if (!created.Succeeded)
+        {
+            logger.LogError(
+                "Could not create the demonstration viewer: {Errors}",
+                string.Join("; ", created.Errors.Select(e => e.Description)));
+            return;
+        }
+
+        await userManager.AddToRoleAsync(user, Roles.Viewer);
     }
 
     /// <summary>

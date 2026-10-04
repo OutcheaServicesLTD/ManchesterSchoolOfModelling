@@ -179,7 +179,8 @@ public class MediaController(
     /// </summary>
     private bool IsStaff() =>
         User.Identity?.IsAuthenticated == true
-        && (User.IsInRole(Roles.SuperAdmin) || User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Retoucher));
+        && (User.IsInRole(Roles.SuperAdmin) || User.IsInRole(Roles.Admin) || User.IsInRole(Roles.Retoucher)
+            || User.IsInRole(Roles.Viewer));
 
     private async Task<bool> IsAllowedAsync(MediaAsset asset)
     {

@@ -148,7 +148,7 @@ public class AccountController(
     {
         var roles = await userManager.GetRolesAsync(user);
 
-        if (roles.Contains(Roles.SuperAdmin) || roles.Contains(Roles.Admin))
+        if (roles.Contains(Roles.SuperAdmin) || roles.Contains(Roles.Admin) || roles.Contains(Roles.Viewer))
         {
             return "/admin";
         }

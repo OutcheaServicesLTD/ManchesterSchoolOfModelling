@@ -58,6 +58,7 @@ The pages worth having to hand:
 |---|---|
 | Model Board | `/models` |
 | Sign in | `/account/login` |
+| Register as a model | `/register` |
 | Admin | `/admin` |
 | Which integrations are on | `/admin/integrations` |
 | Retoucher queue | `/retoucher` |
@@ -78,9 +79,20 @@ MSM. The Model Board stays empty until she is published.
 would appear on a published portfolio as though MSM had measured her — an agency would
 book against it. Add them on her client record before publishing.
 
-There is also a second sign-in, `retoucher@msm.local`, using the **same password** you
-set for the owner. Use it to see the retoucher's view of the queue, which is narrower
-than an Admin's.
+There are three further sign-ins, all using the **same password** you set for the owner:
+
+| Email | Role | What it shows |
+|-------|------|----------------|
+| `retoucher@msm.local` | Retoucher | The upload workspace and queue, narrower than an Admin's. |
+| `viewer@msm.local` | Viewer | The same client list and detail pages as Admin, restricted to view-only. |
+| `elizabeth.cousins@example.com` | Client | Elizabeth's own dashboard — Photographs, Profile and Subscription — once her portfolio has something in it to show. |
+
+To see self-registration itself rather than a pre-seeded account, open `/register`
+(linked from `/account/login`) and create a new model. It pre-fills from URL query
+parameters — try `/register?firstName=Test&lastName=Model&email=test.model@example.com`
+— but never submits on its own; review the form and press Register. On success you are
+signed straight in as that new client, and the account appears in Admin's Clients list
+immediately, ready for a retoucher to claim.
 
 #### Building her portfolio
 
