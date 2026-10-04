@@ -49,7 +49,11 @@
     {
         var step = steps[i];
         var isCurrent = step.Section == Model.CurrentSection;
-        <a href="@step.Url" class="stepper-step @(step.Done ? "is-done" : "") @(isCurrent ? "is-current" : "")"
+        @* Highlighting is reserved for "done" — the page you happen to be standing on
+           otherwise looked highlighted whether or not anything had been done there,
+           which read as the opposite of what the ring was meant to say. aria-current
+           still marks it for assistive technology; nothing visual hangs off it. *@
+        <a href="@step.Url" class="stepper-step @(step.Done ? "is-done" : "")"
            aria-current="@(isCurrent ? "page" : null)">
             <span class="stepper-circle" aria-hidden="true">
                 @if (step.Done)

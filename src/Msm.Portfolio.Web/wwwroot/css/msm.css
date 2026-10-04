@@ -2204,19 +2204,6 @@ body.viewer-open {
     color: var(--fg);
 }
 
-/* The page actually open right now — independent of is-done, since a page can be the
-   current one without having anything in it yet (Library, say, with nothing picked).
-   A ring around the circle rather than a colour change, so it reads whether or not
-   is-done has already filled the circle solid. */
-.stepper-step.is-current .stepper-circle {
-    box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--fg);
-}
-
-.stepper-step.is-current .stepper-label {
-    color: var(--fg);
-    font-weight: 700;
-}
-
 /* Drawn with the same tick used for a checked checkbox, in the page background colour
    so it reads against the filled circle exactly as it does there. */
 .stepper-tick {
