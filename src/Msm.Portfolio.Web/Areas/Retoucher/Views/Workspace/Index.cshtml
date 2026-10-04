@@ -8,27 +8,21 @@
     var token = Antiforgery.GetAndStoreTokens(Context).RequestToken;
     var baseUrl = $"/retoucher/client/{Model.ClientId}";
 
-    // Each stop the retoucher can jump to, in order, and whether it already has
-    // something in it. Nothing here is ever locked — the retoucher can open any of
-    // them in any order, the URL goes with it, and the page saves as they go — so
-    // "done" only draws the checkmark and fills the line before it; it never gates a
-    // later stop the way a sign-up wizard's steps would.
-    var steps = new List<(WorkspaceSection Section, string Url, string Label, bool Done)>
+    // Each stop the retoucher can jump to, in order. Nothing here is ever locked —
+    // the retoucher can open any of them in any order and the page saves as they go.
+    var steps = new List<(WorkspaceSection Section, string Url, string Label)>
     {
-        (WorkspaceSection.Upload, $"{baseUrl}/upload", "Upload", Model.Assets.Count > 0)
+        (WorkspaceSection.Upload, $"{baseUrl}/upload", "Upload")
     };
 
     if (Model.Cover is not null)
     {
-        steps.Add((WorkspaceSection.Cover, $"{baseUrl}/cover", "Cover photo", true));
+        steps.Add((WorkspaceSection.Cover, $"{baseUrl}/cover", "Cover photo"));
     }
 
-    steps.Add((WorkspaceSection.Portfolio, $"{baseUrl}/portfolio",
-        $"Portfolio ({Model.Selected.Count})", Model.Selected.Count > 0));
-    // The library has no "done" state of its own — it is reviewed, not completed — so
-    // it always shows its plain number rather than a checkmark.
-    steps.Add((WorkspaceSection.Library, $"{baseUrl}/library", $"Library ({Model.Unselected.Count})", false));
-    steps.Add((WorkspaceSection.Submit, $"{baseUrl}/submit", "Submit", Model.AlreadySubmitted));
+    steps.Add((WorkspaceSection.Portfolio, $"{baseUrl}/portfolio", $"Portfolio ({Model.Selected.Count})"));
+    steps.Add((WorkspaceSection.Library, $"{baseUrl}/library", $"Library ({Model.Unselected.Count})"));
+    steps.Add((WorkspaceSection.Submit, $"{baseUrl}/submit", "Submit"));
 
     // Back/Next walk the same ordered list the stepper does, so a cover that does not
     // exist yet is skipped by both exactly the same way rather than two separate ideas
@@ -67,28 +61,18 @@
         {
             var step = steps[i];
             var isCurrent = step.Section == Model.CurrentSection;
-            @* Highlighting is reserved for "done" — the page you happen to be standing on
-               otherwise looked highlighted whether or not anything had been done there,
-               which read as the opposite of what the ring was meant to say. aria-current
-               still marks it for assistive technology; nothing visual hangs off it. *@
-            <a href="@step.Url" class="stepper-step @(step.Done ? "is-done" : "")"
+            @* Only the page actually open right now is highlighted — moving on to the
+               next page moves the highlight with it rather than leaving a trail behind
+               on every page already visited. *@
+            <a href="@step.Url" class="stepper-step @(isCurrent ? "is-current" : "")"
                aria-current="@(isCurrent ? "page" : null)">
-                <span class="stepper-circle" aria-hidden="true">
-                    @if (step.Done)
-                    {
-                        <span class="stepper-tick"></span>
-                    }
-                    else
-                    {
-                        @(i + 1)
-                    }
-                </span>
+                <span class="stepper-circle" aria-hidden="true">@(i + 1)</span>
                 <span class="stepper-label">@step.Label</span>
             </a>
 
             if (i < steps.Count - 1)
             {
-                <span class="stepper-line @(step.Done ? "is-done" : "")" aria-hidden="true"></span>
+                <span class="stepper-line" aria-hidden="true"></span>
             }
         }
     </nav>

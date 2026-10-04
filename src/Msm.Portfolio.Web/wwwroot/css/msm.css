@@ -2142,8 +2142,8 @@ body.viewer-open {
    either were ever tall enough to touch.
 
    Nothing here is ever locked the way a sign-up wizard's steps would be — the
-   retoucher can open any page in any order, and each one saves as they go. "Done"
-   only fills the circle and the line leading to it; it never disables a later page. */
+   retoucher can open any page in any order, and each one saves as they go. The
+   circle filled in is simply whichever page is open right now. */
 .stepper-bar {
     position: sticky;
     top: 76px;
@@ -2239,24 +2239,17 @@ body.viewer-open {
     color: var(--fg);
 }
 
-.stepper-step.is-done .stepper-circle {
+/* The page actually open right now, and only that one — moving on moves this with
+   it rather than leaving every page already visited looking the same as this one. */
+.stepper-step.is-current .stepper-circle {
     background: var(--fg);
     border-color: var(--fg);
+    color: var(--bg);
 }
 
-.stepper-step.is-done .stepper-label {
+.stepper-step.is-current .stepper-label {
     color: var(--fg);
-}
-
-/* Drawn with the same tick used for a checked checkbox, in the page background colour
-   so it reads against the filled circle exactly as it does there. */
-.stepper-tick {
-    width: 11px;
-    height: 11px;
-    background-image: var(--tick);
-    background-repeat: no-repeat;
-    background-position: center;
-    background-size: 11px 11px;
+    font-weight: 700;
 }
 
 .stepper-line {
@@ -2267,10 +2260,6 @@ body.viewer-open {
        top of the step. */
     margin-top: 14px;
     flex-shrink: 1;
-}
-
-.stepper-line.is-done {
-    background: var(--fg-md);
 }
 
 .portal-brand {
