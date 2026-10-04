@@ -202,6 +202,39 @@
             </div>
         </div>
     </div>
+
+    @if (Model.Assets.Count > 0)
+    {
+        @* A quiet proof the upload landed, without leaving this page: every photograph
+           already in the library, read-only. Choosing which go on the portfolio stays on
+           the Library page — this is confirmation, not a second place to do that work. *@
+        <h2 class="h5">In the library (@Model.Assets.Count)</h2>
+        <p class="text-muted">
+            Everything uploaded for this shoot so far. Go to the
+            <a href="@baseUrl/library">library</a> to choose which go on the portfolio.
+        </p>
+        <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
+            @foreach (var asset in Model.Assets)
+            {
+                <div class="col">
+                    <div class="card h-100">
+                        <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
+                             style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
+                             alt="@asset.Filename" />
+                        <div class="card-body p-2">
+                            <p class="small text-muted mb-0">
+                                @asset.Orientation
+                                @if (asset.IsFeatured)
+                                {
+                                    <span class="badge text-bg-primary">Main</span>
+                                }
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
 }
 
 @if (Model.CurrentSection == WorkspaceSection.Cover && Model.Cover is { } cover)
