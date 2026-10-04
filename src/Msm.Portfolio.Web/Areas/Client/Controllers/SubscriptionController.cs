@@ -19,11 +19,31 @@ namespace Msm.Portfolio.Web.Areas.Client.Controllers;
 [Authorize(Policy = Policies.ClientArea)]
 public class SubscriptionController(
     IClientProfileAccessor profiles,
+    IClientDashboardBuilder dashboards,
     IStripeSubscriptionService subscriptions,
     IStripeService stripe,
     IMaintenanceService maintenance,
     ApplicationDbContext db) : Controller
 {
+    /// <summary>
+    /// The model's own Subscription page: current status, renewal or cancellation date,
+    /// and the Start, Cancel and Manage actions.
+    /// </summary>
+    [HttpGet("")]
+    public async Task<IActionResult> Index(CancellationToken cancellationToken = default)
+    {
+        var client = await profiles.GetCurrentAsync(User, cancellationToken);
+
+        if (client is null)
+        {
+            return RedirectToAction("Index", "Home");
+        }
+
+        var model = await dashboards.BuildAsync(client, isPreview: false, cancellationToken);
+
+        return View(model);
+    }
+
     [HttpPost("start")]
     public async Task<IActionResult> Start(CancellationToken cancellationToken = default)
     {
@@ -37,15 +57,35 @@ public class SubscriptionController(
         var origin = $"{Request.Scheme}://{Request.Host}";
 
         var result = await subscriptions.StartCheckoutAsync(
-            client.Id, $"{origin}/client?subscription=started", $"{origin}/client", cancellationToken);
+            client.Id, $"{origin}/client/subscription?started=true", $"{origin}/client/subscription",
+            cancellationToken);
 
         if (!result.Succeeded)
         {
             TempData["Error"] = result.Error;
-            return RedirectToAction("Index", "Home");
+            return RedirectToAction(nameof(Index));
         }
 
         return Redirect(result.RedirectUrl!);
+    }
+
+    [HttpPost("cancel")]
+    public async Task<IActionResult> Cancel(CancellationToken cancellationToken = default)
+    {
+        var client = await profiles.GetCurrentAsync(User, cancellationToken);
+
+        if (client is null)
+        {
+            return RedirectToAction("Index", "Home");
+        }
+
+        var result = await subscriptions.CancelAsync(client.Id, cancellationToken);
+
+        TempData[result.Succeeded ? "Saved" : "Error"] = result.Succeeded
+            ? "Your subscription will not renew. Your portfolio stays online until the date already paid for."
+            : result.Error;
+
+        return RedirectToAction(nameof(Index));
     }
 
     [HttpPost("manage")]
@@ -60,12 +100,13 @@ public class SubscriptionController(
 
         var origin = $"{Request.Scheme}://{Request.Host}";
 
-        var result = await subscriptions.OpenManagePortalAsync(client.Id, $"{origin}/client", cancellationToken);
+        var result = await subscriptions.OpenManagePortalAsync(
+            client.Id, $"{origin}/client/subscription", cancellationToken);
 
         if (!result.Succeeded)
         {
             TempData["Error"] = result.Error;
-            return RedirectToAction("Index", "Home");
+            return RedirectToAction(nameof(Index));
         }
 
         return Redirect(result.RedirectUrl!);
@@ -129,6 +170,6 @@ public class SubscriptionController(
             product?.Currency ?? "GBP", cancellationToken);
 
         TempData["Saved"] = "Subscription started.";
-        return RedirectToAction("Index", "Home");
+        return RedirectToAction(nameof(Index));
     }
 }

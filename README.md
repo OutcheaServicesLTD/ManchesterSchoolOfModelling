@@ -161,13 +161,17 @@ tests/Msm.Portfolio.Tests/
 
 ## Roles and permissions
 
-Four authenticated roles: `SuperAdmin`, `Admin`, `Retoucher`, `Client`. There is no
-Agency account — agencies open the public portfolio URL without signing in.
+Five authenticated roles: `SuperAdmin`, `Admin`, `Retoucher`, `Viewer`, `Client`. There
+is no Agency account — agencies open the public portfolio URL without signing in.
+`Viewer` is a restricted, view-only staff role: it reaches the same admin client
+list/detail pages as Admin, narrowed to read-only by its own default permission set
+(no create, edit, publish or staff-management capability) rather than by a separate
+set of views.
 
 Capabilities are granted as permission claims on a role rather than inferred from the
 role name, because the specification requires that several staff accounts can hold
 different privileges. `Permissions.DefaultsByRole` holds the defaults applied at
-seeding.
+seeding, including Viewer's.
 
 Super Admin is granted every permission by `PermissionAuthorizationHandler` rather
 than by a seeded claim list, so a permission added later cannot fall outside the
@@ -175,22 +179,44 @@ owner's reach. The capabilities reserved to Super Admin in specification section
 listed in `Permissions.SuperAdminOnly`, and a test asserts no other role is granted
 them.
 
-## Onboarding and guardian consent
+Staff accounts of any of the three staff roles are created the same way, from the one
+Super Admin staff-creation flow (`Areas/Admin/Views/Users/Index.cshtml`): name, email,
+role and a permission-editor card for that role, reusing `StaffService` rather than a
+parallel path per role.
 
-The client arrives from a GoHighLevel link carrying their contact id:
+## Onboarding, self-registration and guardian consent
 
-```
-/onboarding?ghlContactId=abc123
-```
+A model can arrive by either of two routes into the same form and the same
+`ClientOnboardingService`:
 
-The contact id is stored against the client and is the permanent CRM link; email and
-telephone are never used as the CRM identifier, because either can change without the
-contact changing.
+- **Staff-mediated**, from a GoHighLevel link carrying the contact id:
+
+  ```
+  /onboarding?ghlContactId=abc123
+  ```
+
+- **Self-registration**, from the login page's "Register as a Model" link:
+
+  ```
+  /register?firstName=John&lastName=Smith&email=john@email.com
+  ```
+
+  The query parameters only **pre-fill** the form (`OnboardingController.Index`,
+  `GET`) — nothing is submitted until the visitor reviews the pre-filled details and
+  presses Register themselves. `/register` additionally collects and confirms a
+  password (`OnboardingViewModel.IsSelfRegistration`, validated server-side), and on
+  success signs the new account straight in and redirects to `/client`. `/onboarding`
+  is unchanged: that account is still created **without a password** — the client
+  receives sign-in access after purchase (specification section 50).
+
+Either way, the contact id (where present) is stored against the client as the
+permanent CRM link; email and telephone are never used as the CRM identifier, because
+either can change without the contact changing.
 
 Submitting the form creates the account, profile, measurements and a portfolio, and
 places that portfolio in the retoucher queue — all in one transaction, so a client can
-never exist without a portfolio or vice versa. The account is created **without a
-password**: the client receives sign-in access after purchase (specification section 50).
+never exist without a portfolio or vice versa, and a self-registered model appears in
+Super Admin's Clients section immediately, ready for a retoucher.
 
 Two behaviours here are worth knowing about:
 
@@ -508,16 +534,41 @@ take down every one of them on the first run.
 The programme product is retired rather than rewritten, and orders still reference it.
 Restating a past £3,499 sale as a sale of something else would falsify the record.
 
-## Maintenance and the grace period
+## Subscription and the grace period
 
-**Off.** `Commerce:MaintenanceEnabled` is false, so no subscription is opened on purchase
-and none of what follows can fire. It is a switch rather than a deletion, so MSM can go
-back to charging maintenance without the work being rebuilt.
+Portfolio Maintenance is a separate, annual subscription (`Commerce:MaintenancePrice`,
+£20/year by default, and `Integrations:Stripe:PriceId` for what Stripe actually charges —
+see "What the website sells" above for the distinction) that a client starts, manages
+and cancels themselves, from their own dashboard's Subscription page
+(`/client/subscription`, `Areas/Client/Controllers/SubscriptionController.cs`) — never
+tied to the one-off £99 purchase. A subscription record is created the first time a
+client subscribes, fixing the price agreed that day so a later change cannot alter it.
 
-When it is on: the monthly maintenance charge is a separate product. A subscription
-record is created when the portfolio is purchased, fixing the price agreed that day so a
-later change cannot alter it, and starting at the offset in
-`Commerce:MaintenanceStartsAfterDays`.
+### Cancelling does not end access immediately
+
+This is the behaviour the specification calls out as extremely important, modelled on
+Netflix or Spotify: cancelling marks the subscription "cancel at period end" but leaves
+it entitled for the period already paid for. Concretely:
+
+1. `SubscriptionController.Cancel` calls Stripe directly to set
+   `cancel_at_period_end=true` on the subscription — not left to however the Stripe
+   Dashboard's Customer Portal happens to be configured.
+2. Stripe's `customer.subscription.updated` webhook confirms the flag and the renewal
+   date (`MaintenanceService.UpdatePeriodAsync`). This **never touches the subscription's
+   status** — Stripe itself keeps a cancel-pending subscription "active" right up to the
+   date already paid for, so entitlement (`MaintenanceSubscription.IsEntitlementActive`)
+   is untouched by cancelling.
+3. Only `customer.subscription.deleted` — sent once the paid period is genuinely over —
+   ends entitlement and takes the portfolio down (`MaintenanceService.RecordCancelledAsync`).
+4. Subscribing again at any point — including after a lapse — reactivates the same row
+   and republishes the portfolio automatically
+   (`MaintenanceService.ActivateSubscriptionAsync`), since re-subscribing is the client's
+   own choice reversed, with nothing for staff to decide.
+
+Portfolio visibility (`PublicPortfolioService.GetBySlugAsync`, `SendEnquiryAsync`, the
+Model Board) checks entitlement the same way throughout: a client who has never touched
+the subscription feature stays entitled (the older £99-purchase-and-publish flow never
+required one), and only a subscription that has actually lapsed withdraws it.
 
 ### What happens when a payment fails
 
@@ -710,7 +761,7 @@ The full list, and what each deployment has to set, is in
 | `POST /account/login` | 10 per 5 minutes |
 | `POST /onboarding`, `GET`/`POST /guardian/approve/{token}` | 30 per 10 minutes |
 | `POST /{slug}/enquire` | 5 per 10 minutes |
-| `POST /webhooks/gocardless` | 300 per minute |
+| `POST /webhooks/stripe` | 300 per minute |
 
 Sized against how the application is genuinely used rather than as low as possible: a
 studio onboarding a queue of clients after a shoot must never reach one.
@@ -843,12 +894,14 @@ requirements.
   by default.
 - **Stripe** — `Integrations:Stripe:SecretKey` and `WebhookSecret` are what the £99
   one-off purchase needs; leave them unset and the stub takes over, exactly as above.
-  Add `PriceId` (the recurring Price created for the Portfolio Maintenance product in
-  the Stripe Dashboard) to also offer the subscription — optional on top, the client
-  portal simply does not offer it until set. Unverified against a real Stripe account
-  either way. `webhooks/stripe` needs a webhook endpoint configured in the Stripe
-  Dashboard for `checkout.session.completed`, `checkout.session.expired`,
-  `invoice.paid`, `invoice.payment_failed` and `customer.subscription.deleted`.
+  Add `PriceId` (the annual Price created for the Portfolio Maintenance product in
+  the Stripe Dashboard — change the amount there, never in code) to also offer the
+  subscription — optional on top, the client portal simply does not offer it until set.
+  Unverified against a real Stripe account either way. `webhooks/stripe` needs a webhook
+  endpoint configured in the Stripe Dashboard for `checkout.session.completed`,
+  `checkout.session.expired`, `invoice.paid`, `invoice.payment_failed`,
+  `customer.subscription.created`, `customer.subscription.updated` and
+  `customer.subscription.deleted`.
 - **Image and video size limits** — `Media:MaxImageBytes`, `Media:MaxVideoBytes`.
 
 ### One judgement call worth confirming

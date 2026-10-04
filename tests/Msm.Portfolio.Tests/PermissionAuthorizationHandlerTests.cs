@@ -126,4 +126,30 @@ public class PermissionAuthorizationHandlerTests
 
         Assert.False(await EvaluateAsync(retoucher, permission));
     }
+
+    /// <summary>
+    /// Viewer is restricted and view-only by design: no unnecessary editing permission
+    /// should come with the role's own defaults.
+    /// </summary>
+    [Theory]
+    [InlineData(Permissions.Portfolios.Publish)]
+    [InlineData(Permissions.Portfolios.Unpublish)]
+    [InlineData(Permissions.Portfolios.DeletePermanently)]
+    [InlineData(Permissions.Media.Upload)]
+    [InlineData(Permissions.Users.ManageStaff)]
+    public async Task Viewer_is_denied_every_editing_capability(string permission)
+    {
+        var viewer = UserWith(Roles.Viewer, Permissions.DefaultsByRole[Roles.Viewer]);
+
+        Assert.False(await EvaluateAsync(viewer, permission));
+    }
+
+    [Fact]
+    public async Task Viewer_can_view_clients_and_portfolios()
+    {
+        var viewer = UserWith(Roles.Viewer, Permissions.DefaultsByRole[Roles.Viewer]);
+
+        Assert.True(await EvaluateAsync(viewer, Permissions.Clients.ViewAll));
+        Assert.True(await EvaluateAsync(viewer, Permissions.Portfolios.View));
+    }
 }

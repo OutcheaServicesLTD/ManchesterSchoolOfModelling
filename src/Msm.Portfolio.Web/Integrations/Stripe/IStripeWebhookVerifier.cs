@@ -23,6 +23,18 @@ namespace Msm.Portfolio.Web.Integrations.Stripe;
 /// <param name="PaymentIntentId">
 /// Stripe's payment identifier for a completed one-off Checkout Session.
 /// </param>
+/// <param name="CurrentPeriodEnd">
+/// Present on a subscription object itself (<c>customer.subscription.*</c>): when the
+/// period this subscription has already been paid for ends. This is the renewal date
+/// while the subscription is due to continue, and the date entitlement ends if it is
+/// not (<see cref="CancelAtPeriodEnd"/>).
+/// </param>
+/// <param name="CancelAtPeriodEnd">
+/// Whether the client has asked to cancel. True does not end entitlement by itself —
+/// Stripe keeps the subscription's status "active" right up to
+/// <see cref="CurrentPeriodEnd"/>, which is what lets a cancelled subscription stay
+/// live for the period already paid for, Netflix/Spotify-style.
+/// </param>
 public record StripeWebhookEvent(
     string EventId,
     string Type,
@@ -32,7 +44,9 @@ public record StripeWebhookEvent(
     string? ClientIdFromMetadata,
     string? Reason,
     string? SessionId = null,
-    string? PaymentIntentId = null);
+    string? PaymentIntentId = null,
+    DateTimeOffset? CurrentPeriodEnd = null,
+    bool? CancelAtPeriodEnd = null);
 
 public interface IStripeWebhookVerifier
 {
@@ -180,6 +194,10 @@ public class StripeWebhookVerifier(
 
             var sessionId = type.StartsWith("checkout.session.") ? Text(obj, "id") : null;
 
+            // current_period_end and cancel_at_period_end live on the subscription object
+            // itself, so they are only meaningful on a customer.subscription.* event.
+            var isSubscriptionObject = type.StartsWith("customer.subscription.");
+
             return new StripeWebhookEvent(
                 id,
                 type,
@@ -190,7 +208,9 @@ public class StripeWebhookVerifier(
                 Reason: Text(obj, "cancellation_reason")
                     ?? DottedText(obj, "last_finalization_error", "message"),
                 SessionId: sessionId,
-                PaymentIntentId: Text(obj, "payment_intent"));
+                PaymentIntentId: Text(obj, "payment_intent"),
+                CurrentPeriodEnd: isSubscriptionObject ? UnixSeconds(obj, "current_period_end") : null,
+                CancelAtPeriodEnd: isSubscriptionObject ? Bool(obj, "cancel_at_period_end") : null);
         }
         catch (JsonException ex)
         {
@@ -209,5 +229,20 @@ public class StripeWebhookVerifier(
     private static string? DottedText(JsonElement element, string property, string nested) =>
         element.ValueKind == JsonValueKind.Object && element.TryGetProperty(property, out var value)
             ? Text(value, nested)
+            : null;
+
+    private static DateTimeOffset? UnixSeconds(JsonElement element, string property) =>
+        element.ValueKind == JsonValueKind.Object
+        && element.TryGetProperty(property, out var value)
+        && value.ValueKind == JsonValueKind.Number
+        && value.TryGetInt64(out var seconds)
+            ? DateTimeOffset.FromUnixTimeSeconds(seconds)
+            : null;
+
+    private static bool? Bool(JsonElement element, string property) =>
+        element.ValueKind == JsonValueKind.Object
+        && element.TryGetProperty(property, out var value)
+        && value.ValueKind is JsonValueKind.True or JsonValueKind.False
+            ? value.GetBoolean()
             : null;
 }

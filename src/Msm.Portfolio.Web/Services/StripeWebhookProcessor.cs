@@ -148,10 +148,19 @@ public class StripeWebhookProcessor(
                     evt, (clientId, ct) => maintenance.RecordCancelledAsync(clientId, ct), cancellationToken);
                 break;
 
-            // customer.subscription.updated is deliberately not handled: invoice.paid
-            // and invoice.payment_failed already drive the grace-period machinery, and
-            // acting on both would risk applying the same state change twice from two
-            // different event types for the one underlying change.
+            case "customer.subscription.created":
+            case "customer.subscription.updated":
+                // Deliberately limited to the renewal date and the cancel-pending flag.
+                // invoice.paid and invoice.payment_failed already drive every state
+                // change; applying one from here too would risk the same change landing
+                // twice from two different event types.
+                if (!string.IsNullOrWhiteSpace(evt.SubscriptionId))
+                {
+                    await maintenance.UpdatePeriodAsync(
+                        evt.SubscriptionId, evt.CurrentPeriodEnd, evt.CancelAtPeriodEnd ?? false,
+                        cancellationToken);
+                }
+                break;
         }
     }
 

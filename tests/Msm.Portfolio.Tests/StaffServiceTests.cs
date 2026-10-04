@@ -125,11 +125,43 @@ public class StaffServiceTests : IDisposable
     [InlineData(Roles.Client)]
     [InlineData(Roles.SuperAdmin)]
     [InlineData("Nonsense")]
-    public async Task Only_admin_and_retoucher_accounts_can_be_created(string role)
+    public async Task Only_staff_roles_can_be_created(string role)
     {
         var result = await _service.CreateAsync("x@msm.local", "A", "B", role, null);
 
         Assert.False(result.Succeeded);
+    }
+
+    /// <summary>
+    /// Viewer is the third staff role: view-only, reusing the same creation flow as
+    /// Admin and Retoucher rather than a parallel one.
+    /// </summary>
+    [Fact]
+    public async Task A_viewer_account_can_be_created()
+    {
+        var result = await _service.CreateAsync("viewer@msm.local", "New", "Viewer", Roles.Viewer, null);
+
+        Assert.True(result.Succeeded);
+
+        var staff = await _service.GetStaffAsync();
+        Assert.Contains(staff, s => s.Email == "viewer@msm.local" && s.Role == Roles.Viewer);
+    }
+
+    /// <summary>
+    /// Viewer's permissions are set the same way Admin's and Retoucher's are — through
+    /// the one existing permissions API, not a parallel mechanism for the new role.
+    /// </summary>
+    [Fact]
+    public async Task A_viewers_permissions_can_be_set_and_read_back_through_the_same_api()
+    {
+        await _service.CreateAsync("viewer3@msm.local", "A", "B", Roles.Viewer, null);
+
+        await _service.SetPermissionsAsync(
+            Roles.Viewer, [Permissions.Clients.ViewAll, Permissions.Portfolios.View], null);
+
+        var granted = await _service.GetPermissionsAsync(Roles.Viewer);
+        Assert.Equal(2, granted.Count);
+        Assert.Contains(Permissions.Clients.ViewAll, granted);
     }
 
     [Fact]

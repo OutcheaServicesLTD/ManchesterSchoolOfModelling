@@ -131,6 +131,12 @@ public static class Permissions
                 Media.ViewPool, Media.Upload, Media.Select,
                 Portfolios.View, Portfolios.SubmitForReview
             ],
+            [Roles.Viewer] =
+            [
+                Clients.ViewAll,
+                Media.ViewPool,
+                Portfolios.View
+            ],
             [Roles.Client] =
             [
                 Clients.ViewOwn, Clients.EditOwn,

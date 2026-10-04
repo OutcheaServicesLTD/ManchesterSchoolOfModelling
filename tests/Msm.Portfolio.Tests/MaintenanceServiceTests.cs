@@ -514,6 +514,90 @@ public class MaintenanceServiceTests : IDisposable
         Assert.False(result.Succeeded);
     }
 
+    /// <summary>
+    /// Re-subscribing after a lapse is the one case where republishing happens
+    /// automatically, with nothing for staff to decide (specification version 2: "if
+    /// they later subscribe again, the portfolio is re-enabled").
+    /// </summary>
+    [Theory]
+    [InlineData(MaintenanceSubscriptionStatus.Cancelled)]
+    [InlineData(MaintenanceSubscriptionStatus.GracePeriodExpired)]
+    [InlineData(MaintenanceSubscriptionStatus.Ended)]
+    public async Task Resubscribing_after_a_lapse_republishes_the_portfolio(
+        MaintenanceSubscriptionStatus lapsedStatus)
+    {
+        var clientId = AddPublishedClient(lapsedStatus);
+        PortfolioFor(clientId).IsPublished = false;
+        PortfolioFor(clientId).Status = PortfolioStatus.Unpublished;
+        await _db.SaveChangesAsync();
+
+        await _service.ActivateSubscriptionAsync(clientId, "Stripe", "sub_again", 20.00m, "GBP");
+
+        Assert.True(PortfolioFor(clientId).IsPublished);
+    }
+
+    /// <summary>
+    /// A first-time subscriber has nothing to republish — this must not throw just
+    /// because there was never a portfolio taken down.
+    /// </summary>
+    [Fact]
+    public async Task A_first_time_subscription_does_not_attempt_to_republish()
+    {
+        var clientId = AddClientWithoutSubscription();
+
+        var subscription = await _service.ActivateSubscriptionAsync(
+            clientId, "Stripe", "sub_first", 20.00m, "GBP");
+
+        Assert.Equal(MaintenanceSubscriptionStatus.Active, subscription.Status);
+    }
+
+    // ---------- Period tracking from Stripe (customer.subscription.created/.updated) ----------
+
+    /// <summary>
+    /// This must never touch Status: Stripe keeps a cancel-pending subscription
+    /// "active" until the period genuinely ends, so updating the period and flag here
+    /// has to leave entitlement exactly as it was (the "extremely important" Netflix/
+    /// Spotify behaviour).
+    /// </summary>
+    [Fact]
+    public async Task Updating_the_period_records_the_renewal_date_and_cancel_flag_without_ending_entitlement()
+    {
+        var clientId = AddPublishedClient(MaintenanceSubscriptionStatus.Active);
+        var periodEnd = DateTimeOffset.UtcNow.AddDays(340);
+
+        await _service.UpdatePeriodAsync(SubscriptionFor(clientId).ProviderSubscriptionId!, periodEnd, true);
+
+        var subscription = SubscriptionFor(clientId);
+        Assert.Equal(periodEnd, subscription.NextPaymentDate);
+        Assert.True(subscription.CancelAtPeriodEnd);
+        Assert.Equal(MaintenanceSubscriptionStatus.Active, subscription.Status);
+        Assert.True(PortfolioFor(clientId).IsPublished);
+    }
+
+    [Fact]
+    public async Task Clearing_the_cancel_flag_is_recorded_the_same_way()
+    {
+        var clientId = AddPublishedClient(MaintenanceSubscriptionStatus.Active);
+        var providerId = SubscriptionFor(clientId).ProviderSubscriptionId!;
+
+        await _service.UpdatePeriodAsync(providerId, DateTimeOffset.UtcNow.AddDays(300), true);
+        await _service.UpdatePeriodAsync(providerId, DateTimeOffset.UtcNow.AddDays(365), false);
+
+        Assert.False(SubscriptionFor(clientId).CancelAtPeriodEnd);
+    }
+
+    /// <summary>
+    /// Stripe does not guarantee delivery order: this can arrive before the event that
+    /// creates the subscription row. Nothing must throw, and nothing is created.
+    /// </summary>
+    [Fact]
+    public async Task Updating_the_period_for_an_unknown_subscription_is_a_silent_no_op()
+    {
+        await _service.UpdatePeriodAsync("sub_does_not_exist", DateTimeOffset.UtcNow.AddDays(30), false);
+
+        Assert.Empty(_db.MaintenanceSubscriptions);
+    }
+
     /// <summary>These tests are about subscriptions, not about messages leaving.</summary>
     private sealed class SilentEmailSender : IEmailSender
     {

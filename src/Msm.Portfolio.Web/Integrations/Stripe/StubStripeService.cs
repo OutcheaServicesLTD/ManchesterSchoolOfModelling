@@ -50,4 +50,13 @@ public class StubStripeService(
 
         return Task.FromResult(returnUrl);
     }
+
+    public Task CancelAtPeriodEndAsync(string subscriptionId, CancellationToken cancellationToken = default)
+    {
+        logger.LogWarning(
+            "Stripe is not configured. Cancel-at-period-end for subscription {SubscriptionId} is a no-op "
+            + "on the local stub.", subscriptionId);
+
+        return Task.CompletedTask;
+    }
 }

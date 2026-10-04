@@ -70,6 +70,19 @@ public interface IMaintenanceService
     /// </summary>
     Task<OperationResult> RecordCancelledAsync(
         Guid clientId, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Records the renewal/expiry date and whether the client has asked to cancel, from
+    /// Stripe's <c>customer.subscription.created</c> or <c>.updated</c>. Deliberately
+    /// does not touch <see cref="Domain.Entities.MaintenanceSubscription.Status"/>:
+    /// Stripe keeps a cancel-pending subscription's status "active" until the period
+    /// genuinely ends, so this can run freely without ever ending entitlement early.
+    /// </summary>
+    Task UpdatePeriodAsync(
+        string providerSubscriptionId,
+        DateTimeOffset? currentPeriodEnd,
+        bool cancelAtPeriodEnd,
+        CancellationToken cancellationToken = default);
 }
 
 public class MaintenanceService(
@@ -165,7 +178,9 @@ public class MaintenanceService(
         subscription.Status = MaintenanceSubscriptionStatus.Active;
         subscription.GracePeriodEndsAt = null;
         subscription.UpdatedAt = DateTimeOffset.UtcNow;
-        subscription.NextPaymentDate = DateTimeOffset.UtcNow.AddMonths(1);
+        // The real renewal date follows separately from Stripe's own
+        // customer.subscription.updated (UpdatePeriodAsync); guessing one here would be
+        // wrong for anything other than a monthly product.
 
         if (!wasInDifficulty && !hadExpired)
         {
@@ -333,8 +348,12 @@ public class MaintenanceService(
             db.MaintenanceSubscriptions.Add(subscription);
         }
 
+        // Any of these means entitlement had lapsed and the portfolio may have been
+        // taken down for it — re-subscribing is what brings it back (specification
+        // version 2: "if they later subscribe again, the portfolio is re-enabled").
         var wasEnded = subscription.Status is MaintenanceSubscriptionStatus.Cancelled
-            or MaintenanceSubscriptionStatus.Ended;
+            or MaintenanceSubscriptionStatus.Ended
+            or MaintenanceSubscriptionStatus.GracePeriodExpired;
 
         subscription.Provider = provider;
         subscription.ProviderSubscriptionId = providerSubscriptionId;
@@ -342,16 +361,32 @@ public class MaintenanceService(
         subscription.Currency = currency;
         subscription.Status = MaintenanceSubscriptionStatus.Active;
         subscription.GracePeriodEndsAt = null;
-        subscription.NextPaymentDate = now.AddMonths(1);
+        subscription.CancelAtPeriodEnd = false;
         subscription.UpdatedAt = now;
 
         audit.Record(nameof(MaintenanceSubscription), subscription.Id.ToString(),
             AuditActions.MaintenanceActivated,
-            newValue: $"Subscription active via {provider} at {price:0.00} {currency}/month");
+            newValue: $"Subscription active via {provider} at {price:0.00} {currency}");
 
         await db.SaveChangesAsync(cancellationToken);
 
         var client = await db.ClientProfiles.FindAsync([clientId], cancellationToken);
+
+        if (wasEnded)
+        {
+            // Automatic, unlike a portfolio taken down by an unresolved payment problem
+            // (see RecordPaymentSuccessAsync): a lapsed subscription is the client's own
+            // choice to end or not renew, so the same choice reversed — paying again —
+            // is enough on its own, with nothing for staff to decide.
+            var published = await portfolios.PublishAsync(clientId, null, cancellationToken);
+
+            if (!published.Succeeded)
+            {
+                logger.LogWarning(
+                    "Client {ClientId} resubscribed but their portfolio could not be republished: {Reason}",
+                    clientId, published.Error);
+            }
+        }
 
         if (client is not null)
         {
@@ -359,12 +394,36 @@ public class MaintenanceService(
                 client.ApplicationUserId,
                 NotificationTypes.MaintenancePaymentResolved,
                 wasEnded
-                    ? "Your subscription is active again."
+                    ? "Your subscription is active again and your portfolio is back online."
                     : "Thank you. Your subscription is now active.",
                 "/client");
         }
 
         return subscription;
+    }
+
+    public async Task UpdatePeriodAsync(
+        string providerSubscriptionId,
+        DateTimeOffset? currentPeriodEnd,
+        bool cancelAtPeriodEnd,
+        CancellationToken cancellationToken = default)
+    {
+        var subscription = await db.MaintenanceSubscriptions.FirstOrDefaultAsync(
+            s => s.ProviderSubscriptionId == providerSubscriptionId, cancellationToken);
+
+        if (subscription is null)
+        {
+            // Stripe does not guarantee delivery order: this can arrive before the
+            // checkout.session.completed that creates the row. Nothing is lost — the
+            // next update carries the same information.
+            return;
+        }
+
+        subscription.NextPaymentDate = currentPeriodEnd ?? subscription.NextPaymentDate;
+        subscription.CancelAtPeriodEnd = cancelAtPeriodEnd;
+        subscription.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await db.SaveChangesAsync(cancellationToken);
     }
 
     public async Task<OperationResult> RecordCancelledAsync(

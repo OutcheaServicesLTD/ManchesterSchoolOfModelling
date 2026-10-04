@@ -42,7 +42,22 @@ public class MaintenanceSubscription
     /// </summary>
     public DateTimeOffset? StartDate { get; set; }
 
+    /// <summary>
+    /// When the period already paid for ends, straight from Stripe's own
+    /// <c>current_period_end</c> rather than guessed from the billing interval. This is
+    /// the renewal date while the subscription is due to continue, and — when
+    /// <see cref="CancelAtPeriodEnd"/> is set — the date entitlement ends instead.
+    /// </summary>
     public DateTimeOffset? NextPaymentDate { get; set; }
+
+    /// <summary>
+    /// True once the client has asked to cancel. Entitlement does not drop the moment
+    /// this is set: Stripe keeps the subscription "active" right up to
+    /// <see cref="NextPaymentDate"/>, which is what lets a cancelled subscription stay
+    /// live for the period already paid for — Netflix/Spotify-style, not an immediate
+    /// cut-off.
+    /// </summary>
+    public bool CancelAtPeriodEnd { get; set; }
 
     /// <summary>
     /// When a failed payment's grace period ends. While this is in the future the

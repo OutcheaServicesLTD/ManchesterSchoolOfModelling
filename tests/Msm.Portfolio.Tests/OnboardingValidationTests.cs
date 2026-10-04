@@ -143,6 +143,59 @@ public class OnboardingValidationTests
 
         Assert.Empty(Validate(model));
     }
+
+    // ---------- Self-registration (/register) ----------
+
+    [Fact]
+    public void Self_registration_requires_a_password()
+    {
+        var model = ValidAdult();
+        model.IsSelfRegistration = true;
+
+        Assert.True(HasErrorFor(Validate(model), nameof(model.Password)));
+    }
+
+    [Fact]
+    public void Staff_mediated_onboarding_does_not_require_a_password()
+    {
+        var model = ValidAdult();
+        model.IsSelfRegistration = false;
+
+        Assert.Empty(Validate(model));
+    }
+
+    [Fact]
+    public void A_short_password_is_rejected()
+    {
+        var model = ValidAdult();
+        model.IsSelfRegistration = true;
+        model.Password = "short1";
+        model.ConfirmPassword = "short1";
+
+        Assert.True(HasErrorFor(Validate(model), nameof(model.Password)));
+    }
+
+    [Fact]
+    public void A_mismatched_confirmation_is_rejected()
+    {
+        var model = ValidAdult();
+        model.IsSelfRegistration = true;
+        model.Password = "a-genuine-password";
+        model.ConfirmPassword = "a-different-password";
+
+        Assert.True(HasErrorFor(Validate(model), nameof(model.ConfirmPassword)));
+    }
+
+    [Fact]
+    public void A_matching_password_of_sufficient_length_passes()
+    {
+        var model = ValidAdult();
+        model.IsSelfRegistration = true;
+        model.Password = "a-genuine-password";
+        model.ConfirmPassword = "a-genuine-password";
+
+        Assert.Empty(Validate(model));
+    }
 }
 
 public class GuardianConsentBlockTests

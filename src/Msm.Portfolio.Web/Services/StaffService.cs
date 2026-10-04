@@ -88,9 +88,9 @@ public class StaffService(
     {
         // Only staff roles can be created here. Creating a Client this way would produce
         // an account with no profile, and a Super Admin is never created from the UI.
-        if (role != Roles.Admin && role != Roles.Retoucher)
+        if (role != Roles.Admin && role != Roles.Retoucher && role != Roles.Viewer)
         {
-            return new CreateStaffResult(false, "Only Admin and Retoucher accounts can be created here.");
+            return new CreateStaffResult(false, "Only Admin, Retoucher and Viewer accounts can be created here.");
         }
 
         var normalised = email.Trim();

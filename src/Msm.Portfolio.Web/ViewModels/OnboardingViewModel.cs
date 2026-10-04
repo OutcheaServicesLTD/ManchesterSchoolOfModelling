@@ -41,6 +41,22 @@ public class OnboardingViewModel : IValidatableObject
     [Display(Name = "Telephone number")]
     public string? Phone { get; set; }
 
+    /// <summary>
+    /// True when this form was reached as self-service registration (<c>/register</c>)
+    /// rather than the staff-mediated onboarding link (<c>/onboarding</c>). Set by the
+    /// controller from the route, never posted by the browser: it decides whether a
+    /// password is collected and required, not whether the fields it renders exist.
+    /// </summary>
+    public bool IsSelfRegistration { get; set; }
+
+    [DataType(DataType.Password)]
+    [Display(Name = "Password")]
+    public string? Password { get; set; }
+
+    [DataType(DataType.Password)]
+    [Display(Name = "Confirm password")]
+    public string? ConfirmPassword { get; set; }
+
     [Required(ErrorMessage = "Please enter your date of birth.")]
     [DataType(DataType.Date)]
     [Display(Name = "Date of birth")]
@@ -168,6 +184,20 @@ public class OnboardingViewModel : IValidatableObject
                 yield return new ValidationResult(
                     "The guardian's email address must be different from your own.",
                     [nameof(GuardianEmail)]);
+            }
+        }
+
+        if (IsSelfRegistration)
+        {
+            if (string.IsNullOrWhiteSpace(Password) || Password.Length < 8)
+            {
+                yield return new ValidationResult(
+                    "Please choose a password of at least 8 characters.", [nameof(Password)]);
+            }
+            else if (Password != ConfirmPassword)
+            {
+                yield return new ValidationResult(
+                    "Password and confirmation do not match.", [nameof(ConfirmPassword)]);
             }
         }
 

@@ -25,6 +25,13 @@ public interface IStripeSubscriptionService
 
     Task<(bool Succeeded, string? RedirectUrl, string? Error)> OpenManagePortalAsync(
         Guid clientId, string returnUrl, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Cancels at the end of the period already paid for — never immediately. A client
+    /// who paid for a year keeps their portfolio for the year, exactly as leaving a
+    /// Netflix or Spotify subscription running until it is used up.
+    /// </summary>
+    Task<OperationResult> CancelAsync(Guid clientId, CancellationToken cancellationToken = default);
 }
 
 public class StripeSubscriptionService(
@@ -121,5 +128,42 @@ public class StripeSubscriptionService(
             logger.LogError(ex, "Could not open the Stripe Customer Portal for client {ClientId}.", clientId);
             return (false, null, "We could not open the subscription management page. Please try again.");
         }
+    }
+
+    public async Task<OperationResult> CancelAsync(Guid clientId, CancellationToken cancellationToken = default)
+    {
+        var subscription = await maintenance.GetForClientAsync(clientId, cancellationToken);
+
+        if (subscription?.ProviderSubscriptionId is null)
+        {
+            return OperationResult.Fail("There is no subscription to cancel.");
+        }
+
+        if (subscription.Status is not (Domain.Enums.MaintenanceSubscriptionStatus.Active
+            or Domain.Enums.MaintenanceSubscriptionStatus.PaymentIssue))
+        {
+            return OperationResult.Fail("This subscription is not currently active.");
+        }
+
+        try
+        {
+            await stripe.CancelAtPeriodEndAsync(subscription.ProviderSubscriptionId, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(
+                ex, "Could not cancel the subscription for client {ClientId}.", clientId);
+            return OperationResult.Fail("We could not cancel the subscription. Please try again.");
+        }
+
+        // Set optimistically for the page the client is looking at right now; Stripe's
+        // own customer.subscription.updated webhook (MaintenanceService.UpdatePeriodAsync)
+        // confirms it shortly after and is the authority, same as every other state
+        // change in this flow (specification section 44, extended to Stripe).
+        subscription.CancelAtPeriodEnd = true;
+        subscription.UpdatedAt = DateTimeOffset.UtcNow;
+        await db.SaveChangesAsync(cancellationToken);
+
+        return OperationResult.Ok();
     }
 }

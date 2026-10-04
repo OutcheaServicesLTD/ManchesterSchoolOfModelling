@@ -120,11 +120,11 @@ public class PublicPortfolioService(
         var portfolio = await db.Portfolios
             .Include(p => p.Client)
             .ThenInclude(c => c.Measurements)
-            // IsPublished is the only gate. A portfolio with a slug that has been
+            // IsPublished is the main gate. A portfolio with a slug that has been
             // unpublished must read as missing, not as a private page.
             .FirstOrDefaultAsync(p => p.Slug == slug && p.IsPublished, cancellationToken);
 
-        if (portfolio is null)
+        if (portfolio is null || !await IsEntitledAsync(portfolio.ClientId, cancellationToken))
         {
             return null;
         }
@@ -197,6 +197,24 @@ public class PublicPortfolioService(
             selfTape?.Id,
             client.InstagramUrl,
             client.TikTokUrl);
+    }
+
+    /// <summary>
+    /// Whether this client's subscription entitles their portfolio to be shown publicly
+    /// right now — on top of <c>IsPublished</c>, the same additional check the Model
+    /// Board already applies (specification section 18, extended to the portfolio page
+    /// and enquiry form for consistency). A client who has never touched the
+    /// subscription feature is unaffected: only a subscription that has actually lapsed
+    /// withdraws entitlement.
+    /// </summary>
+    private async Task<bool> IsEntitledAsync(Guid clientId, CancellationToken cancellationToken)
+    {
+        var subscription = await db.MaintenanceSubscriptions
+            .Where(s => s.ClientId == clientId)
+            .OrderByDescending(s => s.CreatedAt)
+            .FirstOrDefaultAsync(cancellationToken);
+
+        return subscription is null || subscription.IsEntitlementActive(DateTimeOffset.UtcNow);
     }
 
     /// <summary>
@@ -280,7 +298,8 @@ public class PublicPortfolioService(
             .Include(c => c.GuardianConsent)
             .FirstOrDefaultAsync(c => c.Id == clientId, cancellationToken);
 
-        if (client?.Portfolio is not { IsPublished: true })
+        if (client?.Portfolio is not { IsPublished: true }
+            || !await IsEntitledAsync(clientId, cancellationToken))
         {
             logger.LogWarning("Enquiry rejected for client {ClientId}: no published portfolio.", clientId);
             return EnquiryOutcome.UnknownModel;

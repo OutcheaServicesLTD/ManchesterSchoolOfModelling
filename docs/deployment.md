@@ -104,6 +104,7 @@ Msm__ContactPhone=...
 
 Integrations__Stripe__SecretKey=...
 Integrations__Stripe__WebhookSecret=...
+Integrations__Stripe__PriceId=...        # the annual Portfolio Maintenance Price in Stripe
 Integrations__HighLevel__ApiKey=...
 Integrations__HighLevel__LocationId=...
 
@@ -213,7 +214,7 @@ abuse, not to ration normal work.
 | `POST /account/login` | 10 per 5 minutes per address |
 | `POST /onboarding`, `GET`/`POST /guardian/approve/{token}` | 30 per 10 minutes per address |
 | `POST /{slug}/enquire` | 5 per 10 minutes per address |
-| `POST /webhooks/gocardless` | 300 per minute per address |
+| `POST /webhooks/stripe` | 300 per minute per address |
 
 Requests over a limit are rejected with `429` and a `Retry-After` header rather than
 queued, and each rejection is logged with the path and address. Queuing would hold
@@ -235,9 +236,13 @@ rules entirely and expose every client's unpublished photographs.
 ## Webhook endpoint
 
 Register this endpoint in the Stripe Dashboard, listening for `checkout.session.completed`,
-`checkout.session.expired`, `invoice.paid`, `invoice.payment_failed` and
-`customer.subscription.deleted` — the £99 one-off purchase and the portfolio-maintenance
-subscription both land here, one Stripe account behind both:
+`checkout.session.expired`, `invoice.paid`, `invoice.payment_failed`,
+`customer.subscription.created`, `customer.subscription.updated` and
+`customer.subscription.deleted` — the £99 one-off purchase and the annual
+portfolio-maintenance subscription both land here, one Stripe account behind both. The
+`created`/`updated` events only track the renewal date and the cancel-pending flag;
+`deleted` is what Stripe sends once a cancelled subscription's paid period is genuinely
+over, and is the only event that ends entitlement.
 
 ```
 https://model-portfolio.manchesterschoolofmodelling.co.uk/webhooks/stripe

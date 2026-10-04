@@ -70,6 +70,17 @@ public class ClientDashboardViewModel
 
     public DateTimeOffset? SubscriptionNextPaymentDate { get; set; }
 
+    /// <summary>
+    /// True once the client has asked to cancel. Still "Active" until the date above —
+    /// this only changes what the date means (renews vs. ends) and whether Cancel or
+    /// Start is offered.
+    /// </summary>
+    public bool SubscriptionCancelAtPeriodEnd { get; set; }
+
+    /// <summary>"year", "month" or similar, read from the product rather than assumed,
+    /// so the price can change term without the page needing to change with it.</summary>
+    public string SubscriptionBillingIntervalLabel { get; set; } = "year";
+
     public bool HasSubscription => SubscriptionStatus is not (null or Domain.Enums.MaintenanceSubscriptionStatus.NotStarted);
 
     public bool SubscriptionCanBeManaged =>
@@ -77,8 +88,15 @@ public class ClientDashboardViewModel
             or Domain.Enums.MaintenanceSubscriptionStatus.PaymentIssue
             or Domain.Enums.MaintenanceSubscriptionStatus.GracePeriodExpired;
 
+    /// <summary>Whether the direct-cancel action should be offered at all.</summary>
+    public bool SubscriptionCanBeCancelled =>
+        !SubscriptionCancelAtPeriodEnd
+        && SubscriptionStatus is Domain.Enums.MaintenanceSubscriptionStatus.Active
+            or Domain.Enums.MaintenanceSubscriptionStatus.PaymentIssue;
+
     public string SubscriptionStatusLabel => SubscriptionStatus switch
     {
+        Domain.Enums.MaintenanceSubscriptionStatus.Active when SubscriptionCancelAtPeriodEnd => "Cancelling",
         Domain.Enums.MaintenanceSubscriptionStatus.Active => "Active",
         Domain.Enums.MaintenanceSubscriptionStatus.PaymentIssue => "Payment problem",
         Domain.Enums.MaintenanceSubscriptionStatus.GracePeriodExpired => "Payment problem",

@@ -245,6 +245,9 @@ public class ProductionReadinessTests
         public Task<string> CreateManagePortalSessionAsync(
             string customerId, string returnUrl, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+
+        public Task CancelAtPeriodEndAsync(string subscriptionId, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
     }
 
     private sealed class FakeCrm(bool isLive) : IHighLevelService

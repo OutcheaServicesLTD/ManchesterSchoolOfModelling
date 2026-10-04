@@ -82,4 +82,20 @@ public class StripeService(ILogger<StripeService> logger) : IStripeService
 
         return session.Url;
     }
+
+    public async Task CancelAtPeriodEndAsync(
+        string subscriptionId, CancellationToken cancellationToken = default)
+    {
+        // Fully qualified: this file's own namespace ends in "Stripe", which would
+        // otherwise shadow the SDK's top-level namespace.
+        var service = new global::Stripe.SubscriptionService();
+
+        await service.UpdateAsync(
+            subscriptionId,
+            new global::Stripe.SubscriptionUpdateOptions { CancelAtPeriodEnd = true },
+            cancellationToken: cancellationToken);
+
+        logger.LogInformation(
+            "Subscription {SubscriptionId} set to cancel at period end.", subscriptionId);
+    }
 }

@@ -19,6 +19,7 @@ public class PublicPortfolioServiceTests : IDisposable
     private readonly ApplicationDbContext _db;
     private readonly PublicPortfolioService _service;
     private readonly RecordingEmailSender _email = new();
+    private readonly Guid _maintenanceProductId;
 
     public PublicPortfolioServiceTests()
     {
@@ -27,6 +28,19 @@ public class PublicPortfolioServiceTests : IDisposable
         _db = new ApplicationDbContext(
             new DbContextOptionsBuilder<ApplicationDbContext>().UseSqlite(_connection).Options);
         _db.Database.EnsureCreated();
+
+        var product = new Product
+        {
+            Code = ProductCodes.PortfolioMaintenance,
+            Name = "Portfolio Maintenance",
+            Price = 20.00m,
+            Currency = "GBP",
+            BillingType = BillingType.Recurring,
+            BillingInterval = BillingInterval.Yearly
+        };
+        _db.Products.Add(product);
+        _db.SaveChanges();
+        _maintenanceProductId = product.Id;
 
         _service = new PublicPortfolioService(
             _db,
@@ -168,6 +182,72 @@ public class PublicPortfolioServiceTests : IDisposable
         AddModel(published: false);
 
         Assert.Null(await _service.GetBySlugAsync("emma-johnson"));
+    }
+
+    /// <summary>
+    /// A client who never touched the subscription feature keeps the entitlement they
+    /// always had from the £99-purchase-and-publish flow (specification version 2,
+    /// item 9: null subscription is not the same as a lapsed one).
+    /// </summary>
+    [Fact]
+    public async Task A_client_with_no_subscription_at_all_is_still_served()
+    {
+        AddModel();
+
+        Assert.NotNull(await _service.GetBySlugAsync("emma-johnson"));
+    }
+
+    /// <summary>
+    /// Cancelling must not take the portfolio down immediately: Stripe keeps the
+    /// subscription's status "active" through the period already paid for, and
+    /// entitlement follows that status (the "extremely important" requirement).
+    /// </summary>
+    [Fact]
+    public async Task A_cancelled_but_still_in_period_subscription_keeps_the_portfolio_visible()
+    {
+        var clientId = AddModel();
+        AddSubscription(clientId, MaintenanceSubscriptionStatus.Active, cancelAtPeriodEnd: true);
+
+        Assert.NotNull(await _service.GetBySlugAsync("emma-johnson"));
+    }
+
+    /// <summary>
+    /// Once Stripe's customer.subscription.deleted lands, entitlement is withdrawn and
+    /// the direct portfolio page must stop serving it — not only the Model Board.
+    /// </summary>
+    [Theory]
+    [InlineData(MaintenanceSubscriptionStatus.Cancelled)]
+    [InlineData(MaintenanceSubscriptionStatus.Ended)]
+    [InlineData(MaintenanceSubscriptionStatus.GracePeriodExpired)]
+    public async Task A_lapsed_subscription_takes_the_portfolio_page_down(MaintenanceSubscriptionStatus status)
+    {
+        AddModel();
+        AddSubscription((await _db.ClientProfiles.SingleAsync()).Id, status);
+
+        Assert.Null(await _service.GetBySlugAsync("emma-johnson"));
+    }
+
+    /// <summary>Re-subscribing re-enables the page, following the same entitlement check.</summary>
+    [Fact]
+    public async Task An_active_subscription_serves_the_portfolio_again()
+    {
+        var clientId = AddModel();
+        AddSubscription(clientId, MaintenanceSubscriptionStatus.Active);
+
+        Assert.NotNull(await _service.GetBySlugAsync("emma-johnson"));
+    }
+
+    private void AddSubscription(
+        Guid clientId, MaintenanceSubscriptionStatus status, bool cancelAtPeriodEnd = false)
+    {
+        _db.MaintenanceSubscriptions.Add(new MaintenanceSubscription
+        {
+            ClientId = clientId,
+            ProductId = _maintenanceProductId,
+            Status = status,
+            CancelAtPeriodEnd = cancelAtPeriodEnd
+        });
+        _db.SaveChanges();
     }
 
     [Fact]
@@ -413,6 +493,36 @@ public class PublicPortfolioServiceTests : IDisposable
     {
         Assert.Equal(EnquiryOutcome.UnknownModel, await _service.SendEnquiryAsync(
             Guid.CreateVersion7(), "Scout", null, "scout@agency.example", null, "Hello."));
+    }
+
+    /// <summary>
+    /// The enquiry form must apply the same entitlement check as the portfolio page
+    /// itself — an agency should not be able to reach a model whose subscription has
+    /// lapsed just because they already know the client id.
+    /// </summary>
+    [Fact]
+    public async Task An_enquiry_about_a_lapsed_subscription_is_refused()
+    {
+        var clientId = AddModel();
+        AddSubscription(clientId, MaintenanceSubscriptionStatus.Cancelled);
+
+        var outcome = await _service.SendEnquiryAsync(
+            clientId, "Scout", null, "scout@agency.example", null, "Hello.");
+
+        Assert.Equal(EnquiryOutcome.UnknownModel, outcome);
+        Assert.Empty(_email.Sent);
+    }
+
+    [Fact]
+    public async Task An_enquiry_about_a_cancelled_but_still_in_period_subscription_is_delivered()
+    {
+        var clientId = AddModel();
+        AddSubscription(clientId, MaintenanceSubscriptionStatus.Active, cancelAtPeriodEnd: true);
+
+        var outcome = await _service.SendEnquiryAsync(
+            clientId, "Scout", null, "scout@agency.example", null, "Hello.");
+
+        Assert.Equal(EnquiryOutcome.Delivered, outcome);
     }
 
     /// <summary>

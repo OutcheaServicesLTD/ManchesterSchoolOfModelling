@@ -656,21 +656,26 @@ public class MediaService(
         }
     }
 
-    private async Task WriteVariantsAsync(
+    private Task WriteVariantsAsync(
         string originalKey,
         IReadOnlyList<GeneratedVariant> variants,
-        CancellationToken cancellationToken)
-    {
-        foreach (var variant in variants)
-        {
-            using var variantStream = new MemoryStream(variant.Content);
+        CancellationToken cancellationToken) =>
+        // In parallel rather than one after another: each variant is an independent
+        // upload, and on network object storage (the production target behind
+        // IMediaStorageService) that is real round-trip latency saved per file, not
+        // just a local-disk nicety.
+        Task.WhenAll(variants.Select(variant => WriteVariantAsync(originalKey, variant, cancellationToken)));
 
-            await storage.UploadAsync(
-                variantStream,
-                MediaStorageKeys.ForVariant(originalKey, variant.Variant),
-                variant.ContentType,
-                cancellationToken);
-        }
+    private async Task WriteVariantAsync(
+        string originalKey, GeneratedVariant variant, CancellationToken cancellationToken)
+    {
+        using var variantStream = new MemoryStream(variant.Content);
+
+        await storage.UploadAsync(
+            variantStream,
+            MediaStorageKeys.ForVariant(originalKey, variant.Variant),
+            variant.ContentType,
+            cancellationToken);
     }
 
     public async Task<IReadOnlyList<MediaAsset>> GetPoolAsync(

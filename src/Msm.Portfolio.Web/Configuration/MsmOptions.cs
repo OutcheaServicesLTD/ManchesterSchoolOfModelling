@@ -89,9 +89,15 @@ public class CommerceOptions
     /// </summary>
     public int PortfolioTermDays { get; set; } = 365;
 
-    /// <summary>Monthly maintenance price, for the Portfolio Maintenance product a client
-    /// can subscribe to themselves from their portal.</summary>
-    public decimal MaintenancePrice { get; set; } = 19.99m;
+    /// <summary>
+    /// Annual maintenance price, for the Portfolio Maintenance product a client can
+    /// subscribe to themselves from their portal. This is the locally-displayed price —
+    /// changing it does not change what Stripe actually charges. That is set by
+    /// whichever Stripe Price <c>Integrations:Stripe:PriceId</c> points at, so the real
+    /// price can change without a deployment; keep this in step with it so the client
+    /// portal and the Stripe Dashboard agree on what is shown.
+    /// </summary>
+    public decimal MaintenancePrice { get; set; } = 20.00m;
 
     /// <summary>
     /// Days a portfolio stays public after a failed maintenance payment

@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Msm.Portfolio.Web.Configuration;
+using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.Domain.Enums;
 using Msm.Portfolio.Web.Services;
 using Msm.Portfolio.Web.ViewModels;
@@ -9,24 +11,32 @@ using Msm.Portfolio.Web.ViewModels;
 namespace Msm.Portfolio.Web.Controllers;
 
 /// <summary>
-/// The form the client completes after their photoshoot (specification sections 8 and 34).
+/// Where a model's account and portfolio profile get created — either filled in by
+/// staff after a photoshoot (<c>/onboarding</c>, reached from a GoHighLevel link
+/// carrying a contact id), or by the model themselves (<c>/register</c>). Both routes
+/// share this one form: what differs is whether a password is collected, which is what
+/// <see cref="OnboardingViewModel.IsSelfRegistration"/> is for.
 /// </summary>
 /// <remarks>
-/// Reached from a GoHighLevel link carrying the contact id, so it is open to anonymous
-/// visitors by necessity. The contact id identifies which CRM contact submitted the
-/// form; it is never treated as proof of identity, and nothing already stored is read
-/// back to the visitor.
+/// Open to anonymous visitors by necessity in both cases. The contact id identifies
+/// which CRM contact submitted the form; it is never treated as proof of identity, and
+/// nothing already stored is read back to the visitor.
 /// </remarks>
-[Route("onboarding")]
 [AllowAnonymous]
 public class OnboardingController(
     IClientOnboardingService onboarding,
     IMeasurementTemplateProvider templates,
+    SignInManager<ApplicationUser> signInManager,
     ILogger<OnboardingController> logger) : Controller
 {
-    [HttpGet("")]
+    [HttpGet("onboarding")]
+    [HttpGet("register")]
     public async Task<IActionResult> Index(
         string? ghlContactId = null,
+        string? firstName = null,
+        string? lastName = null,
+        string? email = null,
+        string? phone = null,
         CancellationToken cancellationToken = default)
     {
         if (!string.IsNullOrWhiteSpace(ghlContactId)
@@ -39,18 +49,37 @@ public class OnboardingController(
             return View("AlreadySubmitted");
         }
 
-        var model = new OnboardingViewModel { GhlContactId = ghlContactId };
+        var isSelfRegistration = IsRegisterRoute();
+
+        var model = new OnboardingViewModel
+        {
+            GhlContactId = ghlContactId,
+            IsSelfRegistration = isSelfRegistration,
+            // A personalised link — /register?firstName=...&lastName=...&email=...,
+            // the kind an email automation sends — fills these in so the model does not
+            // retype what the studio already knows. Nothing is submitted on their
+            // behalf: they still review it and press Register themselves.
+            FirstName = firstName?.Trim() ?? string.Empty,
+            LastName = lastName?.Trim() ?? string.Empty,
+            Email = email?.Trim() ?? string.Empty,
+            Phone = phone?.Trim()
+        };
+
         PrepareTemplate(model);
 
-        return View(model);
+        return View(isSelfRegistration ? "Register" : "Index", model);
     }
 
-    [HttpPost("")]
+    [HttpPost("onboarding")]
+    [HttpPost("register")]
     [EnableRateLimiting(RateLimitPolicies.AnonymousForm)]
     public async Task<IActionResult> Index(
         OnboardingViewModel model,
         CancellationToken cancellationToken = default)
     {
+        var isSelfRegistration = IsRegisterRoute();
+        model.IsSelfRegistration = isSelfRegistration;
+
         // The template has to be attached before validation, because the required
         // measurements for the chosen profile type are part of the rules.
         PrepareTemplate(model);
@@ -58,7 +87,7 @@ public class OnboardingController(
 
         if (!ModelState.IsValid)
         {
-            return View(model);
+            return View(isSelfRegistration ? "Register" : "Index", model);
         }
 
         var result = await onboarding.SubmitAsync(model, cancellationToken);
@@ -66,7 +95,15 @@ public class OnboardingController(
         if (!result.Succeeded)
         {
             ModelState.AddModelError(string.Empty, result.Error ?? "We could not save your details.");
-            return View(model);
+            return View(isSelfRegistration ? "Register" : "Index", model);
+        }
+
+        if (isSelfRegistration)
+        {
+            // Already proved the password moments ago by setting it; no separate
+            // credential check is needed to sign the account straight in.
+            await signInManager.SignInAsync(result.Client!.ApplicationUser!, isPersistent: false);
+            return Redirect("/client");
         }
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
@@ -75,12 +112,15 @@ public class OnboardingController(
         return RedirectToAction(nameof(Complete));
     }
 
-    [HttpGet("complete")]
+    [HttpGet("onboarding/complete")]
     public IActionResult Complete()
     {
         ViewData["GuardianPending"] = TempData["GuardianPending"] as bool? ?? false;
         return View();
     }
+
+    private bool IsRegisterRoute() =>
+        Request.Path.StartsWithSegments("/register", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Attaches the measurement fields for the chosen profile type and lines the posted

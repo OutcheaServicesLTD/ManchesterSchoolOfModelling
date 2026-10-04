@@ -292,6 +292,56 @@ public class StripeWebhookProcessorTests : IDisposable
     }
 
     /// <summary>
+    /// The "extremely important" cancel-pending behaviour: Stripe sends this with
+    /// cancel_at_period_end=true the moment a client cancels, but the subscription's
+    /// own status stays "active" right up to current_period_end. The event must record
+    /// the flag and renewal date without ending entitlement or taking the portfolio
+    /// down early.
+    /// </summary>
+    [Fact]
+    public async Task Subscription_updated_records_a_pending_cancellation_without_ending_entitlement()
+    {
+        var clientId = AddClient();
+        AddSubscribedPublishedClient(clientId, MaintenanceSubscriptionStatus.Active, "sub_5");
+        var periodEnd = DateTimeOffset.UtcNow.AddDays(200).ToUnixTimeSeconds();
+
+        var payload = """
+        {"id":"evt_6","type":"customer.subscription.updated",
+         "data":{"object":{"id":"sub_5","customer":"cus_1",
+                            "current_period_end":PERIOD_END,"cancel_at_period_end":true}}}
+        """.Replace("PERIOD_END", periodEnd.ToString());
+
+        var result = await _processor.ProcessAsync(payload, Sign(payload));
+
+        Assert.True(result.Accepted);
+
+        var subscription = _db.MaintenanceSubscriptions.Single(s => s.ClientId == clientId);
+        Assert.True(subscription.CancelAtPeriodEnd);
+        Assert.Equal(MaintenanceSubscriptionStatus.Active, subscription.Status);
+        Assert.True(_db.Portfolios.Single(p => p.ClientId == clientId).IsPublished);
+    }
+
+    [Fact]
+    public async Task Subscription_created_records_the_first_renewal_date()
+    {
+        var clientId = AddClient();
+        AddSubscribedPublishedClient(clientId, MaintenanceSubscriptionStatus.Active, "sub_6");
+        var periodEnd = DateTimeOffset.UtcNow.AddDays(365).ToUnixTimeSeconds();
+
+        var payload = """
+        {"id":"evt_7","type":"customer.subscription.created",
+         "data":{"object":{"id":"sub_6","customer":"cus_1",
+                            "current_period_end":PERIOD_END,"cancel_at_period_end":false}}}
+        """.Replace("PERIOD_END", periodEnd.ToString());
+
+        await _processor.ProcessAsync(payload, Sign(payload));
+
+        var subscription = _db.MaintenanceSubscriptions.Single(s => s.ClientId == clientId);
+        Assert.False(subscription.CancelAtPeriodEnd);
+        Assert.Equal(DateTimeOffset.FromUnixTimeSeconds(periodEnd), subscription.NextPaymentDate);
+    }
+
+    /// <summary>
     /// Stripe does not guarantee delivery order. An invoice event for a subscription
     /// this application has not recorded yet must not throw — only checkout.session.
     /// completed has a client reference to create the row from.

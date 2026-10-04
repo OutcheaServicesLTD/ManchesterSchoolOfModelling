@@ -70,7 +70,14 @@ public class ClientDashboardBuilder(
             SubscriptionStatus = subscription?.Status,
             SubscriptionPrice = subscription?.PriceAtCreation ?? maintenanceProduct?.Price ?? 0m,
             SubscriptionCurrency = subscription?.Currency ?? maintenanceProduct?.Currency ?? "GBP",
-            SubscriptionNextPaymentDate = subscription?.NextPaymentDate
+            SubscriptionNextPaymentDate = subscription?.NextPaymentDate,
+            SubscriptionCancelAtPeriodEnd = subscription?.CancelAtPeriodEnd ?? false,
+            SubscriptionBillingIntervalLabel = (maintenanceProduct?.BillingInterval ?? BillingInterval.Yearly) switch
+            {
+                BillingInterval.Weekly => "week",
+                BillingInterval.Monthly => "month",
+                _ => "year"
+            }
         };
     }
 

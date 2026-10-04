@@ -111,6 +111,7 @@
                     <label for="Role" class="form-label">Role</label>
                     <select id="Role" name="Role" class="form-select">
                         <option value="@Roles.Retoucher">Retoucher</option>
+                        <option value="@Roles.Viewer">Viewer</option>
                         <option value="@Roles.Admin">Admin</option>
                     </select>
                 </div>
@@ -121,7 +122,7 @@
         </div>
     </div>
 
-    @foreach (var role in new[] { Roles.Admin, Roles.Retoucher })
+    @foreach (var role in new[] { Roles.Admin, Roles.Retoucher, Roles.Viewer })
     {
         var granted = Model.GrantedTo(role);
 

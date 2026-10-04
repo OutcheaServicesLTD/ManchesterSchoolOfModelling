@@ -181,7 +181,7 @@ public class DbSeeder(
             commerce.MaintenancePrice,
             commerce.Currency,
             BillingType.Recurring,
-            BillingInterval.Monthly,
+            BillingInterval.Yearly,
             cancellationToken);
 
         await db.SaveChangesAsync(cancellationToken);

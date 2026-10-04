@@ -70,9 +70,14 @@ public class ClientOnboardingService(
                 IsActive = true
             };
 
-            // No password is set here. The client receives account access after purchase
-            // (specification section 50), so the account exists but cannot yet be signed in to.
-            var created = await userManager.CreateAsync(user);
+            // Self-registration (/register) chooses its own password and can sign in
+            // immediately. The staff-mediated form (/onboarding) still creates the
+            // account without one — access is granted later, from the client's admin
+            // record — which is why this branches rather than always taking a password.
+            var created = model.IsSelfRegistration
+                ? await userManager.CreateAsync(user, model.Password!)
+                : await userManager.CreateAsync(user);
+
             if (!created.Succeeded)
             {
                 var error = string.Join("; ", created.Errors.Select(e => e.Description));
@@ -87,6 +92,9 @@ public class ClientOnboardingService(
             var client = new ClientProfile
             {
                 ApplicationUserId = user.Id,
+                // Set directly rather than left to change-tracker fixup: self-registration
+                // signs the account straight in afterwards and needs this populated.
+                ApplicationUser = user,
                 GhlContactId = string.IsNullOrWhiteSpace(model.GhlContactId) ? null : model.GhlContactId.Trim(),
                 FirstName = model.FirstName.Trim(),
                 LastName = model.LastName.Trim(),
@@ -99,7 +107,9 @@ public class ClientOnboardingService(
                 EyeColour = model.EyeColour?.Trim(),
                 InstagramUrl = model.InstagramUrl?.Trim(),
                 TikTokUrl = model.TikTokUrl?.Trim(),
-                AccountStatus = ClientAccountStatus.Invited
+                AccountStatus = model.IsSelfRegistration
+                    ? ClientAccountStatus.Active
+                    : ClientAccountStatus.Invited
             };
 
             db.ClientProfiles.Add(client);

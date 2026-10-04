@@ -6,10 +6,11 @@ namespace Msm.Portfolio.Web.Integrations.Stripe;
 /// </summary>
 /// <remarks>
 /// Deliberately narrow. Everything Stripe Checkout and the Stripe Customer Portal
-/// already do — collecting a card, retrying a failed payment, letting a client cancel —
-/// stays on Stripe's hosted pages rather than being rebuilt here. This interface only
-/// ever asks Stripe to start one of those pages and hands back where to send the
-/// browser; nothing above it ever sees a card number or a secret key.
+/// already do — collecting a card, retrying a failed payment — stays on Stripe's hosted
+/// pages rather than being rebuilt here. Cancelling is the one exception: it is called
+/// directly, at period end, so the Netflix/Spotify-style "stays live until the paid
+/// period ends" rule does not depend on how the Stripe Dashboard's own Customer Portal
+/// happens to be configured.
 /// </remarks>
 public interface IStripeService
 {
@@ -41,4 +42,12 @@ public interface IStripeService
     /// </summary>
     Task<string> CreateManagePortalSessionAsync(
         string customerId, string returnUrl, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Marks a subscription to stop at the end of the period already paid for, rather
+    /// than cancelling it outright. The subscription's Stripe status stays "active"
+    /// until then — Stripe's own behaviour, not something this application tracks — so
+    /// entitlement is unaffected until the real expiry webhook arrives.
+    /// </summary>
+    Task CancelAtPeriodEndAsync(string subscriptionId, CancellationToken cancellationToken = default);
 }
