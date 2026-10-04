@@ -1,4 +1,5 @@
 @model Msm.Portfolio.Web.ViewModels.RetoucherQueueViewModel
+@using Msm.Portfolio.Web.Domain.Enums
 @using Msm.Portfolio.Web.Services
 @using Msm.Portfolio.Web.ViewModels
 @{
@@ -94,7 +95,7 @@ else
                                 <span class="text-muted">(@item.SelectedCount on portfolio)</span>
                             }
                         </td>
-                        <td>@item.Status</td>
+                        <td>@item.Status.Label()</td>
                         <td>
                             @(item.AssignedRetoucher ?? "—")
                             @if (item.AssignedToMe)

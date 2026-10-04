@@ -29,7 +29,7 @@
             <option value="">All</option>
             @foreach (var status in Enum.GetValues<PortfolioStatus>())
             {
-                <option value="@status" selected="@(Model.Status == status)">@status</option>
+                <option value="@status" selected="@(Model.Status == status)">@status.Label()</option>
             }
         </select>
     </div>
@@ -85,7 +85,7 @@ else
                             }
                         </th>
                         <td data-label="Portfolio status">
-                            @row.Status
+                            @row.Status.Label()
                             @if (row.IsPublished)
                             {
                                 <span class="badge text-bg-success">Live</span>

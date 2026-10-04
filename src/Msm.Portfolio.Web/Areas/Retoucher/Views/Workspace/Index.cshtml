@@ -1,4 +1,5 @@
 @model Msm.Portfolio.Web.ViewModels.RetoucherWorkspaceViewModel
+@using Msm.Portfolio.Web.Domain.Enums
 @inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
 @{
     ViewData["Title"] = Model.ClientName;
@@ -9,7 +10,7 @@
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
     <div>
         <h1 class="mb-1">@Model.ClientName</h1>
-        <p class="text-muted mb-0">Status: @Model.Status</p>
+        <p class="text-muted mb-0">Status: @Model.Status.Label()</p>
     </div>
     <a class="btn btn-outline-secondary" href="/retoucher">Back to queue</a>
 </div>
