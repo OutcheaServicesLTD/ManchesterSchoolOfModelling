@@ -25,7 +25,7 @@ remain open — see [Decisions still open](#decisions-still-open) and
 | 4 | Retoucher queue, assignments, upload workspace, submit for review | Done |
 | 5 | Admin dashboard, client management, portfolio preview, status management, publish/unpublish | Done |
 | 6 | Public portfolio, responsive gallery, contact MSM, Model Board, slugs | Done |
-| 7 | Orders, checkout, GoCardless integration, webhooks | Done, except the provider's own HTTP calls — see below |
+| 7 | Orders, checkout, Stripe integration, webhooks | Done, except the provider's own HTTP calls — see below |
 | 8 | Maintenance subscription, failed payment detection, grace period, automatic unpublish | Done |
 | 9 | GoHighLevel synchronisation | Done, except the provider's own HTTP calls — see below |
 | 10 | Audit, security, permissions, upload, payment, mobile, accessibility and performance hardening | Done |
@@ -38,7 +38,7 @@ Four items requested after the platform went into real use:
 | ---- | ----- | ----- |
 | 1 | Image optimisation | Was already mostly built (multi-size JPEG renditions, lazy loading, responsive `srcset`). Added: a WebP rendition, offered automatically to any browser that says it can use one via content negotiation on the existing `/media` URLs — no template changes needed, roughly 60% smaller than the JPEG for the same photograph in testing |
 | 2 | Auto-preview after retoucher upload | Submitting now carries a portfolio straight to viewable, reusing the same checks the old manual "Mark in viewing" click applied. That click still exists for a legacy portfolio stuck mid-review, but nothing new ever needs it |
-| 3 | Stripe subscriptions | A second, optional recurring layer alongside the existing £99 one-off purchase — GoCardless is untouched. A client starts and manages it themselves from the client portal; Stripe Checkout and the Stripe Customer Portal do almost all of the work. See below |
+| 3 | Stripe subscriptions | A second, optional recurring layer alongside the existing £99 one-off purchase, on the same Stripe account. A client starts and manages it themselves from the client portal; Stripe Checkout and the Stripe Customer Portal do almost all of the work. See below |
 | 4 | Portfolio URL collisions | Was already collision-safe (`SlugService` auto-suffixes a taken slug). Changing a slug by hand is now Super Admin only, so an ordinary Admin cannot break a link an agency already has |
 
 ## Just want to look at the site?
@@ -425,9 +425,11 @@ client-editable.
 
 ## Payments
 
-The £3,499 programme is sold from the studio: Admin opens the checkout with the client
-present, the client accepts the terms, and the provider's hosted page collects the
-payment details. None are handled by this application.
+The £99 digital portfolio is sold from the studio: Admin opens the checkout with the
+client present, the client accepts the terms, and Stripe's hosted Checkout page collects
+the payment details. None are handled by this application. One Stripe account also runs
+the portfolio-maintenance subscription below (specification version 2, item 3) — the
+£99 purchase itself is unaffected by whether that subscription is ever used.
 
 ### What is built and tested, and what is not
 
@@ -436,23 +438,22 @@ lifecycle, the payment states from specification section 21, webhook signature
 verification, replay-safe idempotency, and the rule that publishes a portfolio on a
 successful payment.
 
-**`GoCardlessService` — the HTTP calls to GoCardless — is not verified.** Their API and
-their documentation were both unreachable from the environment this was built in, so the
-request and response shapes come from documented knowledge rather than an observed
-exchange. Before taking real payments, work through
-[`docs/gocardless-verification.md`](docs/gocardless-verification.md).
+**The HTTP calls to Stripe are not verified against a live account.** Before taking real
+payments, exercise a real checkout and a real webhook delivery against a Stripe test-mode
+account first.
 
-Until then, leave `Integrations:GoCardless:AccessToken` unset. `StubGoCardlessService` is
-registered automatically when it is: it takes no money, says so plainly on every page,
-and refuses to authorise anything outside Development, so it cannot quietly publish
-portfolios nobody paid for.
+Until a secret key is configured, the local stub is registered automatically: it takes
+no money, says so plainly on every page, and refuses to authorise anything outside
+Development, so it cannot quietly publish portfolios nobody paid for.
 
 ### The order
 
 The agreed amount is copied onto the order at checkout and never read back from the
 product, so changing the advertised price later cannot alter what a client was charged
-(specification section 19). Reopening a checkout reuses the unfinished order rather than
-creating a second one, and a client who has already paid cannot open another.
+(specification section 19). There is no pre-created Stripe Price for this purchase —
+unlike the subscription below, the amount is already owned by the order, so it is sent to
+Stripe as a line item built on the spot. Reopening a checkout reuses the unfinished order
+rather than creating a second one, and a client who has already paid cannot open another.
 
 Checkout refuses to open for a portfolio the client has not been shown, and for an
 under-18 client whose guardian has not approved — both enforced in the service as well
@@ -460,29 +461,32 @@ as the page, so opening the URL directly achieves nothing.
 
 ### Webhooks
 
-`POST /webhooks/gocardless` is anonymous and exempt from anti-forgery by necessity: the
-provider has no session and no token. The payload signature is therefore the only thing
+`POST /webhooks/stripe` is anonymous and exempt from anti-forgery by necessity: Stripe
+has no session and no token. The payload signature is therefore the only thing
 separating a real payment notification from a forged one, and it is verified before
 anything is read from the body. With no signing secret configured, everything is
 refused — accepting unsigned webhooks would let anyone who found the URL mark an order
 as paid and publish a portfolio.
 
-Providers retry until they get a success, so the same event arrives repeatedly. Each is
-recorded under a unique provider event id first; a repeat is acknowledged and skipped
-rather than applied again. Processing does not depend on a browser, so a client who
-closed the tab mid-payment still gets their portfolio published.
+Stripe retries until it gets a success, so the same event arrives repeatedly. Each is
+recorded under a unique event id first; a repeat is acknowledged and skipped rather than
+applied again. Processing does not depend on a browser, so a client who closed the tab
+mid-payment still gets their portfolio published once the webhook arrives. A Checkout
+Session that expires unused (Stripe's default: 24 hours) fails the order it was opened
+for, so a sale that quietly never happened does not sit looking open forever.
 
-An unrecognised provider action is recorded and changes nothing, so a new event type
-cannot corrupt an order.
+A completed Checkout Session with no subscription attached is this purchase, not the
+membership below — nothing else in this application opens a Stripe Checkout Session, so
+that one distinction is enough to route an event correctly.
 
 ### Two deliberate behaviours
 
 - **A paid order stands even if publication is refused.** If payment succeeds but the
   portfolio cannot go live, the sale is kept and staff are notified — the client has paid
   either way, and a person resolves it.
-- **A payment failure after confirmation does not unpublish anything.** That concerns the
-  money, not the sale; tearing the portfolio down there would bypass the grace period in
-  specification section 23.
+- **An expiry for an order a later session already paid changes nothing.** Stripe does
+  not guarantee delivery order, so a stale `checkout.session.expired` arriving after
+  confirmation must not undo the sale.
 
 ## What the website sells
 
@@ -803,9 +807,9 @@ will maintain them in a later phase.
 | `Media` | 60-image pool limit, 30-image portfolio limit, file size and type restrictions, storage provider |
 | `MeasurementTemplates` | Which measurements are collected per profile type. Overrides the section 9 defaults without a schema change |
 | `GuardianConsent` | Consent wording version, approval link lifetime, consent text |
-| `Commerce` | Portfolio price (£99) and term (365 days), whether maintenance is charged at all (off), maintenance price (£19.99), 7-day grace period, maintenance start offset |
+| `Commerce` | Portfolio price (£99) and term (365 days), maintenance price (£19.99), 7-day grace period |
 | `Msm` | Business name, public domain, contact email/phone/WhatsApp, social links |
-| `Integrations` | GoCardless, GoHighLevel and Stripe credentials |
+| `Integrations` | GoHighLevel and Stripe credentials |
 
 Credentials are never committed. Supply them through user secrets in development and
 environment variables in deployment.
@@ -823,9 +827,6 @@ requirements.
 - **Malware scanning** — specification section 38 asks for it where the hosting
   infrastructure supports it. Uploads are currently validated by decoding rather than
   scanned; wire a scanner in once hosting is chosen.
-- **Maintenance** — not charged. `Commerce:MaintenanceEnabled` is false and the £99 is
-  the only payment. The price, grace period and start offset settings are all still there
-  and take effect the moment it is switched back on.
 - **MSM contact details** — `Msm:ContactEmail`, `ContactPhone`, `WhatsApp`, to be
   supplied by MSM. Until they are set, the public portfolio shows the enquiry form but
   no direct contact options, and the footer omits them.
@@ -837,20 +838,17 @@ requirements.
   logged. Either route guardian messaging through GoHighLevel or register a real
   `IEmailSender` before go-live. The readiness guard blocks a production start until
   one exists.
-- **GoCardless** — `Integrations:GoCardless:AccessToken` and `WebhookSecret`. The HTTP
-  client is written but unverified; see `docs/gocardless-verification.md`. Leave the
-  token unset until it is checked, and the stub takes over.
 - **GoHighLevel** — `Integrations:HighLevel:ApiKey` and `LocationId`, plus the six
-  custom fields listed in `docs/gohighlevel-verification.md`. Same position as
-  GoCardless: written, unverified, stub by default.
-- **Stripe** — `Integrations:Stripe:SecretKey`, `WebhookSecret` and `PriceId` (the
-  recurring Price created for the Portfolio Maintenance product in the Stripe
-  Dashboard). Optional: the client portal simply does not offer a subscription until
-  all three are set, and the stub takes over in the meantime — same position as
-  GoCardless and GoHighLevel, and equally unverified against a real Stripe account.
-  `webhooks/stripe` needs a webhook endpoint configured in the Stripe Dashboard for
-  `checkout.session.completed`, `invoice.paid`, `invoice.payment_failed` and
-  `customer.subscription.deleted`.
+  custom fields listed in `docs/gohighlevel-verification.md`. Written, unverified, stub
+  by default.
+- **Stripe** — `Integrations:Stripe:SecretKey` and `WebhookSecret` are what the £99
+  one-off purchase needs; leave them unset and the stub takes over, exactly as above.
+  Add `PriceId` (the recurring Price created for the Portfolio Maintenance product in
+  the Stripe Dashboard) to also offer the subscription — optional on top, the client
+  portal simply does not offer it until set. Unverified against a real Stripe account
+  either way. `webhooks/stripe` needs a webhook endpoint configured in the Stripe
+  Dashboard for `checkout.session.completed`, `checkout.session.expired`,
+  `invoice.paid`, `invoice.payment_failed` and `customer.subscription.deleted`.
 - **Image and video size limits** — `Media:MaxImageBytes`, `Media:MaxVideoBytes`.
 
 ### One judgement call worth confirming

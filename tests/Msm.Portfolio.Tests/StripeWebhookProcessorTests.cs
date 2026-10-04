@@ -13,10 +13,12 @@ using Msm.Portfolio.Web.Storage;
 namespace Msm.Portfolio.Tests;
 
 /// <summary>
-/// Same shape as the GoCardless webhook tests (<c>CheckoutAndWebhookTests</c>): real
-/// signed payloads through the real verifier and processor against a real database, so
-/// idempotency and the state changes it drives are exercised end to end rather than
-/// through a mock of the boundary that matters most.
+/// Real signed payloads through the real verifier and processor against a real
+/// database, so idempotency and the state changes it drives are exercised end to end
+/// rather than through a mock of the boundary that matters most. Covers both things
+/// that land on the one Stripe webhook: the £99 one-off portfolio purchase
+/// (specification sections 19-21) and the portfolio-maintenance subscription
+/// (specification version 2, item 3).
 /// </summary>
 public class StripeWebhookProcessorTests : IDisposable
 {
@@ -25,6 +27,8 @@ public class StripeWebhookProcessorTests : IDisposable
     private readonly SqliteConnection _connection;
     private readonly ApplicationDbContext _db;
     private readonly StripeWebhookProcessor _processor;
+    private readonly ICheckoutService _checkout;
+    private readonly FakeProvider _purchaseProvider = new();
     private readonly Guid _maintenanceProductId;
 
     public StripeWebhookProcessorTests()
@@ -45,6 +49,14 @@ public class StripeWebhookProcessorTests : IDisposable
             BillingInterval = BillingInterval.Monthly
         };
         _db.Products.Add(product);
+        _db.Products.Add(new Product
+        {
+            Code = ProductCodes.DigitalPortfolioYear,
+            Name = "Digital Portfolio",
+            Price = 99.00m,
+            Currency = "GBP",
+            BillingType = BillingType.OneOff
+        });
         _db.SaveChanges();
         _maintenanceProductId = product.Id;
 
@@ -53,12 +65,17 @@ public class StripeWebhookProcessorTests : IDisposable
 
         var portfolios = new PortfolioService(
             _db, new SlugService(_db), new InMemoryStorage(), audit, notifications,
-            new SilentBiographyWriter(), NullLogger<PortfolioService>.Instance);
+            NullLogger<PortfolioService>.Instance);
+
+        var commerce = new OptionsWrapper<CommerceOptions>(
+            new CommerceOptions { MaintenanceGracePeriodDays = 7 });
 
         var maintenance = new MaintenanceService(
-            _db, portfolios, audit, notifications,
-            new OptionsWrapper<CommerceOptions>(new CommerceOptions { MaintenanceGracePeriodDays = 7 }),
-            NullLogger<MaintenanceService>.Instance);
+            _db, portfolios, audit, notifications, commerce, NullLogger<MaintenanceService>.Instance);
+
+        _checkout = new CheckoutService(
+            _db, _purchaseProvider, portfolios, audit, notifications, commerce,
+            NullLogger<CheckoutService>.Instance);
 
         var verifier = new StripeWebhookVerifier(
             new OptionsWrapper<IntegrationOptions>(new IntegrationOptions
@@ -68,7 +85,7 @@ public class StripeWebhookProcessorTests : IDisposable
             NullLogger<StripeWebhookVerifier>.Instance);
 
         _processor = new StripeWebhookProcessor(
-            _db, verifier, maintenance, NullLogger<StripeWebhookProcessor>.Instance);
+            _db, verifier, _checkout, maintenance, NullLogger<StripeWebhookProcessor>.Instance);
     }
 
     public void Dispose()
@@ -120,6 +137,43 @@ public class StripeWebhookProcessorTests : IDisposable
     {
         var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
         return $"t={timestamp},v1={StripeWebhookVerifier.ComputeSignature(timestamp, payload, Secret)}";
+    }
+
+    /// <summary>
+    /// Takes a client all the way to an open £99 checkout, the same way
+    /// <c>CheckoutController</c> does, so the order carries a real
+    /// <c>StripeCheckoutSessionId</c> a webhook can be matched against.
+    /// </summary>
+    private async Task<(Guid ClientId, string SessionId)> OpenPurchaseAsync()
+    {
+        var clientId = AddClient();
+
+        _db.Portfolios.Add(new Msm.Portfolio.Web.Domain.Entities.Portfolio
+        {
+            ClientId = clientId, Status = PortfolioStatus.InViewing
+        });
+        var asset = new MediaAsset
+        {
+            ClientId = clientId,
+            StorageKey = $"clients/{clientId:N}/a/original.jpg",
+            OriginalFilename = "a.jpg",
+            MimeType = "image/jpeg",
+            FileSize = 10,
+            MediaType = MediaType.Image,
+            IsSelectedForPortfolio = true,
+            IsFeatured = true
+        };
+        _db.MediaAssets.Add(asset);
+        await _db.SaveChangesAsync();
+
+        var portfolio = _db.Portfolios.Single(p => p.ClientId == clientId);
+        portfolio.FeaturedMediaId = asset.Id;
+        await _db.SaveChangesAsync();
+
+        var order = (await _checkout.OpenAsync(clientId, null)).Order!;
+        await _checkout.BeginPaymentAsync(order.Id, "https://x/s", "https://x/f");
+
+        return (clientId, (await _checkout.GetOrderAsync(order.Id))!.StripeCheckoutSessionId!);
     }
 
     [Fact]
@@ -254,5 +308,116 @@ public class StripeWebhookProcessorTests : IDisposable
 
         Assert.True(result.Accepted);
         Assert.Empty(_db.MaintenanceSubscriptions);
+    }
+
+    // ---------- The £99 one-off portfolio purchase ----------
+
+    /// <summary>
+    /// A completed Checkout Session with no subscription attached is the one-off £99
+    /// purchase, not the membership above — nothing else in this application opens a
+    /// Stripe Checkout Session.
+    /// </summary>
+    [Fact]
+    public async Task Checkout_completed_confirms_the_purchase_and_publishes_the_portfolio()
+    {
+        var (clientId, sessionId) = await OpenPurchaseAsync();
+
+        var payload = """
+            {"id":"evt_p1","type":"checkout.session.completed",
+             "data":{"object":{"id":"SESSION_ID","payment_intent":"pi_1"}}}
+            """.Replace("SESSION_ID", sessionId);
+
+        var result = await _processor.ProcessAsync(payload, Sign(payload));
+
+        Assert.True(result.Accepted);
+        Assert.Equal(1, result.Processed);
+
+        var order = _db.Orders.Single(o => o.ClientId == clientId);
+        Assert.Equal(OrderStatus.Confirmed, order.Status);
+        Assert.True(_db.Portfolios.Single(p => p.ClientId == clientId).IsPublished);
+    }
+
+    /// <summary>
+    /// The webhook is the authority and does not need the browser: a client who closed
+    /// the tab still gets their portfolio published (specification section 44).
+    /// </summary>
+    [Fact]
+    public async Task Replaying_the_same_purchase_event_confirms_it_only_once()
+    {
+        var (_, sessionId) = await OpenPurchaseAsync();
+
+        var payload = """
+            {"id":"evt_p2","type":"checkout.session.completed",
+             "data":{"object":{"id":"SESSION_ID","payment_intent":"pi_2"}}}
+            """.Replace("SESSION_ID", sessionId);
+        var signature = Sign(payload);
+
+        var first = await _processor.ProcessAsync(payload, signature);
+        var second = await _processor.ProcessAsync(payload, signature);
+
+        Assert.Equal(1, first.Processed);
+        Assert.Equal(0, second.Processed);
+        Assert.Equal(1, second.Skipped);
+        Assert.Equal(1, await _db.Orders.CountAsync(o => o.Status == OrderStatus.Confirmed));
+    }
+
+    [Fact]
+    public async Task A_completed_session_matching_no_order_is_recorded_but_changes_nothing()
+    {
+        const string payload = """
+            {"id":"evt_p3","type":"checkout.session.completed",
+             "data":{"object":{"id":"cs_does_not_exist","payment_intent":"pi_3"}}}
+            """;
+
+        var result = await _processor.ProcessAsync(payload, Sign(payload));
+
+        Assert.True(result.Accepted);
+        Assert.Equal(1, await _db.PaymentWebhookEvents.CountAsync());
+        Assert.Empty(_db.Orders);
+    }
+
+    /// <summary>
+    /// Stripe's default Checkout Session expiry (24 hours unused) fails an order still
+    /// waiting on it, so staff are not left looking at a sale that quietly never happened.
+    /// </summary>
+    [Fact]
+    public async Task An_expired_session_fails_the_still_waiting_order()
+    {
+        var (clientId, sessionId) = await OpenPurchaseAsync();
+
+        var payload = """
+            {"id":"evt_p4","type":"checkout.session.expired",
+             "data":{"object":{"id":"SESSION_ID"}}}
+            """.Replace("SESSION_ID", sessionId);
+
+        await _processor.ProcessAsync(payload, Sign(payload));
+
+        Assert.Equal(OrderStatus.Failed, _db.Orders.Single(o => o.ClientId == clientId).Status);
+        Assert.False(_db.Portfolios.Single(p => p.ClientId == clientId).IsPublished);
+    }
+
+    /// <summary>
+    /// An expiry arriving for an order a later session already paid must not undo the
+    /// sale — Stripe does not guarantee delivery order.
+    /// </summary>
+    [Fact]
+    public async Task An_expired_session_for_an_already_confirmed_order_changes_nothing()
+    {
+        var (clientId, sessionId) = await OpenPurchaseAsync();
+
+        var completed = """
+            {"id":"evt_p5a","type":"checkout.session.completed",
+             "data":{"object":{"id":"SESSION_ID","payment_intent":"pi_5"}}}
+            """.Replace("SESSION_ID", sessionId);
+        await _processor.ProcessAsync(completed, Sign(completed));
+
+        var expired = """
+            {"id":"evt_p5b","type":"checkout.session.expired",
+             "data":{"object":{"id":"SESSION_ID"}}}
+            """.Replace("SESSION_ID", sessionId);
+        await _processor.ProcessAsync(expired, Sign(expired));
+
+        Assert.Equal(OrderStatus.Confirmed, _db.Orders.Single(o => o.ClientId == clientId).Status);
+        Assert.True(_db.Portfolios.Single(p => p.ClientId == clientId).IsPublished);
     }
 }

@@ -31,7 +31,7 @@ public class PortfolioTermTests : IDisposable
 
         var portfolios = new PortfolioService(
             _db, new SlugService(_db), new InMemoryStorage(), audit, notifications,
-            new SilentBiographyWriter(), NullLogger<PortfolioService>.Instance);
+            NullLogger<PortfolioService>.Instance);
 
         _service = new PortfolioTermService(
             _db, portfolios, audit, notifications, NullLogger<PortfolioTermService>.Instance);

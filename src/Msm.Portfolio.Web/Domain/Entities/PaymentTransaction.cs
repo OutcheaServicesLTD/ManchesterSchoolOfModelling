@@ -4,8 +4,8 @@ namespace Msm.Portfolio.Web.Domain.Entities;
 
 /// <summary>
 /// A single payment attempt against an order (specification sections 21 and 26).
-/// Payment is tracked as a state rather than a paid flag, because GoCardless
-/// settlement moves through several stages after authorisation.
+/// Payment is tracked as a state rather than a paid flag, because settlement can move
+/// through more than one stage after authorisation.
 /// </summary>
 public class PaymentTransaction
 {
@@ -15,8 +15,8 @@ public class PaymentTransaction
 
     public Order Order { get; set; } = null!;
 
-    /// <summary>Payment provider name, for example "GoCardless".</summary>
-    public string Provider { get; set; } = "GoCardless";
+    /// <summary>Payment provider name — "Stripe".</summary>
+    public string Provider { get; set; } = "Stripe";
 
     /// <summary>Provider's own payment identifier, used to reconcile inbound webhooks.</summary>
     public string? ProviderPaymentId { get; set; }

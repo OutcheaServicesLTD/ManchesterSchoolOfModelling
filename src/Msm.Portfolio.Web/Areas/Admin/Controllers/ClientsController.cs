@@ -8,7 +8,6 @@ using Msm.Portfolio.Web.Configuration;
 using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.Domain.Enums;
-using Msm.Portfolio.Web.Integrations.Bio;
 using Msm.Portfolio.Web.Services;
 using Msm.Portfolio.Web.ViewModels;
 
@@ -32,8 +31,6 @@ public class ClientsController(
     IRetoucherService retouchers,
     IMaintenanceService maintenance,
     IMeasurementTemplateProvider templates,
-    IBiographyDraftService biographies,
-    IBiographyWriter biographyWriter,
     IClientAccessService clientAccess,
     IClientDashboardBuilder dashboards,
     ISlugService slugs,
@@ -173,10 +170,6 @@ public class ClientsController(
         // only disabling the box is the half that matters — a readonly attribute is a
         // courtesy to the person at the keyboard, not a rule about what may be saved.
 
-        // Saving is how a suggestion gets accepted, since it is offered in the box rather
-        // than applied behind the scenes.
-        client.CloseBiographyDraftIfSaved();
-
         client.HairColour = model.HairColour?.Trim();
         client.EyeColour = model.EyeColour?.Trim();
         client.UpdatedAt = DateTimeOffset.UtcNow;
@@ -222,65 +215,6 @@ public class ClientsController(
     /// decision, and being able to change the crop without being able to change the
     /// photograph would be an odd half of the job.
     /// </remarks>
-    /// <summary>Uses the suggested biography, or throws it away.</summary>
-    /// <remarks>
-    /// Behind the same permission as editing the client, because that is exactly what
-    /// accepting one is: it copies the suggestion into the biography, where it can still
-    /// be edited before anything is published.
-    /// </remarks>
-    /// <summary>
-    /// Writes a biography for the About me box, on request.
-    /// </summary>
-    /// <remarks>
-    /// Answers in JSON and stores nothing. The text lands in the box on the form, where
-    /// the person who asked for it reads it, changes what is wrong and saves — so the
-    /// biography is still theirs, not something that appeared on a public page by itself.
-    /// <para>
-    /// Runs inside the request, unlike the draft offered at approval, because somebody is
-    /// sitting there waiting for it. That is the whole difference between the two.
-    /// </para>
-    /// </remarks>
-    [HttpPost("biography/suggest")]
-    [Authorize(Policy = Permissions.Clients.Edit)]
-    public async Task<IActionResult> SuggestBiography(
-        Guid clientId, CancellationToken cancellationToken = default)
-    {
-        var result = await biographies.SuggestNowAsync(clientId, cancellationToken);
-
-        return Json(new
-        {
-            succeeded = result.Succeeded,
-            text = result.Text,
-            error = result.Error
-        });
-    }
-
-    [HttpPost("biography/accept")]
-    [Authorize(Policy = Permissions.Clients.Edit)]
-    public async Task<IActionResult> AcceptBiography(
-        Guid clientId, CancellationToken cancellationToken = default)
-    {
-        if (await biographies.ResolveAsync(clientId, accept: true, CurrentUserId(), cancellationToken))
-        {
-            TempData["Saved"] = "The suggested biography is now this client's biography.";
-        }
-
-        return RedirectToAction(nameof(Index), new { clientId });
-    }
-
-    [HttpPost("biography/discard")]
-    [Authorize(Policy = Permissions.Clients.Edit)]
-    public async Task<IActionResult> DiscardBiography(
-        Guid clientId, CancellationToken cancellationToken = default)
-    {
-        if (await biographies.ResolveAsync(clientId, accept: false, CurrentUserId(), cancellationToken))
-        {
-            TempData["Saved"] = "The suggestion was thrown away.";
-        }
-
-        return RedirectToAction(nameof(Index), new { clientId });
-    }
-
     [HttpPost("media/{assetId:guid}/focal")]
     [Authorize(Policy = Permissions.Media.SetFeatured)]
     public async Task<IActionResult> Focal(
@@ -458,18 +392,6 @@ public class ClientsController(
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var brand = brandOptions.Value;
 
-        // A client with no biography is asked about the moment somebody opens their page,
-        // rather than waiting for an approval that may be weeks away — which is what makes
-        // this feel automatic instead of like a button somebody has to know to press.
-        //
-        // Safe to do on a page view: the request is refused unless this is the first time
-        // and the biography is still empty, so opening the same page a hundred times asks
-        // once. The writing itself happens on the worker, so the page does not wait.
-        if (biographyWriter.IsEnabled && client.RequestBiographyDraft())
-        {
-            await db.SaveChangesAsync(cancellationToken);
-        }
-
         return new AdminClientDetailViewModel
         {
             ClientId = clientId,
@@ -502,7 +424,6 @@ public class ClientsController(
             GuardianApprovalPending = client.IsBlockedPendingGuardianConsent(today),
             MaintenanceWarning = await maintenance.GetWarningAsync(clientId, cancellationToken),
             PublishBlocker = await portfolios.DescribePublishBlockerAsync(clientId, cancellationToken),
-            BiographyFeatureIsOn = biographyWriter.IsEnabled,
             PublicUrlBase = brand.PublicDomain.TrimEnd('/'),
             HasPaid = await db.Orders.AnyAsync(
                 o => o.ClientId == clientId && o.Status == OrderStatus.Confirmed, cancellationToken),

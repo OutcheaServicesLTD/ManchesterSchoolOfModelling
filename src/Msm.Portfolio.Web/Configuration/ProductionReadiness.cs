@@ -1,6 +1,5 @@
-using Msm.Portfolio.Web.Integrations.GoCardless;
 using Msm.Portfolio.Web.Integrations.HighLevel;
-using Msm.Portfolio.Web.Integrations.Bio;
+using Msm.Portfolio.Web.Integrations.Stripe;
 
 namespace Msm.Portfolio.Web.Services;
 
@@ -29,7 +28,7 @@ public static class ProductionReadiness
 {
     public static IReadOnlyList<ReadinessProblem> Check(
         IConfiguration configuration,
-        IGoCardlessService payments,
+        IStripeService payments,
         IHighLevelService crm,
         bool emailSenderIsStub,
         string mediaStorageProvider,
@@ -44,21 +43,19 @@ public static class ProductionReadiness
         {
             problems.Add(new ReadinessProblem(
                 "Payments",
-                "No GoCardless access token is configured, so no payment can be taken. "
-                + "Set Integrations:GoCardless:AccessToken once the provider has been verified "
-                + "against docs/gocardless-verification.md.",
+                "No Stripe secret key is configured, so no payment can be taken. Set "
+                + "Integrations:Stripe:SecretKey and Integrations:Stripe:WebhookSecret.",
                 IsFatal: true));
         }
-
         // Fatal: without it, a forged webhook could mark an order paid and publish a
         // portfolio. The verifier already refuses everything, so payments would simply
         // never confirm.
-        if (string.IsNullOrWhiteSpace(configuration["Integrations:GoCardless:WebhookSecret"]))
+        else if (string.IsNullOrWhiteSpace(configuration["Integrations:Stripe:WebhookSecret"]))
         {
             problems.Add(new ReadinessProblem(
                 "Payments",
-                "No GoCardless webhook secret is configured, so no webhook can be trusted and "
-                + "payments will never confirm. Set Integrations:GoCardless:WebhookSecret.",
+                "Integrations:Stripe:SecretKey is set but Integrations:Stripe:WebhookSecret is "
+                + "not, so no webhook can be trusted and payments will never confirm. Set both.",
                 IsFatal: true));
         }
 
@@ -113,40 +110,16 @@ public static class ProductionReadiness
         }
 
         // The portfolio-maintenance subscription (specification version 2, item 3) is
-        // optional — nothing breaks with it left off, the client portal simply does not
-        // offer it. Fatal only when it is half configured: a secret key with no webhook
-        // secret would let a client pay Stripe and never be recorded as subscribed,
-        // because nothing could then be trusted to confirm it.
-        var stripeSecretKey = configuration["Integrations:Stripe:SecretKey"];
-        var stripeWebhookSecret = configuration["Integrations:Stripe:WebhookSecret"];
-        var stripePriceId = configuration["Integrations:Stripe:PriceId"];
-        var stripeConfigured = !string.IsNullOrWhiteSpace(stripeSecretKey);
-
-        if (stripeConfigured && string.IsNullOrWhiteSpace(stripeWebhookSecret))
+        // optional on top of the same Stripe account the £99 purchase already requires
+        // above — nothing breaks with it left off, the client portal simply does not
+        // offer it.
+        if (payments.IsLive && string.IsNullOrWhiteSpace(configuration["Integrations:Stripe:PriceId"]))
         {
             problems.Add(new ReadinessProblem(
                 "Subscriptions",
-                "Integrations:Stripe:SecretKey is set but Integrations:Stripe:WebhookSecret is not, "
-                + "so a subscription payment could never be confirmed. Set both, or neither.",
-                IsFatal: true));
-        }
-        else if (stripeConfigured && string.IsNullOrWhiteSpace(stripePriceId))
-        {
-            problems.Add(new ReadinessProblem(
-                "Subscriptions",
-                "Integrations:Stripe:SecretKey is set but Integrations:Stripe:PriceId is not, so no "
-                + "client could actually be sent to a subscription checkout. Set "
-                + "Integrations:Stripe:PriceId to the recurring Price created for Portfolio "
+                "Integrations:Stripe:PriceId is not set, so no client could actually be sent to a "
+                + "subscription checkout. Set it to the recurring Price created for Portfolio "
                 + "Maintenance in the Stripe Dashboard.",
-                IsFatal: true));
-        }
-        else if (!stripeConfigured)
-        {
-            problems.Add(new ReadinessProblem(
-                "Subscriptions",
-                "No Stripe secret key is configured, so the client portal will not offer a "
-                + "subscription. Set Integrations:Stripe:SecretKey, WebhookSecret and PriceId to "
-                + "turn it on.",
                 IsFatal: false));
         }
 
@@ -170,19 +143,6 @@ public static class ProductionReadiness
                 "Database",
                 "Migrations run at startup. With more than one instance this races. Set "
                 + "Database:MigrateOnStartup to false and migrate as a deployment step.",
-                IsFatal: false));
-        }
-
-        // Not fatal: the feature is optional, and a studio that writes its own biographies
-        // wants exactly this. Said out loud so nobody is left wondering why approvals
-        // never suggest one.
-        if (string.IsNullOrWhiteSpace(configuration[$"{BiographyOptions.SectionName}:ApiKey"]))
-        {
-            problems.Add(new ReadinessProblem(
-                "Biographies",
-                "No biography provider is configured, so approving a portfolio will not suggest "
-                + "a biography and staff write every one by hand. Set Biography:ApiKey to turn "
-                + "it on.",
                 IsFatal: false));
         }
 

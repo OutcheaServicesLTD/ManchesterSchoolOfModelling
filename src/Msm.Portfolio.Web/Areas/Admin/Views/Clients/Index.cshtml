@@ -152,52 +152,6 @@
             </dd>
         </dl>
 
-        @* Always, now. The About me box below is read-only — the biography is the model's own
-   words — so accepting or throwing away a suggestion here is the only way it can become
-   one, whether or not they have written something already. *@
-@if (Model.Client.BiographyDraftStatus == BiographyDraftStatus.Ready
-     && !string.IsNullOrWhiteSpace(Model.Client.BiographyDraft))
-{
-    @* A suggestion, never the published biography. This text describes a real person and
-       is what an agency reads about them, so somebody reads it before it goes anywhere. *@
-    <div class="card mb-4">
-        <div class="card-body">
-            <h2 class="h5 card-title">Suggested biography</h2>
-            <p class="text-muted">
-                Written from this client's measurements and details when the portfolio was
-                approved. Nothing has been published — read it, and use it only if it is
-                right. It cannot know anything the studio has not recorded, so check it
-                for anything that simply is not true.
-            </p>
-
-            <blockquote class="draft-quote">@Model.Client.BiographyDraft</blockquote>
-
-            <div class="d-flex gap-2 flex-wrap">
-                <form method="post" asp-action="AcceptBiography" asp-route-clientId="@Model.ClientId">
-                    <button type="submit" class="btn btn-primary">Use this biography</button>
-                </form>
-                <form method="post" asp-action="DiscardBiography" asp-route-clientId="@Model.ClientId"
-                      data-confirm="Throw this suggestion away? It will not be offered again.">
-                    <button type="submit" class="btn btn-outline-secondary">Throw it away</button>
-                </form>
-            </div>
-
-            <p class="form-text mb-0">
-                Using it copies the text into the biography below, where you can edit it
-                before the portfolio goes live.
-            </p>
-        </div>
-    </div>
-}
-else if (Model.Client.BiographyDraftStatus == BiographyDraftStatus.Failed)
-{
-    <div class="alert alert-warning" role="alert">
-        A biography could not be suggested for this client
-        @(Model.Client.BiographyDraftError is { } why ? $"({why})" : "") —
-        write one in the client details below.
-    </div>
-}
-
 @if (Model.PublishBlocker is not null && !Model.IsPublished)
         {
             @* Explains a disabled Publish button rather than only refusing the attempt. *@
@@ -597,40 +551,18 @@ else
                 @{
                     // Nothing is put into the box from here any more. The biography is
                     // the model's own words, so an administrator reads it rather than
-                    // types in it, and a suggestion is accepted or thrown away on the card
-                    // above rather than edited in place.
+                    // types in it.
                 }
 
                 <div class="mb-3">
-                    @* for= must name the id below, not the one the tag helper would have
-                       generated: the id is overridden so the suggestion script can find the
-                       box, and that quietly orphaned the label. *@
                     <label asp-for="@edit.Biography" for="biography-box" class="form-label"></label>
                     <textarea asp-for="@edit.Biography" name="Biography" class="form-control"
                               rows="4" id="biography-box" readonly aria-readonly="true"></textarea>
 
                     <p class="form-text mb-0">
-                        @Model.Client.PublicName writes this in their own account. You can
-                        accept or throw away a suggestion above, but this is theirs to word.
+                        @Model.Client.PublicName writes this in their own account. This is
+                        theirs to word.
                     </p>
-
-                    @if (Model.BiographyFeatureIsOn
-                         && Model.Client.BiographyDraftStatus == BiographyDraftStatus.Pending)
-                    {
-                        <p class="form-text mb-0">
-                            A biography is being written for this client and will appear at the
-                            top of this page within a minute or so, to accept or throw away.
-                        </p>
-                    }
-                    else if (!Model.BiographyFeatureIsOn)
-                    {
-                        @* No provider, so nothing is written automatically. Said plainly
-                           rather than left as a box that silently never fills. *@
-                        <p class="form-text mb-0">
-                            Biographies are not being written automatically yet — that needs an
-                            API key setting up. Until then this stays as the model wrote it.
-                        </p>
-                    }
                 </div>
                 <button type="submit" class="btn btn-primary">Save client details</button>
             </form>

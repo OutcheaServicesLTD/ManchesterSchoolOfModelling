@@ -8,10 +8,9 @@ namespace Msm.Portfolio.Web.Integrations.Stripe;
 /// Customer Portal (specification version 2, item 3).
 /// </summary>
 /// <remarks>
-/// Its HTTP calls have not been verified against a live Stripe account — as with
-/// GoCardless, that verification is a deployment step for MSM, tracked the same way.
-/// Registered only once Integrations:Stripe:SecretKey is configured; the stub stands in
-/// until then.
+/// Its HTTP calls have not been verified against a live Stripe account — that
+/// verification is a deployment step for MSM. Registered only once
+/// Integrations:Stripe:SecretKey is configured; the stub stands in until then.
 /// </remarks>
 public class StripeService(ILogger<StripeService> logger) : IStripeService
 {

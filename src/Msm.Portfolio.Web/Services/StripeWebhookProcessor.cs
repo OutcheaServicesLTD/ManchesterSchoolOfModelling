@@ -6,6 +6,8 @@ using Msm.Portfolio.Web.Integrations.Stripe;
 
 namespace Msm.Portfolio.Web.Services;
 
+public record WebhookResult(bool Accepted, int Processed, int Skipped, string? Error = null);
+
 public interface IStripeWebhookProcessor
 {
     Task<WebhookResult> ProcessAsync(
@@ -13,20 +15,21 @@ public interface IStripeWebhookProcessor
 }
 
 /// <summary>
-/// Applies inbound Stripe events to the portfolio-maintenance subscription
-/// (specification version 2, item 3).
+/// Applies inbound Stripe events to the £99 one-off portfolio purchase (specification
+/// sections 20, 21 and 44) and to the portfolio-maintenance subscription (specification
+/// version 2, item 3) — the one Stripe account behind both.
 /// </summary>
 /// <remarks>
-/// The same shape as <see cref="PaymentWebhookProcessor"/>: verify the signature first,
-/// record every event under a unique provider event id before doing anything else, and
-/// treat an event already stored as already handled. It shares that table
-/// (<c>PaymentWebhookEvents</c>) with GoCardless — the unique index is on
-/// (Provider, ProviderEventId), so "Stripe" and "GoCardless" event streams cannot
-/// collide with each other no matter how their ids happen to look.
+/// The signature is verified first, every event is recorded under a unique provider
+/// event id before anything else is done, and an event already stored is acknowledged
+/// and skipped rather than applied a second time, since Stripe retries until it gets a
+/// success. Processing is independent of any browser session, so a client who closed the
+/// tab mid-payment still gets their portfolio published once the webhook arrives.
 /// </remarks>
 public class StripeWebhookProcessor(
     ApplicationDbContext db,
     IStripeWebhookVerifier verifier,
+    ICheckoutService checkout,
     IMaintenanceService maintenance,
     ILogger<StripeWebhookProcessor> logger) : IStripeWebhookProcessor
 {
@@ -121,6 +124,10 @@ public class StripeWebhookProcessor(
                 await ApplyCheckoutCompletedAsync(evt, cancellationToken);
                 break;
 
+            case "checkout.session.expired":
+                await ApplyCheckoutExpiredAsync(evt, cancellationToken);
+                break;
+
             case "invoice.paid":
                 await ApplyToSubscriptionAsync(
                     evt, (clientId, ct) => maintenance.RecordPaymentSuccessAsync(clientId, ct), cancellationToken);
@@ -149,19 +156,29 @@ public class StripeWebhookProcessor(
     }
 
     /// <summary>
+    /// A Checkout Session completed. Carries a subscription id for the recurring
+    /// membership; carries none for the one-off £99 purchase, which is what tells the
+    /// two apart — nothing else in this application opens a Stripe Checkout Session.
+    /// </summary>
+    private async Task ApplyCheckoutCompletedAsync(StripeWebhookEvent evt, CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(evt.SubscriptionId))
+        {
+            await ApplySubscriptionCheckoutCompletedAsync(evt, cancellationToken);
+            return;
+        }
+
+        await ApplyPurchaseCheckoutCompletedAsync(evt, cancellationToken);
+    }
+
+    /// <summary>
     /// Activates a subscription for the first time. The only event that carries a
     /// client reference directly — everything after this looks the client up by the
     /// subscription id instead (specification version 2, item 3).
     /// </summary>
-    private async Task ApplyCheckoutCompletedAsync(StripeWebhookEvent evt, CancellationToken cancellationToken)
+    private async Task ApplySubscriptionCheckoutCompletedAsync(
+        StripeWebhookEvent evt, CancellationToken cancellationToken)
     {
-        // Nothing else in this application opens a Stripe Checkout Session, so a
-        // completion with no subscription attached is not one of ours.
-        if (string.IsNullOrWhiteSpace(evt.SubscriptionId))
-        {
-            return;
-        }
-
         var clientIdText = evt.ClientReferenceId ?? evt.ClientIdFromMetadata;
 
         if (!Guid.TryParse(clientIdText, out var clientId))
@@ -186,8 +203,68 @@ public class StripeWebhookProcessor(
             p => p.Code == ProductCodes.PortfolioMaintenance, cancellationToken);
 
         await maintenance.ActivateSubscriptionAsync(
-            clientId, Provider, evt.SubscriptionId, product?.Price ?? 0m, product?.Currency ?? "GBP",
+            clientId, Provider, evt.SubscriptionId!, product?.Price ?? 0m, product?.Currency ?? "GBP",
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Confirms the £99 one-off purchase. The webhook is the authority and works without
+    /// a browser, so a client who closed the tab still gets their portfolio published.
+    /// </summary>
+    private async Task ApplyPurchaseCheckoutCompletedAsync(
+        StripeWebhookEvent evt, CancellationToken cancellationToken)
+    {
+        var order = await FindOrderAsync(evt.SessionId, cancellationToken);
+
+        if (order is null)
+        {
+            // Not every Checkout Session in the account is necessarily ours to know
+            // about, and a session this application never opened matches nothing here.
+            return;
+        }
+
+        if (order.Status == OrderStatus.Confirmed)
+        {
+            return;
+        }
+
+        await checkout.ActivateAsync(order, evt.PaymentIntentId, PaymentStatus.Confirmed, cancellationToken);
+    }
+
+    /// <summary>
+    /// A one-off Checkout Session expired unused (Stripe's default: 24 hours). Only
+    /// meaningful for an order still waiting on it — an expiry long after a client paid
+    /// through a different, later session is not this order's business.
+    /// </summary>
+    private async Task ApplyCheckoutExpiredAsync(StripeWebhookEvent evt, CancellationToken cancellationToken)
+    {
+        if (!string.IsNullOrWhiteSpace(evt.SubscriptionId))
+        {
+            return;
+        }
+
+        var order = await FindOrderAsync(evt.SessionId, cancellationToken);
+
+        if (order is null || order.Status == OrderStatus.Confirmed)
+        {
+            return;
+        }
+
+        order.Status = OrderStatus.Failed;
+    }
+
+    private Task<Order?> FindOrderAsync(string? sessionId, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(sessionId))
+        {
+            return Task.FromResult<Order?>(null);
+        }
+
+        return db.Orders
+            .Include(o => o.Client)
+            .Include(o => o.Product)
+            .Include(o => o.Transactions)
+            .FirstOrDefaultAsync(o => o.StripeCheckoutSessionId == sessionId, cancellationToken);
     }
 
     /// <summary>

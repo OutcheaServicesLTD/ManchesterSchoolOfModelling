@@ -14,18 +14,11 @@ public class IntegrationsViewModel
 {
     public bool CrmIsLive { get; set; }
 
-    public bool PaymentsIsLive { get; set; }
-
-    /// <summary>Whether Stripe is configured for the portfolio-maintenance subscription.</summary>
-    public bool SubscriptionsAreLive { get; set; }
-
-    /// <summary>Whether a biography provider is configured, so the page can say.</summary>
-    public bool BiographiesAreOn { get; set; }
-
-    /// <summary>How many biographies are waiting to be written, and how many gave up.</summary>
-    public int BiographiesPending { get; set; }
-
-    public int BiographiesFailed { get; set; }
+    /// <summary>
+    /// Whether Stripe is configured — covers both the £99 one-off portfolio purchase
+    /// and the portfolio-maintenance subscription, one account behind both.
+    /// </summary>
+    public bool StripeIsLive { get; set; }
 
     public IReadOnlyDictionary<CrmSyncStatus, int> CrmStates { get; set; } =
         new Dictionary<CrmSyncStatus, int>();
@@ -35,10 +28,6 @@ public class IntegrationsViewModel
     public int WebhookEventsReceived { get; set; }
 
     public int WebhookEventsFailed { get; set; }
-
-    public int SubscriptionWebhookEventsReceived { get; set; }
-
-    public int SubscriptionWebhookEventsFailed { get; set; }
 
     public int CountFor(CrmSyncStatus status) =>
         CrmStates.TryGetValue(status, out var count) ? count : 0;

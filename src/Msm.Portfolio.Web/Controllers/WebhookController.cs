@@ -18,39 +18,13 @@ namespace Msm.Portfolio.Web.Controllers;
 [AllowAnonymous]
 [IgnoreAntiforgeryToken]
 public class WebhookController(
-    IPaymentWebhookProcessor processor,
     IStripeWebhookProcessor stripeProcessor,
     ILogger<WebhookController> logger) : ControllerBase
 {
-    [HttpPost("gocardless")]
-    [EnableRateLimiting(RateLimitPolicies.Webhook)]
-    public async Task<IActionResult> GoCardless(CancellationToken cancellationToken = default)
-    {
-        // Read as raw text: the signature covers the exact bytes sent, so re-serialising
-        // a deserialised model would not produce a payload that verifies.
-        using var reader = new StreamReader(Request.Body);
-        var payload = await reader.ReadToEndAsync(cancellationToken);
-
-        var signature = Request.Headers["Webhook-Signature"].FirstOrDefault();
-
-        var result = await processor.ProcessAsync(payload, signature, cancellationToken);
-
-        if (!result.Accepted)
-        {
-            // 498 is what GoCardless expects for a signature it should not retry.
-            return StatusCode(498, new { error = result.Error });
-        }
-
-        logger.LogInformation(
-            "Webhook accepted: {Processed} applied, {Skipped} already seen.", result.Processed, result.Skipped);
-
-        // 200 tells the provider to stop retrying. Returned even when every event was a
-        // duplicate, because a duplicate means the work is already done.
-        return Ok(new { processed = result.Processed, skipped = result.Skipped });
-    }
-
     /// <summary>
-    /// The portfolio-maintenance subscription's webhook (specification version 2, item 3).
+    /// Both the £99 one-off portfolio purchase and the portfolio-maintenance
+    /// subscription (specification version 2, item 3) land here — one Stripe account,
+    /// one webhook.
     /// </summary>
     [HttpPost("stripe")]
     [EnableRateLimiting(RateLimitPolicies.Webhook)]

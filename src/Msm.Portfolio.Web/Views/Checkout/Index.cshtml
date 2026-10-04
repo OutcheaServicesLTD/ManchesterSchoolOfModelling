@@ -19,7 +19,7 @@
             <div class="alert alert-warning" role="alert">
                 <strong>No payment provider is configured.</strong>
                 This checkout will not take any money. It exists so the journey can be
-                walked through before GoCardless is connected.
+                walked through before Stripe is connected.
             </div>
         }
 
@@ -51,7 +51,7 @@
         </form>
 
         <p class="form-text mt-3">
-            Payment details are collected by @(Model.ProviderIsLive ? "GoCardless" : "the payment provider"),
+            Payment details are collected by @(Model.ProviderIsLive ? "Stripe" : "the payment provider"),
             not by @Model.Brand.BusinessName. All sales are final.
         </p>
     </div>

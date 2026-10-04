@@ -211,7 +211,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
         {
             entity.Property(o => o.Amount).HasPrecision(18, 2);
             entity.Property(o => o.Currency).HasMaxLength(3).IsRequired();
-            entity.Property(o => o.GoCardlessReference).HasMaxLength(200);
+            entity.Property(o => o.StripeCheckoutSessionId).HasMaxLength(200);
 
             entity.HasOne(o => o.Client)
                 .WithMany(c => c.Orders)
@@ -224,7 +224,7 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 .HasForeignKey(o => o.ProductId)
                 .OnDelete(DeleteBehavior.Restrict);
 
-            entity.HasIndex(o => o.GoCardlessReference);
+            entity.HasIndex(o => o.StripeCheckoutSessionId);
             entity.HasIndex(o => new { o.ClientId, o.Status });
         });
 

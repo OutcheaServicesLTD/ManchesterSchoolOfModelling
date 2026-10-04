@@ -89,18 +89,8 @@ public class CommerceOptions
     /// </summary>
     public int PortfolioTermDays { get; set; } = 365;
 
-    /// <summary>
-    /// Whether a recurring maintenance subscription is created on purchase.
-    /// </summary>
-    /// <remarks>
-    /// Off. The £99 is the only payment — nothing is collected monthly, so no
-    /// subscription is opened and none of the payment-failure machinery below can fire.
-    /// It is a switch rather than a deletion so MSM can go back to charging maintenance
-    /// without the work being rebuilt.
-    /// </remarks>
-    public bool MaintenanceEnabled { get; set; }
-
-    /// <summary>Monthly maintenance price. Unused while maintenance is off.</summary>
+    /// <summary>Monthly maintenance price, for the Portfolio Maintenance product a client
+    /// can subscribe to themselves from their portal.</summary>
     public decimal MaintenancePrice { get; set; } = 19.99m;
 
     /// <summary>
@@ -108,12 +98,6 @@ public class CommerceOptions
     /// (specification section 23).
     /// </summary>
     public int MaintenanceGracePeriodDays { get; set; } = 7;
-
-    /// <summary>
-    /// Days after purchase before maintenance billing begins. MSM has not confirmed
-    /// the commercial timing, so it stays configurable (specification section 22).
-    /// </summary>
-    public int MaintenanceStartsAfterDays { get; set; } = 0;
 }
 
 /// <summary>
@@ -195,22 +179,9 @@ public class IntegrationOptions
 {
     public const string SectionName = "Integrations";
 
-    public GoCardlessOptions GoCardless { get; set; } = new();
-
     public HighLevelOptions HighLevel { get; set; } = new();
 
     public StripeOptions Stripe { get; set; } = new();
-}
-
-public class GoCardlessOptions
-{
-    public string? AccessToken { get; set; }
-
-    /// <summary>"sandbox" until MSM's live account is connected.</summary>
-    public string Environment { get; set; } = "sandbox";
-
-    /// <summary>Secret used to verify inbound webhook signatures (specification section 44).</summary>
-    public string? WebhookSecret { get; set; }
 }
 
 public class HighLevelOptions
@@ -223,11 +194,11 @@ public class HighLevelOptions
 }
 
 /// <summary>
-/// Credentials for the recurring portfolio-maintenance subscription (specification
-/// version 2, item 3). Separate from GoCardless: the £99 digital portfolio purchase
-/// keeps running exactly as it does today, and this is the ongoing membership a client
-/// can start, manage and cancel for themselves, Stripe Checkout and the Stripe Customer
-/// Portal doing almost all of the work.
+/// Stripe credentials. One account serves two things: the £99 one-off digital-portfolio
+/// purchase (specification sections 19-21), and the ongoing portfolio-maintenance
+/// membership a client can start, manage and cancel for themselves (specification
+/// version 2, item 3) — Stripe Checkout and the Stripe Customer Portal doing almost all
+/// of the work for both.
 /// </summary>
 public class StripeOptions
 {
@@ -236,7 +207,7 @@ public class StripeOptions
 
     /// <summary>
     /// Secret used to verify inbound webhook signatures. Without one, nothing arriving
-    /// at webhooks/stripe can be trusted (mirrors GoCardlessOptions.WebhookSecret).
+    /// at webhooks/stripe can be trusted (specification section 44, extended to Stripe).
     /// </summary>
     public string? WebhookSecret { get; set; }
 

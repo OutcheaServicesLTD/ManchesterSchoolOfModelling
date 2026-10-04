@@ -7,8 +7,6 @@ using Msm.Portfolio.Web.Configuration;
 using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.Services;
-using Msm.Portfolio.Web.Integrations.GoCardless;
-using Msm.Portfolio.Web.Integrations.Bio;
 using Msm.Portfolio.Web.Integrations.HighLevel;
 using Msm.Portfolio.Web.Integrations.Stripe;
 using Msm.Portfolio.Web.Storage;
@@ -88,7 +86,6 @@ builder.Services.AddScoped<IStaffService, StaffService>();
 builder.Services.AddScoped<IClientAccessService, ClientAccessService>();
 builder.Services.AddScoped<IClientDashboardBuilder, ClientDashboardBuilder>();
 builder.Services.AddScoped<ICheckoutService, CheckoutService>();
-builder.Services.AddScoped<IPaymentWebhookProcessor, PaymentWebhookProcessor>();
 builder.Services.AddScoped<IMaintenanceService, MaintenanceService>();
 
 // A grace period expires by the passage of time, so nothing in a request can be
@@ -103,31 +100,8 @@ builder.Services.AddScoped<ICrmSyncService, CrmSyncService>();
 // that is down cannot delay the studio or roll back a purchase (specification section 45).
 builder.Services.AddHostedService<CrmSyncWorker>();
 
-// ── Suggested biographies ────────────────────────────────────────────────────────
-// Off unless a key is configured, and off means nothing is requested at all rather
-// than a queue of drafts that can only fail.
-builder.Services.Configure<BiographyOptions>(
-    builder.Configuration.GetSection(BiographyOptions.SectionName));
-
-var biographyKey = builder.Configuration[$"{BiographyOptions.SectionName}:ApiKey"];
-
-if (string.IsNullOrWhiteSpace(biographyKey))
-{
-    builder.Services.AddSingleton<IBiographyWriter, StubBiographyWriter>();
-}
-else
-{
-    builder.Services.AddSingleton<IBiographyWriter, AnthropicBiographyWriter>();
-}
-
-builder.Services.AddScoped<IBiographyDraftService, BiographyDraftService>();
-
-// Written on a worker for the same reason the CRM push is: approving a portfolio is
-// the administrator's action and must not wait on somebody else's API.
-builder.Services.AddHostedService<BiographyDraftWorker>();
-
-// As with GoCardless, the real client is only used when configured, and its HTTP calls
-// have not been verified against the provider.
+// The real client is only used when configured, and its HTTP calls have not been
+// verified against the provider.
 var highLevelKey = builder.Configuration[$"{IntegrationOptions.SectionName}:HighLevel:ApiKey"];
 
 if (string.IsNullOrWhiteSpace(highLevelKey))
@@ -139,27 +113,12 @@ else
     builder.Services.AddHttpClient<IHighLevelService, HighLevelService>()
         .SetHandlerLifetime(TimeSpan.FromMinutes(5));
 }
-builder.Services.AddScoped<IWebhookVerifier, GoCardlessWebhookVerifier>();
 
-// The real GoCardless client is used only when an access token is configured. Its HTTP
-// calls have not been verified against the provider's sandbox, so the stub stays the
-// default: a half-right payment client is worse than an obvious placeholder.
-var goCardlessToken = builder.Configuration[$"{IntegrationOptions.SectionName}:GoCardless:AccessToken"];
-
-if (string.IsNullOrWhiteSpace(goCardlessToken))
-{
-    builder.Services.AddScoped<IGoCardlessService, StubGoCardlessService>();
-}
-else
-{
-    builder.Services.AddHttpClient<IGoCardlessService, GoCardlessService>()
-        .SetHandlerLifetime(TimeSpan.FromMinutes(5));
-}
-// ── Portfolio-maintenance subscription (specification version 2, item 3) ───────────
-// A client's own choice, started and managed from the client portal, quite separate
-// from the £99 digital-portfolio purchase above. As with GoCardless, the real client is
-// used only once a secret key is configured, and its calls have not been verified
-// against a live Stripe account.
+// ── Stripe (specification sections 19-21, and version 2, item 3) ───────────────────
+// One account behind two things: the £99 one-off digital-portfolio purchase, and the
+// portfolio-maintenance membership a client starts and manages themselves from the
+// client portal. The real client for both is used only once a secret key is configured,
+// and its calls have not been verified against a live Stripe account.
 builder.Services.AddScoped<IStripeWebhookVerifier, StripeWebhookVerifier>();
 builder.Services.AddScoped<IStripeWebhookProcessor, StripeWebhookProcessor>();
 builder.Services.AddScoped<IStripeSubscriptionService, StripeSubscriptionService>();
@@ -169,6 +128,7 @@ var stripeSecretKey = builder.Configuration[$"{IntegrationOptions.SectionName}:S
 if (string.IsNullOrWhiteSpace(stripeSecretKey))
 {
     builder.Services.AddScoped<IStripeService, StubStripeService>();
+    builder.Services.AddScoped<IStripeCheckoutService, StubStripeCheckoutService>();
 }
 else
 {
@@ -177,6 +137,7 @@ else
     // file also has a "Stripe" segment of its own namespace in scope.
     global::Stripe.StripeConfiguration.ApiKey = stripeSecretKey;
     builder.Services.AddScoped<IStripeService, StripeService>();
+    builder.Services.AddScoped<IStripeCheckoutService, StripeCheckoutService>();
 }
 
 builder.Services.AddSingleton<IImageProcessor, ImageProcessor>();
@@ -294,7 +255,7 @@ static void CheckProductionReadiness(WebApplication app)
 
     var problems = ProductionReadiness.Check(
         app.Configuration,
-        services.GetRequiredService<IGoCardlessService>(),
+        services.GetRequiredService<IStripeService>(),
         services.GetRequiredService<IHighLevelService>(),
         emailSenderIsStub: services.GetRequiredService<IEmailSender>() is LoggingEmailSender,
         mediaStorageProvider: services.GetRequiredService<IOptions<MediaOptions>>().Value.StorageProvider,

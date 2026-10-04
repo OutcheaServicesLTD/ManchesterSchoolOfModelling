@@ -44,7 +44,7 @@ public class HardeningTests
            typeof(CancellationToken)],
           RateLimitPolicies.PublicEnquiry },
 
-        { typeof(WebhookController), nameof(WebhookController.GoCardless),
+        { typeof(WebhookController), nameof(WebhookController.Stripe),
           [typeof(CancellationToken)], RateLimitPolicies.Webhook }
     };
 

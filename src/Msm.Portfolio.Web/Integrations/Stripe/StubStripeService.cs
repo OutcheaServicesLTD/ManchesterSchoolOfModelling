@@ -7,8 +7,8 @@ namespace Msm.Portfolio.Web.Integrations.Stripe;
 /// <remarks>
 /// Registered whenever no Stripe secret key is configured. It takes no money and makes
 /// no network call: it issues a reference and sends the client to a local page that
-/// imitates Stripe Checkout, exactly as <c>StubGoCardlessService</c> does for the
-/// portfolio purchase.
+/// imitates Stripe Checkout, exactly as <c>StubStripeCheckoutService</c> does for the
+/// £99 portfolio purchase.
 /// </remarks>
 public class StubStripeService(
     IHostEnvironment environment, ILogger<StubStripeService> logger) : IStripeService

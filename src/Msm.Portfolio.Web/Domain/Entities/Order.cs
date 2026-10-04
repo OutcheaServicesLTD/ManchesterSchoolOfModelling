@@ -28,8 +28,8 @@ public class Order
 
     public OrderStatus Status { get; set; } = OrderStatus.Draft;
 
-    /// <summary>GoCardless billing request or payment reference for reconciliation.</summary>
-    public string? GoCardlessReference { get; set; }
+    /// <summary>Stripe Checkout Session id for reconciliation.</summary>
+    public string? StripeCheckoutSessionId { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; } = DateTimeOffset.UtcNow;
 

@@ -11,7 +11,7 @@ public class PaymentWebhookEvent
 {
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    public string Provider { get; set; } = "GoCardless";
+    public string Provider { get; set; } = "Stripe";
 
     /// <summary>The provider's event identifier. Unique per provider.</summary>
     public string ProviderEventId { get; set; } = string.Empty;

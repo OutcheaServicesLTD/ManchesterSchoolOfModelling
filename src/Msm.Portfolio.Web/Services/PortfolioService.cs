@@ -2,7 +2,6 @@ using Microsoft.EntityFrameworkCore;
 using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.Domain.Enums;
-using Msm.Portfolio.Web.Integrations.Bio;
 using Msm.Portfolio.Web.Storage;
 
 namespace Msm.Portfolio.Web.Services;
@@ -52,7 +51,6 @@ public class PortfolioService(
     IMediaStorageService storage,
     IAuditService audit,
     INotificationService notifications,
-    IBiographyWriter biographies,
     ILogger<PortfolioService> logger) : IPortfolioService
 {
     public async Task<OperationResult> MarkInViewingAsync(
@@ -76,17 +74,6 @@ public class PortfolioService(
         }
 
         Transition(portfolio, PortfolioStatus.InViewing, userId);
-
-        // Approval is the moment a biography becomes worth suggesting: the photographs
-        // are chosen, the measurements are in, and somebody is about to have to write
-        // one. Asked for once and only ever as a draft — marked here and written on a
-        // worker, so a provider that is slow or down cannot delay this approval or fail
-        // it. Nothing is asked for at all when no provider is configured, and nothing is
-        // asked for when a biography already exists.
-        if (biographies.IsEnabled && client.RequestBiographyDraft())
-        {
-            logger.LogInformation("A biography draft was requested for {ClientId}.", clientId);
-        }
 
         await db.SaveChangesAsync(cancellationToken);
 

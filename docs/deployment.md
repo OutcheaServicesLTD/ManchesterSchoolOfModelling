@@ -13,8 +13,8 @@ startup is far cheaper than discovering either later.
 
 | Check | Fatal | Why |
 | ----- | ----- | --- |
-| GoCardless access token missing | Yes | No payment can be taken |
-| GoCardless webhook secret missing | Yes | No webhook can be trusted, so payments never confirm |
+| Stripe secret key missing | Yes | No payment can be taken |
+| Stripe webhook secret missing | Yes | No webhook can be trusted, so payments never confirm |
 | `IEmailSender` is the logging stub | Yes | Guardian approval requests are never delivered, so under-18 clients can never complete |
 | Media storage is local disk | Yes | Files do not survive a container rebuild and are not shared between instances |
 | GoHighLevel API key missing | No | The application works; MSM's CRM simply falls behind |
@@ -102,9 +102,8 @@ Msm__PublicDomain=https://model-portfolio.manchesterschoolofmodelling.co.uk
 Msm__ContactEmail=...
 Msm__ContactPhone=...
 
-Integrations__GoCardless__AccessToken=...
-Integrations__GoCardless__Environment=live
-Integrations__GoCardless__WebhookSecret=...
+Integrations__Stripe__SecretKey=...
+Integrations__Stripe__WebhookSecret=...
 Integrations__HighLevel__ApiKey=...
 Integrations__HighLevel__LocationId=...
 
@@ -235,15 +234,17 @@ rules entirely and expose every client's unpublished photographs.
 
 ## Webhook endpoint
 
-Register this endpoint with GoCardless:
+Register this endpoint in the Stripe Dashboard, listening for `checkout.session.completed`,
+`checkout.session.expired`, `invoice.paid`, `invoice.payment_failed` and
+`customer.subscription.deleted` — the £99 one-off purchase and the portfolio-maintenance
+subscription both land here, one Stripe account behind both:
 
 ```
-https://model-portfolio.manchesterschoolofmodelling.co.uk/webhooks/gocardless
+https://model-portfolio.manchesterschoolofmodelling.co.uk/webhooks/stripe
 ```
 
-Set
-`Integrations__GoCardless__WebhookSecret` to the secret shown when the endpoint is
-created. With no secret configured every webhook is refused, so payments will never
+Set `Integrations__Stripe__WebhookSecret` to the signing secret shown when the endpoint
+is created. With no secret configured every webhook is refused, so payments will never
 confirm.
 
 ## Before go-live
@@ -254,8 +255,7 @@ Four things are outstanding and none of them are code:
 2. **An email provider** — guardian approval requests are only logged until one exists.
 3. **Malware scanning on uploads** (specification section 38) — uploads are validated by
    decoding, which rejects a renamed non-image but is not a scanner.
-4. **Provider verification** — the GoCardless and GoHighLevel HTTP clients were written
-   against documented behaviour but never exercised against the providers, whose APIs
-   were unreachable from the build environment. Work through
-   [`gocardless-verification.md`](gocardless-verification.md) and
-   [`gohighlevel-verification.md`](gohighlevel-verification.md) first.
+4. **Provider verification** — the Stripe and GoHighLevel HTTP clients were written
+   against documented behaviour but never exercised against the providers. Work through
+   [`gohighlevel-verification.md`](gohighlevel-verification.md), and for Stripe, exercise
+   a real checkout and a real webhook delivery against a Stripe test-mode account first.

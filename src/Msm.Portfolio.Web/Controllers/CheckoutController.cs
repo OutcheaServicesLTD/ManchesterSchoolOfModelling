@@ -6,24 +6,24 @@ using Msm.Portfolio.Web.Authorization;
 using Msm.Portfolio.Web.Configuration;
 using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.Domain.Enums;
-using Msm.Portfolio.Web.Integrations.GoCardless;
+using Msm.Portfolio.Web.Integrations.Stripe;
 using Msm.Portfolio.Web.Services;
 using Msm.Portfolio.Web.ViewModels;
 
 namespace Msm.Portfolio.Web.Controllers;
 
 /// <summary>
-/// The £3,499 checkout (specification sections 19, 20 and 34).
+/// The £99 digital-portfolio checkout (specification sections 19, 20 and 34).
 /// </summary>
 /// <remarks>
 /// Opened by staff in the studio while the client is present, so the pages are reached
-/// by an authenticated Admin rather than by the client alone. The provider's hosted
-/// page collects the payment details; none are handled here.
+/// by an authenticated Admin rather than by the client alone. Stripe's hosted page
+/// collects the payment details; none are handled here.
 /// </remarks>
 [Route("checkout")]
 public class CheckoutController(
     ICheckoutService checkout,
-    IGoCardlessService provider,
+    IStripeCheckoutService provider,
     UserManager<ApplicationUser> userManager,
     IOptions<MsmBrandOptions> brandOptions,
     ILogger<CheckoutController> logger) : Controller

@@ -39,7 +39,6 @@ public class RetoucherServiceTests : IDisposable
             new InMemoryStorage(),
             new AuditService(_db),
             new NotificationService(_db),
-            new SilentBiographyWriter(),
             NullLogger<PortfolioService>.Instance);
 
         _service = new RetoucherService(

@@ -6,19 +6,23 @@ using Msm.Portfolio.Web.Configuration;
 using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.Domain.Enums;
-using Msm.Portfolio.Web.Integrations.GoCardless;
+using Msm.Portfolio.Web.Integrations.Stripe;
 using Msm.Portfolio.Web.Services;
 
 namespace Msm.Portfolio.Tests;
 
+/// <summary>
+/// The £99 one-off portfolio purchase (specification sections 19 and 20), run through
+/// <see cref="CheckoutService"/> against a fake Stripe checkout provider. Webhook
+/// confirmation of the same purchase is covered in
+/// <c>StripeWebhookProcessorTests</c>, alongside the portfolio-maintenance subscription
+/// that shares the one Stripe webhook endpoint.
+/// </summary>
 public class CheckoutAndWebhookTests : IDisposable
 {
-    private const string Secret = "signing-secret";
-
     private readonly SqliteConnection _connection;
     private readonly ApplicationDbContext _db;
     private readonly CheckoutService _checkout;
-    private readonly PaymentWebhookProcessor _webhooks;
     private readonly FakeProvider _provider = new();
     private Guid _programmeProductId;
 
@@ -37,27 +41,13 @@ public class CheckoutAndWebhookTests : IDisposable
 
         var portfolios = new PortfolioService(
             _db, new SlugService(_db), new InMemoryStorage(), audit, notifications,
-            new SilentBiographyWriter(), NullLogger<PortfolioService>.Instance);
+            NullLogger<PortfolioService>.Instance);
 
         var commerce = new OptionsWrapper<CommerceOptions>(new CommerceOptions());
 
         _checkout = new CheckoutService(
             _db, _provider, portfolios, audit, notifications, commerce,
             NullLogger<CheckoutService>.Instance);
-
-        var maintenance = new MaintenanceService(
-            _db, portfolios, audit, notifications, commerce, NullLogger<MaintenanceService>.Instance);
-
-        var verifier = new GoCardlessWebhookVerifier(
-            new OptionsWrapper<IntegrationOptions>(new IntegrationOptions
-            {
-                GoCardless = new GoCardlessOptions { WebhookSecret = Secret }
-            }),
-            NullLogger<GoCardlessWebhookVerifier>.Instance);
-
-        _webhooks = new PaymentWebhookProcessor(
-            _db, verifier, _checkout, maintenance, audit, notifications,
-            NullLogger<PaymentWebhookProcessor>.Instance);
     }
 
     public void Dispose()
@@ -147,19 +137,6 @@ public class CheckoutAndWebhookTests : IDisposable
 
         return clientId;
     }
-
-    private string SignedPayload(params string[] eventJson) =>
-        $$"""{"events":[{{string.Join(",", eventJson)}}]}""";
-
-    private static string Sign(string payload) =>
-        GoCardlessWebhookVerifier.ComputeSignature(payload, Secret);
-
-    private static string PaymentEvent(string id, string action, string paymentId, string? reason = null) =>
-        $$"""
-        {"id":"{{id}}","resource_type":"payments","action":"{{action}}",
-         "links":{"payment":"{{paymentId}}"}
-         {{(reason is null ? "" : $",\"details\":{{\"description\":\"{reason}\"}}")}}}
-        """;
 
     // ---------- Orders ----------
 
@@ -415,141 +392,6 @@ public class CheckoutAndWebhookTests : IDisposable
         Assert.Equal(OrderStatus.Confirmed, (await _checkout.GetOrderAsync(order.Id))!.Status);
     }
 
-    // ---------- Webhooks ----------
-
-    [Fact]
-    public async Task A_webhook_with_a_bad_signature_is_rejected_and_changes_nothing()
-    {
-        var payload = SignedPayload(PaymentEvent("EV1", "confirmed", "PM1"));
-
-        var result = await _webhooks.ProcessAsync(payload, "wrong-signature");
-
-        Assert.False(result.Accepted);
-        Assert.Empty(_db.PaymentWebhookEvents);
-    }
-
-    /// <summary>
-    /// Specification section 44: providers retry until they get a success, so the same
-    /// event arrives repeatedly and must be applied only once.
-    /// </summary>
-    [Fact]
-    public async Task Replaying_the_same_event_applies_it_only_once()
-    {
-        var clientId = AddClient();
-        var order = (await _checkout.OpenAsync(clientId, null)).Order!;
-        await _checkout.BeginPaymentAsync(order.Id, "https://x/s", "https://x/f");
-
-        var transaction = _db.PaymentTransactions.Single(t => t.OrderId == order.Id);
-        transaction.ProviderPaymentId = "PM1";
-        await _db.SaveChangesAsync();
-
-        var payload = SignedPayload(PaymentEvent("EV1", "confirmed", "PM1"));
-        var signature = Sign(payload);
-
-        var first = await _webhooks.ProcessAsync(payload, signature);
-        var second = await _webhooks.ProcessAsync(payload, signature);
-        var third = await _webhooks.ProcessAsync(payload, signature);
-
-        Assert.Equal(1, first.Processed);
-        Assert.Equal(0, second.Processed);
-        Assert.Equal(1, second.Skipped);
-        Assert.Equal(1, third.Skipped);
-
-        // Accepted every time, so the provider stops retrying.
-        Assert.True(second.Accepted);
-        Assert.Equal(1, await _db.PaymentWebhookEvents.CountAsync());
-        Assert.Equal(1, await _db.Orders.CountAsync(o => o.Status == OrderStatus.Confirmed));
-    }
-
-    /// <summary>
-    /// The webhook is the authority and does not need the browser: a client who closed
-    /// the tab still gets their portfolio published.
-    /// </summary>
-    [Fact]
-    public async Task A_webhook_alone_confirms_the_order_and_publishes()
-    {
-        var clientId = AddClient();
-        var order = (await _checkout.OpenAsync(clientId, null)).Order!;
-        await _checkout.BeginPaymentAsync(order.Id, "https://x/s", "https://x/f");
-
-        var transaction = _db.PaymentTransactions.Single(t => t.OrderId == order.Id);
-        transaction.ProviderPaymentId = "PM1";
-        await _db.SaveChangesAsync();
-
-        var payload = SignedPayload(PaymentEvent("EV1", "confirmed", "PM1"));
-        await _webhooks.ProcessAsync(payload, Sign(payload));
-
-        Assert.Equal(OrderStatus.Confirmed, _db.Orders.Single().Status);
-        Assert.True(_db.Portfolios.Single(p => p.ClientId == clientId).IsPublished);
-    }
-
-    [Fact]
-    public async Task A_webhook_for_an_unknown_payment_is_recorded_but_changes_nothing()
-    {
-        var payload = SignedPayload(PaymentEvent("EV1", "confirmed", "PM-does-not-exist"));
-
-        var result = await _webhooks.ProcessAsync(payload, Sign(payload));
-
-        Assert.True(result.Accepted);
-        Assert.Equal(1, await _db.PaymentWebhookEvents.CountAsync());
-        Assert.Empty(_db.Orders);
-    }
-
-    [Fact]
-    public async Task Several_events_in_one_payload_are_all_recorded()
-    {
-        var payload = SignedPayload(
-            PaymentEvent("EV1", "created", "PM1"),
-            PaymentEvent("EV2", "submitted", "PM1"),
-            PaymentEvent("EV3", "confirmed", "PM1"));
-
-        var result = await _webhooks.ProcessAsync(payload, Sign(payload));
-
-        Assert.True(result.Accepted);
-        Assert.Equal(3, await _db.PaymentWebhookEvents.CountAsync());
-    }
-
-    [Fact]
-    public async Task A_failure_webhook_before_confirmation_fails_the_order()
-    {
-        var clientId = AddClient();
-        var order = (await _checkout.OpenAsync(clientId, null)).Order!;
-        await _checkout.BeginPaymentAsync(order.Id, "https://x/s", "https://x/f");
-
-        var transaction = _db.PaymentTransactions.Single(t => t.OrderId == order.Id);
-        transaction.ProviderPaymentId = "PM1";
-        await _db.SaveChangesAsync();
-
-        var payload = SignedPayload(PaymentEvent("EV1", "failed", "PM1", "Insufficient funds"));
-        await _webhooks.ProcessAsync(payload, Sign(payload));
-
-        Assert.Equal(OrderStatus.Failed, _db.Orders.Single().Status);
-        Assert.False(_db.Portfolios.Single(p => p.ClientId == clientId).IsPublished);
-    }
-
-    /// <summary>
-    /// A failure arriving after settlement concerns the money, not the sale. Tearing the
-    /// portfolio down here would bypass the grace period in specification section 23.
-    /// </summary>
-    [Fact]
-    public async Task A_failure_after_confirmation_notifies_staff_without_unpublishing()
-    {
-        var clientId = AddClient();
-        var order = (await _checkout.OpenAsync(clientId, null)).Order!;
-        await _checkout.BeginPaymentAsync(order.Id, "https://x/s", "https://x/f");
-        await _checkout.CompleteAsync(order.Id);
-
-        var transaction = _db.PaymentTransactions.Single(t => t.OrderId == order.Id);
-        transaction.ProviderPaymentId = "PM1";
-        await _db.SaveChangesAsync();
-
-        var payload = SignedPayload(PaymentEvent("EV1", "charged_back", "PM1", "Chargeback"));
-        await _webhooks.ProcessAsync(payload, Sign(payload));
-
-        Assert.Equal(OrderStatus.Confirmed, _db.Orders.Single().Status);
-        Assert.True(_db.Portfolios.Single(p => p.ClientId == clientId).IsPublished);
-    }
-
     /// <summary>
     /// If payment succeeds but publication is refused, the sale still stands: the client
     /// has paid either way, and staff are told so a person can resolve it.
@@ -574,16 +416,16 @@ public class CheckoutAndWebhookTests : IDisposable
 }
 
 /// <summary>A provider that records what it was asked and returns a scripted outcome.</summary>
-internal class FakeProvider : IGoCardlessService
+internal class FakeProvider : IStripeCheckoutService
 {
     public bool IsLive => false;
 
-    public CheckoutOutcome NextOutcome { get; set; } = new(true, "PM-DEFAULT", "MD-DEFAULT");
+    public CheckoutOutcome NextOutcome { get; set; } = new(true, "PI-DEFAULT");
 
     public Task<CheckoutSession> CreateCheckoutAsync(
         Order order, ClientProfile client, string successUrl, string failureUrl,
         CancellationToken cancellationToken = default) =>
-        Task.FromResult(new CheckoutSession($"BR-{order.Id:N}"[..12], successUrl));
+        Task.FromResult(new CheckoutSession($"cs_{order.Id:N}"[..12], successUrl));
 
     public Task<CheckoutOutcome> CompleteCheckoutAsync(
         string providerReference, CancellationToken cancellationToken = default) =>

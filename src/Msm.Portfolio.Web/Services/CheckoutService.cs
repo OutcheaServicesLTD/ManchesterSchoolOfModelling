@@ -4,7 +4,7 @@ using Msm.Portfolio.Web.Configuration;
 using Msm.Portfolio.Web.Data;
 using Msm.Portfolio.Web.Domain.Entities;
 using Msm.Portfolio.Web.Domain.Enums;
-using Msm.Portfolio.Web.Integrations.GoCardless;
+using Msm.Portfolio.Web.Integrations.Stripe;
 
 namespace Msm.Portfolio.Web.Services;
 
@@ -47,7 +47,7 @@ public interface ICheckoutService
 
 public class CheckoutService(
     ApplicationDbContext db,
-    IGoCardlessService provider,
+    IStripeCheckoutService provider,
     IPortfolioService portfolios,
     IAuditService audit,
     INotificationService notifications,
@@ -177,7 +177,7 @@ public class CheckoutService(
             var session = await provider.CreateCheckoutAsync(
                 order, order.Client, successUrl, failureUrl, cancellationToken);
 
-            order.GoCardlessReference = session.ProviderReference;
+            order.StripeCheckoutSessionId = session.ProviderReference;
             order.Status = OrderStatus.CheckoutStarted;
             order.CheckoutStartedAt ??= DateTimeOffset.UtcNow;
 
@@ -186,7 +186,7 @@ public class CheckoutService(
             db.PaymentTransactions.Add(new PaymentTransaction
             {
                 OrderId = order.Id,
-                Provider = "GoCardless",
+                Provider = "Stripe",
                 Amount = order.Amount,
                 Currency = order.Currency,
                 Status = PaymentStatus.CheckoutStarted
@@ -223,12 +223,12 @@ public class CheckoutService(
             return OperationResult.Ok();
         }
 
-        if (string.IsNullOrWhiteSpace(order.GoCardlessReference))
+        if (string.IsNullOrWhiteSpace(order.StripeCheckoutSessionId))
         {
             return OperationResult.Fail("This order has no payment attached.");
         }
 
-        var outcome = await provider.CompleteCheckoutAsync(order.GoCardlessReference, cancellationToken);
+        var outcome = await provider.CompleteCheckoutAsync(order.StripeCheckoutSessionId, cancellationToken);
 
         if (!outcome.Authorised)
         {
@@ -315,8 +315,6 @@ public class CheckoutService(
             ExtendTerm(portfolio);
         }
 
-        await StartMaintenanceAsync(order, cancellationToken);
-
         // Saved before publishing so the sale is durable even if publication is refused.
         await db.SaveChangesAsync(cancellationToken);
 
@@ -339,11 +337,6 @@ public class CheckoutService(
     }
 
     /// <summary>
-    /// Creates the maintenance subscription record at the configured offset
-    /// (specification section 22). Collection itself is Phase 8; this fixes the price
-    /// agreed today so a later change cannot alter it.
-    /// </summary>
-    /// <summary>
     /// Sets the date the portfolio stops being public: a year from now, which is what the
     /// £99 buys.
     /// </summary>
@@ -361,41 +354,6 @@ public class CheckoutService(
         portfolio.UpdatedAt = now;
     }
 
-    private async Task StartMaintenanceAsync(Order order, CancellationToken cancellationToken)
-    {
-        // Off by default: the £99 is the only payment, so no subscription is opened and
-        // none of the payment-failure machinery can fire.
-        if (!commerceOptions.Value.MaintenanceEnabled)
-        {
-            return;
-        }
-
-        if (await db.MaintenanceSubscriptions.AnyAsync(s => s.ClientId == order.ClientId, cancellationToken))
-        {
-            return;
-        }
-
-        var product = await db.Products.FirstOrDefaultAsync(
-            p => p.Code == ProductCodes.PortfolioMaintenance && p.IsActive, cancellationToken);
-
-        if (product is null)
-        {
-            return;
-        }
-
-        var commerce = commerceOptions.Value;
-
-        db.MaintenanceSubscriptions.Add(new MaintenanceSubscription
-        {
-            ClientId = order.ClientId,
-            ProductId = product.Id,
-            PriceAtCreation = product.Price,
-            Currency = product.Currency,
-            Status = MaintenanceSubscriptionStatus.NotStarted,
-            StartDate = DateTimeOffset.UtcNow.AddDays(commerce.MaintenanceStartsAfterDays)
-        });
-    }
-
     private void RecordTransaction(
         Order order, PaymentStatus status, string? providerPaymentId, string? failureReason)
     {
@@ -410,7 +368,7 @@ public class CheckoutService(
             transaction = new PaymentTransaction
             {
                 OrderId = order.Id,
-                Provider = "GoCardless",
+                Provider = "Stripe",
                 Amount = order.Amount,
                 Currency = order.Currency
             };

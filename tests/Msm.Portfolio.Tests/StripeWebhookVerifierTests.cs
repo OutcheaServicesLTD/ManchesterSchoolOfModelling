@@ -6,9 +6,9 @@ using Msm.Portfolio.Web.Integrations.Stripe;
 namespace Msm.Portfolio.Tests;
 
 /// <summary>
-/// As with GoCardless, the webhook endpoint is unauthenticated by necessity, so the
-/// signature is the only thing separating a real Stripe notification from a forged one.
-/// Pure computation, so verified directly without needing a Stripe account.
+/// The webhook endpoint is unauthenticated by necessity, so the signature is the only
+/// thing separating a real Stripe notification from a forged one. Pure computation, so
+/// verified directly without needing a Stripe account.
 /// </summary>
 public class StripeWebhookVerifierTests
 {

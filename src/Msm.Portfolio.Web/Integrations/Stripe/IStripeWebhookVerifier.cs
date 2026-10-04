@@ -6,11 +6,22 @@ using Msm.Portfolio.Web.Configuration;
 
 namespace Msm.Portfolio.Web.Integrations.Stripe;
 
-/// <summary>One Stripe event, reduced to what the subscription flow needs from it.</summary>
+/// <summary>One Stripe event, reduced to what the payment and subscription flows need from it.</summary>
 /// <param name="EventId">
-/// Stripe's own event identifier ("evt_..."). Stored and made unique against the same
-/// PaymentWebhookEvents table GoCardless uses, which is what makes handling idempotent
-/// under Stripe's own retries (specification section 44, extended to Stripe).
+/// Stripe's own event identifier ("evt_..."). Stored and made unique, which is what
+/// makes handling idempotent under Stripe's own retries (specification section 44).
+/// </param>
+/// <param name="SubscriptionId">
+/// Present on a subscription Checkout Session or a subscription lifecycle event; absent
+/// on a one-off payment Checkout Session, which is what distinguishes the £99 portfolio
+/// purchase from the recurring membership below.
+/// </param>
+/// <param name="SessionId">
+/// The Checkout Session's own id ("cs_..."), present on checkout.session.* events. Used
+/// to match a one-off payment back to the <c>Order</c> that opened it.
+/// </param>
+/// <param name="PaymentIntentId">
+/// Stripe's payment identifier for a completed one-off Checkout Session.
 /// </param>
 public record StripeWebhookEvent(
     string EventId,
@@ -19,7 +30,9 @@ public record StripeWebhookEvent(
     string? CustomerId,
     string? ClientReferenceId,
     string? ClientIdFromMetadata,
-    string? Reason);
+    string? Reason,
+    string? SessionId = null,
+    string? PaymentIntentId = null);
 
 public interface IStripeWebhookVerifier
 {
@@ -40,12 +53,11 @@ public interface IStripeWebhookVerifier
 /// </summary>
 /// <remarks>
 /// <para>
-/// Implements Stripe's documented signing scheme directly — the same approach
-/// <c>GoCardlessWebhookVerifier</c> takes for GoCardless — rather than trusting the SDK's
-/// own event deserialisation to match this application's exact Stripe.net version. The
-/// scheme itself is simple and stable: the <c>Stripe-Signature</c> header carries a
-/// timestamp and an HMAC-SHA256 of <c>"{timestamp}.{payload}"</c>, keyed with the
-/// webhook's signing secret.
+/// Implements Stripe's documented signing scheme directly, rather than trusting the
+/// SDK's own event deserialisation to match this application's exact Stripe.net
+/// version. The scheme itself is simple and stable: the <c>Stripe-Signature</c> header
+/// carries a timestamp and an HMAC-SHA256 of <c>"{timestamp}.{payload}"</c>, keyed with
+/// the webhook's signing secret.
 /// </para>
 /// <para>
 /// The timestamp is checked against a tolerance window as well as the signature itself.
@@ -166,6 +178,8 @@ public class StripeWebhookVerifier(
                 ? Text(obj, "id")
                 : null);
 
+            var sessionId = type.StartsWith("checkout.session.") ? Text(obj, "id") : null;
+
             return new StripeWebhookEvent(
                 id,
                 type,
@@ -174,7 +188,9 @@ public class StripeWebhookVerifier(
                 ClientReferenceId: Text(obj, "client_reference_id"),
                 ClientIdFromMetadata: Text(metadata, "clientId"),
                 Reason: Text(obj, "cancellation_reason")
-                    ?? DottedText(obj, "last_finalization_error", "message"));
+                    ?? DottedText(obj, "last_finalization_error", "message"),
+                SessionId: sessionId,
+                PaymentIntentId: Text(obj, "payment_intent"));
         }
         catch (JsonException ex)
         {

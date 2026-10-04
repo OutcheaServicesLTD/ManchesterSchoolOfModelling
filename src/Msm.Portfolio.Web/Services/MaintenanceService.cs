@@ -52,10 +52,8 @@ public interface IMaintenanceService
     /// subscribes and updating it on a later Checkout completion.
     /// </summary>
     /// <remarks>
-    /// Provider-agnostic in shape, but in practice this is always Stripe today: a
-    /// client starts this themselves from their portal, quite separately from the
-    /// £99 digital-portfolio purchase and the auto-provisioned GoCardless arrangement
-    /// <see cref="CommerceOptions.MaintenanceEnabled"/> would otherwise create.
+    /// A client starts this themselves from their portal, quite separately from the
+    /// £99 one-off digital-portfolio purchase.
     /// </remarks>
     Task<MaintenanceSubscription> ActivateSubscriptionAsync(
         Guid clientId,

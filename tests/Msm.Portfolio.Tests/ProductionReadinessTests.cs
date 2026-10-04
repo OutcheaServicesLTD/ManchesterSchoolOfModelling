@@ -2,9 +2,8 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
-using Msm.Portfolio.Web.Domain.Entities;
-using Msm.Portfolio.Web.Integrations.GoCardless;
 using Msm.Portfolio.Web.Integrations.HighLevel;
+using Msm.Portfolio.Web.Integrations.Stripe;
 using Msm.Portfolio.Web.Services;
 
 namespace Msm.Portfolio.Tests;
@@ -18,22 +17,16 @@ public class ProductionReadinessTests
     private const string LiveDomain = "https://model-portfolio.manchesterschoolofmodelling.co.uk";
 
     private static IConfiguration Configuration(
-        string? webhookSecret = "a-secret",
+        string? stripeWebhookSecret = "whsec_x",
         string? contactEmail = "hello@example.com",
         string? publicDomain = LiveDomain,
-        string? biographyKey = "sk-ant-test",
-        string? stripeSecretKey = "sk_test_x",
-        string? stripeWebhookSecret = "whsec_x",
         string? stripePriceId = "price_x")
     {
         var values = new Dictionary<string, string?>
         {
-            ["Integrations:GoCardless:WebhookSecret"] = webhookSecret,
+            ["Integrations:Stripe:WebhookSecret"] = stripeWebhookSecret,
             ["Msm:ContactEmail"] = contactEmail,
             ["Msm:PublicDomain"] = publicDomain,
-            ["Biography:ApiKey"] = biographyKey,
-            ["Integrations:Stripe:SecretKey"] = stripeSecretKey,
-            ["Integrations:Stripe:WebhookSecret"] = stripeWebhookSecret,
             ["Integrations:Stripe:PriceId"] = stripePriceId
         };
 
@@ -46,17 +39,12 @@ public class ProductionReadinessTests
         bool emailSenderIsStub = false,
         string mediaStorageProvider = "ObjectStorage",
         bool migrateOnStartup = false,
-        string? webhookSecret = "a-secret",
+        string? stripeWebhookSecret = "whsec_x",
         string? contactEmail = "hello@example.com",
         string? publicDomain = LiveDomain,
-        string? biographyKey = "sk-ant-test",
-        string? stripeSecretKey = "sk_test_x",
-        string? stripeWebhookSecret = "whsec_x",
         string? stripePriceId = "price_x") =>
         ProductionReadiness.Check(
-            Configuration(
-                webhookSecret, contactEmail, publicDomain, biographyKey,
-                stripeSecretKey, stripeWebhookSecret, stripePriceId),
+            Configuration(stripeWebhookSecret, contactEmail, publicDomain, stripePriceId),
             new FakePayments(paymentsLive),
             new FakeCrm(crmLive),
             emailSenderIsStub,
@@ -67,17 +55,6 @@ public class ProductionReadinessTests
     public void A_fully_configured_deployment_reports_nothing()
     {
         Assert.Empty(Check());
-    }
-
-    [Fact]
-    public void No_biography_provider_is_reported_but_not_fatal()
-    {
-        // Optional by design: a studio that writes its own biographies wants exactly
-        // this. Reported so nobody is left wondering why approvals never suggest one.
-        var problem = Assert.Single(Check(biographyKey: null));
-
-        Assert.Equal("Biographies", problem.Area);
-        Assert.False(problem.IsFatal);
     }
 
     [Fact]
@@ -94,42 +71,21 @@ public class ProductionReadinessTests
     {
         // Without it no payment can ever be confirmed, and a forged notification would be
         // the only thing that could publish a portfolio.
-        var problem = Assert.Single(Check(webhookSecret: null));
+        var problem = Assert.Single(Check(stripeWebhookSecret: null));
 
         Assert.Equal("Payments", problem.Area);
         Assert.True(problem.IsFatal);
     }
 
     [Fact]
-    public void No_stripe_configuration_is_a_non_fatal_warning()
+    public void A_missing_price_id_is_a_non_fatal_warning()
     {
-        // Optional: the client portal simply does not offer a subscription until it is
-        // configured, unlike GoCardless, which the £99 purchase already depends on.
-        var problem = Assert.Single(Check(stripeSecretKey: null, stripeWebhookSecret: null, stripePriceId: null));
-
-        Assert.Equal("Subscriptions", problem.Area);
-        Assert.False(problem.IsFatal);
-    }
-
-    [Fact]
-    public void A_stripe_secret_key_with_no_webhook_secret_is_fatal()
-    {
-        // Without it a subscription payment could never be confirmed — the same reasoning
-        // as GoCardless's own missing webhook secret above.
-        var problem = Assert.Single(Check(stripeWebhookSecret: null));
-
-        Assert.Equal("Subscriptions", problem.Area);
-        Assert.True(problem.IsFatal);
-    }
-
-    [Fact]
-    public void A_stripe_secret_key_with_no_price_id_is_fatal()
-    {
-        // Without it no client could actually be sent to a subscription checkout.
+        // Optional on top of the Stripe account the £99 purchase already requires: the
+        // client portal simply does not offer a subscription until it is set.
         var problem = Assert.Single(Check(stripePriceId: null));
 
         Assert.Equal("Subscriptions", problem.Area);
-        Assert.True(problem.IsFatal);
+        Assert.False(problem.IsFatal);
     }
 
     [Fact]
@@ -271,20 +227,23 @@ public class ProductionReadinessTests
             new NullFileProvider();
     }
 
-    private sealed class FakePayments(bool isLive) : IGoCardlessService
+    private sealed class FakePayments(bool isLive) : IStripeService
     {
         public bool IsLive { get; } = isLive;
 
-        public Task<CheckoutSession> CreateCheckoutAsync(
-            Order order,
-            ClientProfile client,
+        public Task<(string CustomerId, string CheckoutUrl)> CreateSubscriptionCheckoutAsync(
+            Guid clientId,
+            string clientName,
+            string? clientEmail,
+            string? existingCustomerId,
+            string priceId,
             string successUrl,
-            string failureUrl,
+            string cancelUrl,
             CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
 
-        public Task<CheckoutOutcome> CompleteCheckoutAsync(
-            string providerReference, CancellationToken cancellationToken = default) =>
+        public Task<string> CreateManagePortalSessionAsync(
+            string customerId, string returnUrl, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
     }
 

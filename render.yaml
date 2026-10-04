@@ -31,7 +31,7 @@ services:
       #   - the placeholder payment provider only authorises in Development, so the
       #     checkout journey can be demonstrated end to end without taking money
       #   - the readiness guard is skipped, which is what otherwise blocks a start
-      #     while email, object storage and GoCardless are outstanding
+      #     while email, object storage and Stripe are outstanding
       # It also enables the detailed error page, which is a reason not to leave a
       # preview running longer than it is needed.
       - key: ASPNETCORE_ENVIRONMENT
