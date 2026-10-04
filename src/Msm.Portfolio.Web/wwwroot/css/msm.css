@@ -2133,6 +2133,22 @@ body.viewer-open {
     flex-wrap: wrap;
 }
 
+/* A jump nav for a page too long to scroll blind through — the retoucher workspace,
+   up to 30 portfolio photographs and 60 in the library below them. Sticks directly
+   under the portal header, 76px being that header's own min-height, so the two sit
+   flush with no gap and no overlap. One below the header's z-index of 50: the header
+   must still win if either were ever tall enough to touch. */
+.section-nav {
+    position: sticky;
+    top: 76px;
+    z-index: 40;
+    background: var(--bg);
+}
+
+.section-nav .nav-tabs {
+    margin-bottom: 1.5rem;
+}
+
 .portal-brand {
     display: flex;
     flex-direction: column;

@@ -5,6 +5,7 @@
     ViewData["Title"] = Model.ClientName;
     var error = TempData["Error"] as string;
     var token = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+    var cover = Model.Selected.FirstOrDefault(a => a.IsFeatured);
 }
 
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
@@ -14,6 +15,24 @@
     </div>
     <a class="btn btn-outline-secondary" href="/retoucher">Back to queue</a>
 </div>
+
+@* A long page — up to 60 library photographs plus 30 on the portfolio — so jumping
+   straight to a section beats scrolling past all of them to find it. Sticks under the
+   portal header on the way down, the same way the header itself stays put; no
+   scroll-spy highlighting a current section, which would need script this does not
+   otherwise need. *@
+<nav class="section-nav" aria-label="Jump to a section">
+    <ul class="nav nav-tabs">
+        <li class="nav-item"><a class="nav-link" href="#upload">Upload</a></li>
+        @if (cover is not null)
+        {
+            <li class="nav-item"><a class="nav-link" href="#cover">Cover photo</a></li>
+        }
+        <li class="nav-item"><a class="nav-link" href="#portfolio">Portfolio (@Model.Selected.Count)</a></li>
+        <li class="nav-item"><a class="nav-link" href="#library">Library (@Model.Unselected.Count)</a></li>
+        <li class="nav-item"><a class="nav-link" href="#submit">Submit</a></li>
+    </ul>
+</nav>
 
 @if (error is not null)
 {
@@ -52,7 +71,7 @@
     </div>
 </div>
 
-<div class="card mb-4">
+<div id="upload" class="card mb-4">
     <div class="card-body">
         <h2 class="h5 card-title">Upload photographs</h2>
 
@@ -121,24 +140,22 @@
     </div>
 </div>
 
-@{
-    var cover = Model.Selected.FirstOrDefault(a => a.IsFeatured);
-}
-
 @if (cover is not null)
 {
     @* Only ever the main image: it is the only photograph the site crops. *@
-    <partial name="_CoverFocus" model="@(new Msm.Portfolio.Web.ViewModels.CoverFocusViewModel
-    {
-        AssetId = cover.Id,
-        Filename = cover.Filename,
-        PostUrl = $"/retoucher/client/{Model.ClientId}/focal/{cover.Id}",
-        X = cover.FocalPointX,
-        Y = cover.FocalPointY
-    })" />
+    <div id="cover">
+        <partial name="_CoverFocus" model="@(new Msm.Portfolio.Web.ViewModels.CoverFocusViewModel
+        {
+            AssetId = cover.Id,
+            Filename = cover.Filename,
+            PostUrl = $"/retoucher/client/{Model.ClientId}/focal/{cover.Id}",
+            X = cover.FocalPointX,
+            Y = cover.FocalPointY
+        })" />
+    </div>
 }
 
-<h2 class="h5">Portfolio (@Model.Selected.Count)</h2>
+<h2 id="portfolio" class="h5">Portfolio (@Model.Selected.Count)</h2>
 @if (Model.Selected.Count == 0)
 {
     <p class="text-muted">No photographs chosen yet.</p>
@@ -220,7 +237,7 @@ else
     </ol>
 }
 
-<h2 class="h5">Library (@Model.Unselected.Count not on the portfolio)</h2>
+<h2 id="library" class="h5">Library (@Model.Unselected.Count not on the portfolio)</h2>
 @if (Model.Unselected.Count == 0)
 {
     <p class="text-muted">Every photograph is on the portfolio.</p>
@@ -309,7 +326,7 @@ else
     }
 }
 
-<div class="border-top pt-3 d-flex gap-2 flex-wrap align-items-center">
+<div id="submit" class="border-top pt-3 d-flex gap-2 flex-wrap align-items-center">
     @* Sent without reloading, so the answer appears where the retoucher is standing
        rather than throwing them to the top of a fresh page. Falls back to an ordinary
        post with no script — the data attribute is all that changes. *@
