@@ -46,9 +46,9 @@ public class WorkspaceController(
     public Task<IActionResult> Portfolio(Guid clientId, CancellationToken cancellationToken = default) =>
         RenderAsync(clientId, WorkspaceSection.Portfolio, cancellationToken);
 
+    /// <summary>The library is no longer its own stop — it lives on Upload.</summary>
     [HttpGet("library")]
-    public Task<IActionResult> Library(Guid clientId, CancellationToken cancellationToken = default) =>
-        RenderAsync(clientId, WorkspaceSection.Library, cancellationToken);
+    public IActionResult Library(Guid clientId) => RedirectToAction(nameof(Upload), new { clientId });
 
     /// <summary>
     /// Named Review rather than Submit in C#, which the action below already is — the
@@ -177,7 +177,7 @@ public class WorkspaceController(
                 : $"{added} photographs added to the portfolio.";
         }
 
-        return RedirectToAction(nameof(Library), new { clientId });
+        return RedirectToAction(nameof(Upload), new { clientId });
     }
 
     [HttpPost("featured/{assetId:guid}")]
@@ -244,7 +244,7 @@ public class WorkspaceController(
 
         await media.SoftDeleteAsync(clientId, assetId, CurrentUserId(), cancellationToken);
 
-        return RedirectToAction(nameof(Library), new { clientId });
+        return RedirectToAction(nameof(Upload), new { clientId });
     }
 
     /// <summary>

@@ -11,6 +11,8 @@
 
     // Each stop the retoucher can jump to, in order. Nothing here is ever locked —
     // the retoucher can open any of them in any order and the page saves as they go.
+    // The library lives inside the Upload stop rather than being a stop of its own:
+    // it is the uploaded photographs, so it belongs where they land.
     var steps = new List<(WorkspaceSection Section, string Url, string Label)>
     {
         (WorkspaceSection.Upload, $"{baseUrl}/upload", "Upload")
@@ -22,7 +24,6 @@
     }
 
     steps.Add((WorkspaceSection.Portfolio, $"{baseUrl}/portfolio", $"Portfolio ({Model.Selected.Count})"));
-    steps.Add((WorkspaceSection.Library, $"{baseUrl}/library", $"Library ({Model.Unselected.Count})"));
     steps.Add((WorkspaceSection.Submit, $"{baseUrl}/submit", "Submit"));
 
     // Back/Next walk the same ordered list the stepper does, so a cover that does not
@@ -41,7 +42,7 @@
     <a class="btn btn-outline-secondary" href="/retoucher">Back to queue</a>
 </div>
 
-@* Five separate pages rather than sections of one long scroll — up to 60 library
+@* Separate pages rather than sections of one long scroll — up to 60 library
    photographs plus 30 on the portfolio made that scroll too long to work through
    blind. Sticks under the portal header on the way down, the same way the header
    itself stays put, so Back/Next stay reachable without scrolling back up a long
@@ -152,10 +153,9 @@
                     @if (Model.PoolIsFull)
                     {
                         <p class="mb-2"><strong>The library is full at @Model.PoolLimit photographs.</strong></p>
-                        <p class="form-text mb-3">
-                            Delete a few you do not need before uploading any more.
+                        <p class="form-text mb-0">
+                            Delete a few you do not need below before uploading any more.
                         </p>
-                        <a class="btn btn-outline-primary" href="@baseUrl/library">Go to the library</a>
                     }
                     else
                     {
@@ -192,11 +192,13 @@
                 <ul id="upload-list" class="list-group mt-2"></ul>
 
                 @* Only offered when a file failed: a clean batch reloads on its own.
-                   Reloading with failures showing would discard their Retry buttons. New
-                   uploads land in the library unselected, which is where to go look. *@
+                   Reloading with failures showing would discard their Retry buttons, so
+                   it is offered rather than done automatically. The library below already
+                   has everything that did succeed; reloading brings the rest of them up
+                   to date too. *@
                 <div id="refresh-after-upload" class="mt-3 d-none">
-                    <a class="btn btn-outline-primary" href="@baseUrl/library">
-                        Go to the library to see the uploaded photographs
+                    <a class="btn btn-outline-primary" href="@baseUrl/upload">
+                        Reload to see the uploaded photographs
                     </a>
                 </div>
             </div>
@@ -205,35 +207,109 @@
 
     @if (Model.Assets.Count > 0)
     {
-        @* A quiet proof the upload landed, without leaving this page: every photograph
-           already in the library, read-only. Choosing which go on the portfolio stays on
-           the Library page — this is confirmation, not a second place to do that work. *@
-        <h2 class="h5">In the library (@Model.Assets.Count)</h2>
-        <p class="text-muted">
-            Everything uploaded for this shoot so far. Go to the
-            <a href="@baseUrl/library">library</a> to choose which go on the portfolio.
-        </p>
-        <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
-            @foreach (var asset in Model.Assets)
-            {
-                <div class="col">
-                    <div class="card h-100">
-                        <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
-                             style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
-                             alt="@asset.Filename" />
-                        <div class="card-body p-2">
-                            <p class="small text-muted mb-0">
-                                @asset.Orientation
-                                @if (asset.IsFeatured)
-                                {
-                                    <span class="badge text-bg-primary">Main</span>
-                                }
-                            </p>
-                        </div>
+        @* The library lives here rather than on a stop of its own: it is exactly the
+           photographs just uploaded, so choosing which of them go on the portfolio
+           happens right where they landed instead of behind another click. *@
+        <h2 class="h5">Library (@Model.Unselected.Count not on the portfolio)</h2>
+        @if (Model.Unselected.Count == 0)
+        {
+            <p class="text-muted">Every photograph is on the portfolio.</p>
+        }
+        else
+        {
+            <p class="text-muted">
+                Tick the ones you want, then press <strong>Add to portfolio</strong> to
+                move them across.
+            </p>
+
+            @* Tick the ones wanted and add them together. Choosing a shoot's worth one
+               button at a time was the slowest part of the job. *@
+            <form method="post" asp-action="SelectMany" asp-route-clientId="@Model.ClientId" id="picker">
+                <div class="picker-bar">
+                    <div class="form-check mb-0">
+                        <input class="form-check-input" type="checkbox" id="pick-all" data-pick-all />
+                        <label class="form-check-label" for="pick-all">Select all</label>
                     </div>
+
+                    @* Ticks a suggested set rather than adding it. Nothing is saved until
+                       the retoucher looks at the choice and presses the button themselves. *@
+                    @* Hidden until script reveals it: without script it could not do
+                       anything, and an inert button is worse than no button. The picker
+                       itself works either way. *@
+                    <button type="button" class="btn btn-outline-secondary d-none" data-pick-suggest
+                            @(Model.PortfolioIsFull ? "disabled" : "")>
+                        Suggest a selection
+                    </button>
+
+                    <span class="eyebrow" data-pick-count aria-live="polite">None chosen</span>
+
+                    <button type="submit" class="btn btn-primary" data-pick-submit disabled
+                            @(Model.PortfolioIsFull ? "disabled" : "")>
+                        Add to portfolio
+                    </button>
                 </div>
+
+                <p class="form-text mt-2">
+                    <strong>Suggest a selection</strong> ticks the best
+                    @(Model.PortfolioLimit - Model.Selected.Count) photographs to fill the
+                    portfolio — sharpest first, well exposed, with nothing lost to pure black
+                    or pure white. It judges the picture, never the person in it, so look
+                    through the choice and untick whatever you do not want. Press the button
+                    again to clear everything and start over.
+                </p>
+
+                <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
+                    @foreach (var asset in Model.Unselected)
+                    {
+                        <div class="col">
+                            <div class="card h-100">
+                                @* The whole tile is the label, so clicking anywhere on the
+                                   photograph ticks it rather than only the small box. *@
+                                <label class="pick-tile">
+                                    <input class="form-check-input pick" type="checkbox"
+                                           name="assetIds" value="@asset.Id" data-pick
+                                           @(asset.IsSuggested ? "data-pick-suggested" : "")
+                                           @(Model.PortfolioIsFull ? "disabled" : "") />
+                                    <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
+                                         style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
+                                         alt="@asset.Filename" />
+                                </label>
+
+                                <div class="card-body p-2">
+                                    <p class="small text-muted mb-1">@asset.Orientation</p>
+
+                                    <div class="btn-group btn-group-sm w-100" role="group" aria-label="Actions">
+                                        @* Opens in its own tab so the tab this is in keeps
+                                           whatever has been ticked so far. *@
+                                        <a class="btn btn-outline-secondary" href="/media/@asset.Id/original"
+                                           target="_blank" rel="noopener" title="View full size">
+                                            <partial name="_Icon" model="@("eye")" />
+                                            <span class="visually-hidden">View full size</span>
+                                        </a>
+
+                                        @* Deliberately not in the picker form: removal is
+                                           destructive and should never ride along with a bulk
+                                           add. *@
+                                        <button type="submit" class="btn btn-outline-danger" form="remove-@asset.Id"
+                                                title="Remove this photograph">
+                                            <partial name="_Icon" model="@("trash")" />
+                                            <span class="visually-hidden">Remove this photograph</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            </form>
+
+            @foreach (var asset in Model.Unselected)
+            {
+                <form method="post" asp-action="Remove" asp-route-clientId="@Model.ClientId"
+                      asp-route-assetId="@asset.Id" id="remove-@asset.Id" class="d-none"
+                      data-confirm="Remove this photograph?"></form>
             }
-        </div>
+        }
     }
 }
 
@@ -257,7 +333,7 @@
     {
         <p class="text-muted">
             No photographs chosen yet. Add some from the
-            <a href="@baseUrl/library">library</a>.
+            <a href="@baseUrl/upload">library</a>.
         </p>
     }
     else
@@ -354,109 +430,6 @@
                 </li>
             }
         </ol>
-    }
-}
-
-@if (Model.CurrentSection == WorkspaceSection.Library)
-{
-    <h2 class="h5">Library (@Model.Unselected.Count not on the portfolio)</h2>
-    @if (Model.Unselected.Count == 0)
-    {
-        <p class="text-muted">Every photograph is on the portfolio.</p>
-    }
-    else
-    {
-        <p class="text-muted">
-            Every photograph uploaded for this shoot, not yet on the portfolio. Tick the
-            ones you want, then press <strong>Add to portfolio</strong> to move them across.
-        </p>
-
-        @* Tick the ones wanted and add them together. Choosing a shoot's worth one button
-           at a time was the slowest part of the job. *@
-        <form method="post" asp-action="SelectMany" asp-route-clientId="@Model.ClientId" id="picker">
-            <div class="picker-bar">
-                <div class="form-check mb-0">
-                    <input class="form-check-input" type="checkbox" id="pick-all" data-pick-all />
-                    <label class="form-check-label" for="pick-all">Select all</label>
-                </div>
-
-                @* Ticks a suggested set rather than adding it. Nothing is saved until the
-                   retoucher looks at the choice and presses the button themselves. *@
-                @* Hidden until script reveals it: without script it could not do anything,
-                   and an inert button is worse than no button. The picker itself works
-                   either way. *@
-                <button type="button" class="btn btn-outline-secondary d-none" data-pick-suggest
-                        @(Model.PortfolioIsFull ? "disabled" : "")>
-                    Suggest a selection
-                </button>
-
-                <span class="eyebrow" data-pick-count aria-live="polite">None chosen</span>
-
-                <button type="submit" class="btn btn-primary" data-pick-submit disabled
-                        @(Model.PortfolioIsFull ? "disabled" : "")>
-                    Add to portfolio
-                </button>
-            </div>
-
-            <p class="form-text mt-2">
-                <strong>Suggest a selection</strong> ticks the best
-                @(Model.PortfolioLimit - Model.Selected.Count) photographs to fill the
-                portfolio — sharpest first, well exposed, with nothing lost to pure black or
-                pure white. It judges the picture, never the person in it, so look through the
-                choice and untick whatever you do not want. Press the button again to clear
-                everything and start over.
-            </p>
-
-            <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
-                @foreach (var asset in Model.Unselected)
-                {
-                    <div class="col">
-                        <div class="card h-100">
-                            @* The whole tile is the label, so clicking anywhere on the
-                               photograph ticks it rather than only the small box. *@
-                            <label class="pick-tile">
-                                <input class="form-check-input pick" type="checkbox"
-                                       name="assetIds" value="@asset.Id" data-pick
-                                       @(asset.IsSuggested ? "data-pick-suggested" : "")
-                                       @(Model.PortfolioIsFull ? "disabled" : "") />
-                                <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
-                                     style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
-                                     alt="@asset.Filename" />
-                            </label>
-
-                            <div class="card-body p-2">
-                                <p class="small text-muted mb-1">@asset.Orientation</p>
-
-                                <div class="btn-group btn-group-sm w-100" role="group" aria-label="Actions">
-                                    @* Opens in its own tab so the tab this is in keeps whatever
-                                       has been ticked so far. *@
-                                    <a class="btn btn-outline-secondary" href="/media/@asset.Id/original"
-                                       target="_blank" rel="noopener" title="View full size">
-                                        <partial name="_Icon" model="@("eye")" />
-                                        <span class="visually-hidden">View full size</span>
-                                    </a>
-
-                                    @* Deliberately not in the picker form: removal is destructive
-                                       and should never ride along with a bulk add. *@
-                                    <button type="submit" class="btn btn-outline-danger" form="remove-@asset.Id"
-                                            title="Remove this photograph">
-                                        <partial name="_Icon" model="@("trash")" />
-                                        <span class="visually-hidden">Remove this photograph</span>
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                }
-            </div>
-        </form>
-
-        @foreach (var asset in Model.Unselected)
-        {
-            <form method="post" asp-action="Remove" asp-route-clientId="@Model.ClientId"
-                  asp-route-assetId="@asset.Id" id="remove-@asset.Id" class="d-none"
-                  data-confirm="Remove this photograph?"></form>
-        }
     }
 }
 
