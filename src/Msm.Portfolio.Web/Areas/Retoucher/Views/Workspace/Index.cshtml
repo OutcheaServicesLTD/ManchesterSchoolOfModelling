@@ -146,9 +146,10 @@
                     @if (Model.PoolIsFull)
                     {
                         <p class="mb-2"><strong>The library is full at @Model.PoolLimit photographs.</strong></p>
-                        <p class="form-text mb-0">
-                            Remove some from the <a href="@baseUrl/library">library</a> before uploading any more.
+                        <p class="form-text mb-3">
+                            Delete a few you do not need before uploading any more.
                         </p>
+                        <a class="btn btn-outline-primary" href="@baseUrl/library">Go to the library</a>
                     }
                     else
                     {
@@ -222,6 +223,11 @@
     }
     else
     {
+        <p class="text-muted">
+            These are the photographs going on the model's public portfolio. Pick one
+            as the main photo below, and drag a tile — or use the arrows on it — to
+            change the order they appear in.
+        </p>
         @* Dragging is an addition, not a replacement: the arrows below stay, because
            specification section 41 requires the order to be changeable from a keyboard and
            a drag-only control cannot be. The new order posts to Reorder. *@
@@ -307,6 +313,11 @@
     }
     else
     {
+        <p class="text-muted">
+            Every photograph uploaded for this shoot, not yet on the portfolio. Tick the
+            ones you want, then press <strong>Add to portfolio</strong> to move them across.
+        </p>
+
         @* Tick the ones wanted and add them together. Choosing a shoot's worth one button
            at a time was the slowest part of the job. *@
         <form method="post" asp-action="SelectMany" asp-route-clientId="@Model.ClientId" id="picker">
