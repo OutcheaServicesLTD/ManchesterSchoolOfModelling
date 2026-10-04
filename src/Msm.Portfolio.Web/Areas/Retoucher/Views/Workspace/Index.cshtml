@@ -49,38 +49,59 @@
 @* Five separate pages rather than sections of one long scroll — up to 60 library
    photographs plus 30 on the portfolio made that scroll too long to work through
    blind. Sticks under the portal header on the way down, the same way the header
-   itself stays put. The current page is known from the request itself, with no
+   itself stays put, so Back/Next stay reachable without scrolling back up a long
+   page to find them. The current page is known from the request itself, with no
    script needed to track it the way scroll-spying a single page would. *@
-<nav class="stepper" aria-label="Go to a page">
-    @for (var i = 0; i < steps.Count; i++)
+<div class="stepper-bar">
+    @if (previousStep.Url is not null)
     {
-        var step = steps[i];
-        var isCurrent = step.Section == Model.CurrentSection;
-        @* Highlighting is reserved for "done" — the page you happen to be standing on
-           otherwise looked highlighted whether or not anything had been done there,
-           which read as the opposite of what the ring was meant to say. aria-current
-           still marks it for assistive technology; nothing visual hangs off it. *@
-        <a href="@step.Url" class="stepper-step @(step.Done ? "is-done" : "")"
-           aria-current="@(isCurrent ? "page" : null)">
-            <span class="stepper-circle" aria-hidden="true">
-                @if (step.Done)
-                {
-                    <span class="stepper-tick"></span>
-                }
-                else
-                {
-                    @(i + 1)
-                }
-            </span>
-            <span class="stepper-label">@step.Label</span>
-        </a>
-
-        if (i < steps.Count - 1)
-        {
-            <span class="stepper-line @(step.Done ? "is-done" : "")" aria-hidden="true"></span>
-        }
+        <a class="stepper-arrow" href="@previousStep.Url" aria-label="Back to @previousStep.Label">&larr; Back</a>
     }
-</nav>
+    else
+    {
+        <span class="stepper-arrow is-disabled" aria-hidden="true">&larr; Back</span>
+    }
+
+    <nav class="stepper" aria-label="Go to a page">
+        @for (var i = 0; i < steps.Count; i++)
+        {
+            var step = steps[i];
+            var isCurrent = step.Section == Model.CurrentSection;
+            @* Highlighting is reserved for "done" — the page you happen to be standing on
+               otherwise looked highlighted whether or not anything had been done there,
+               which read as the opposite of what the ring was meant to say. aria-current
+               still marks it for assistive technology; nothing visual hangs off it. *@
+            <a href="@step.Url" class="stepper-step @(step.Done ? "is-done" : "")"
+               aria-current="@(isCurrent ? "page" : null)">
+                <span class="stepper-circle" aria-hidden="true">
+                    @if (step.Done)
+                    {
+                        <span class="stepper-tick"></span>
+                    }
+                    else
+                    {
+                        @(i + 1)
+                    }
+                </span>
+                <span class="stepper-label">@step.Label</span>
+            </a>
+
+            if (i < steps.Count - 1)
+            {
+                <span class="stepper-line @(step.Done ? "is-done" : "")" aria-hidden="true"></span>
+            }
+        }
+    </nav>
+
+    @if (nextStep.Url is not null)
+    {
+        <a class="stepper-arrow" href="@nextStep.Url" aria-label="Next: @nextStep.Label">Next &rarr;</a>
+    }
+    else
+    {
+        <span class="stepper-arrow is-disabled" aria-hidden="true">Next &rarr;</span>
+    }
+</div>
 
 @if (error is not null)
 {
@@ -395,10 +416,6 @@
     </p>
 
     <div class="border-top pt-3 d-flex gap-2 flex-wrap align-items-center">
-        @if (previousStep.Url is not null)
-        {
-            <a class="btn btn-outline-secondary btn-lg" href="@previousStep.Url">&larr; Back</a>
-        }
         @* Sent without reloading, so the answer appears where the retoucher is standing
            rather than throwing them to the top of a fresh page. Falls back to an ordinary
            post with no script — the data attribute is all that changes. *@
@@ -424,28 +441,6 @@
     {
         <p class="form-text">Your changes are saved as you make them.</p>
     }
-}
-
-@if (Model.CurrentSection != WorkspaceSection.Submit)
-{
-    @* Submit has its own action row above, with Back already built into it — this is
-       for the other four pages, which otherwise have nothing but the stepper at the
-       top for moving on. *@
-    <div class="border-top pt-3 mt-4 d-flex justify-content-between gap-2 flex-wrap">
-        @if (previousStep.Url is not null)
-        {
-            <a class="btn btn-outline-secondary" href="@previousStep.Url">&larr; Back: @previousStep.Label</a>
-        }
-        else
-        {
-            <span></span>
-        }
-
-        @if (nextStep.Url is not null)
-        {
-            <a class="btn btn-primary" href="@nextStep.Url">Next: @nextStep.Label &rarr;</a>
-        }
-    </div>
 }
 
 @section Scripts {

@@ -2137,20 +2137,64 @@ body.viewer-open {
    Portfolio, Library and Submit — in place of one long scroll through up to 30
    portfolio photographs and 60 in the library. Sticks directly under the portal
    header, 76px being that header's own min-height, so the two sit flush with no gap
-   and no overlap. One below the header's z-index of 50: the header must still win if
+   and no overlap, and Back/Next stay reachable without scrolling back up a long page
+   to find them. One below the header's z-index of 50: the header must still win if
    either were ever tall enough to touch.
 
    Nothing here is ever locked the way a sign-up wizard's steps would be — the
    retoucher can open any page in any order, and each one saves as they go. "Done"
    only fills the circle and the line leading to it; it never disables a later page. */
-.stepper {
+.stepper-bar {
     position: sticky;
     top: 76px;
     z-index: 40;
     display: flex;
-    align-items: flex-start;
+    align-items: center;
+    gap: 1rem;
     background: var(--bg);
     padding: 1rem 0 1.5rem;
+}
+
+.stepper {
+    display: flex;
+    align-items: flex-start;
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow-x: auto;
+}
+
+/* Back/Next either side of the stepper, in the one bar that is always on screen —
+   rather than only at the bottom of whichever page is open, which on Library's up to
+   60 photographs could be most of a scroll away. */
+.stepper-arrow {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    text-decoration: none;
+    color: var(--fg-md);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    white-space: nowrap;
+    transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.stepper-arrow:hover {
+    border-color: var(--fg);
+    color: var(--fg);
+}
+
+/* The first page has no Back, the last has no Next. Kept in place rather than
+   removed, so the bar does not jump sideways as the arrow at the other end appears
+   and disappears between pages. */
+.stepper-arrow.is-disabled {
+    opacity: 0.35;
+    pointer-events: none;
 }
 
 .stepper-step {
