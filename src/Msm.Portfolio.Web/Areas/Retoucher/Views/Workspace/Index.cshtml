@@ -431,6 +431,32 @@
 {
     <h2 class="h5">Submit</h2>
 
+    @if (Model.Selected.Count > 0)
+    {
+        @* A last look before sending, so the retoucher recognises what they chose rather
+           than having to recall it from the pages already left behind. Hidden from
+           screen readers: the text summary right below says the same thing in words. *@
+        <div class="submit-recap mb-3" aria-hidden="true">
+            @if (Model.Cover is { } coverAsset)
+            {
+                <figure class="submit-recap-cover">
+                    <img src="/media/@coverAsset.Id/thumbnail" alt="" />
+                    <figcaption>Main photo</figcaption>
+                </figure>
+            }
+            <div class="submit-recap-strip">
+                @foreach (var asset in Model.Selected.Take(10))
+                {
+                    <img src="/media/@asset.Id/thumbnail" alt="" />
+                }
+                @if (Model.Selected.Count > 10)
+                {
+                    <span class="submit-recap-more">+@(Model.Selected.Count - 10)</span>
+                }
+            </div>
+        </div>
+    }
+
     <p class="text-muted">
         @Model.Selected.Count photograph@(Model.Selected.Count == 1 ? "" : "s") on the portfolio,
         @(Model.Cover is null ? "no main image chosen yet" : "a main image chosen").

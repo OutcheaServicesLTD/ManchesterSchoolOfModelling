@@ -2662,6 +2662,61 @@ body.public > main {
     opacity: 0.72;
 }
 
+/* The Submit page's recap: what is about to be sent, seen rather than remembered from
+   whichever earlier page it was last looked at on. */
+.submit-recap {
+    display: flex;
+    align-items: flex-start;
+    gap: 1.1rem;
+    flex-wrap: wrap;
+}
+
+.submit-recap-cover {
+    margin: 0;
+    flex-shrink: 0;
+}
+
+.submit-recap-cover img {
+    display: block;
+    width: 108px;
+    height: 72px;
+    object-fit: cover;
+    background: var(--raised);
+    /* Same border treatment as the "Main" tile on the Portfolio page, so the main photo
+       reads as the same thing in both places. */
+    border: 1px solid var(--fg);
+    box-shadow: inset 0 0 0 1px var(--fg);
+}
+
+.submit-recap-cover figcaption {
+    margin-top: 0.3rem;
+    font-size: 11px;
+    letter-spacing: var(--track-label);
+    text-transform: uppercase;
+    color: var(--fg-md);
+}
+
+.submit-recap-strip {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+}
+
+.submit-recap-strip img {
+    width: 56px;
+    height: 56px;
+    object-fit: cover;
+    background: var(--raised);
+    border: 1px solid var(--line);
+}
+
+.submit-recap-more {
+    font-size: 13px;
+    color: var(--fg-md);
+    padding: 0 0.2rem;
+}
+
 /* A metric with a large figure and a tracked label beneath. */
 .metrics {
     display: grid;
