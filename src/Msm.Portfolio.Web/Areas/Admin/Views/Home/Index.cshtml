@@ -75,7 +75,7 @@ else
             <tbody>
                 @foreach (var row in Model.Rows)
                 {
-                    <tr>
+                    <tr class="@(row.IsNew ? "is-new" : null)">
                         <th scope="row" class="fw-normal">
                             <div>@row.ClientName</div>
                             <div class="small text-muted">@row.Email</div>

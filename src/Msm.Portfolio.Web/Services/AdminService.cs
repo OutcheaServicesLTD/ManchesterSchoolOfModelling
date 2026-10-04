@@ -17,7 +17,9 @@ public record AdminClientRow(
     PaymentStatus? PaymentStatus,
     bool IsPublished,
     string? Slug,
-    bool GuardianApprovalPending);
+    bool GuardianApprovalPending,
+    /// <summary>Arrived in the last day — same threshold and highlight as the retoucher queue.</summary>
+    bool IsNew);
 
 /// <summary>The filters above the table (specification section 5).</summary>
 public record AdminClientFilter(
@@ -105,6 +107,7 @@ public class AdminService(ApplicationDbContext db) : IAdminService
 
         var rows = await query.ToListAsync(cancellationToken);
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var newSince = DateTimeOffset.UtcNow.AddDays(-1);
 
         return
         [
@@ -123,7 +126,8 @@ public class AdminService(ApplicationDbContext db) : IAdminService
                     r.IsPublished,
                     r.Slug,
                     new Domain.Entities.ClientProfile { DateOfBirth = r.DateOfBirth }.RequiresGuardianConsent(today)
-                        && r.GuardianStatus != GuardianConsentStatus.Approved))
+                        && r.GuardianStatus != GuardianConsentStatus.Approved,
+                    IsNew: r.CreatedAt >= newSince))
         ];
     }
 
