@@ -225,17 +225,33 @@
         }
         else
         {
-            <p class="text-muted">
-                Tick the ones you want, then press <strong>Add to portfolio</strong> to
-                move them across.
-            </p>
+            @if (Model.PortfolioIsFull)
+            {
+                @* The controls below are disabled rather than hidden, so a glance still
+                   shows what picking photographs normally looks like — but a disabled
+                   control with no reason given just looks broken, which is exactly what
+                   was reported. *@
+                <p class="text-muted">
+                    The portfolio already has its full @Model.PortfolioLimit photographs.
+                    Remove some on the <a href="@baseUrl/portfolio">Portfolio</a> page
+                    before picking more from here.
+                </p>
+            }
+            else
+            {
+                <p class="text-muted">
+                    Tick the ones you want, then press <strong>Add to portfolio</strong> to
+                    move them across.
+                </p>
+            }
 
             @* Tick the ones wanted and add them together. Choosing a shoot's worth one
                button at a time was the slowest part of the job. *@
             <form method="post" asp-action="SelectMany" asp-route-clientId="@Model.ClientId" id="picker">
                 <div class="picker-bar">
                     <div class="form-check mb-0">
-                        <input class="form-check-input" type="checkbox" id="pick-all" data-pick-all />
+                        <input class="form-check-input" type="checkbox" id="pick-all" data-pick-all
+                               @(Model.PortfolioIsFull ? "disabled" : "") />
                         <label class="form-check-label" for="pick-all">Select all</label>
                     </div>
 
@@ -257,14 +273,17 @@
                     </button>
                 </div>
 
-                <p class="form-text mt-2">
-                    <strong>Suggest a selection</strong> ticks the best
-                    @(Model.PortfolioLimit - Model.Selected.Count) photographs to fill the
-                    portfolio — sharpest first, well exposed, with nothing lost to pure black
-                    or pure white. It judges the picture, never the person in it, so look
-                    through the choice and untick whatever you do not want. Press the button
-                    again to clear everything and start over.
-                </p>
+                @if (!Model.PortfolioIsFull)
+                {
+                    <p class="form-text mt-2">
+                        <strong>Suggest a selection</strong> ticks the best
+                        @(Model.PortfolioLimit - Model.Selected.Count) photographs to fill
+                        the portfolio — sharpest first, well exposed, with nothing lost to
+                        pure black or pure white. It judges the picture, never the person
+                        in it, so look through the choice and untick whatever you do not
+                        want. Press the button again to clear everything and start over.
+                    </p>
+                }
 
                 <div class="row row-cols-2 row-cols-md-4 g-3 mb-4">
                     @foreach (var asset in Model.Unselected)
