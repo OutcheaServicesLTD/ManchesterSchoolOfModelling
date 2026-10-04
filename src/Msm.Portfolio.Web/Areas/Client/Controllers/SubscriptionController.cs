@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Msm.Portfolio.Web.Authorization;
 using Msm.Portfolio.Web.Data;
+using Msm.Portfolio.Web.Domain.Enums;
 using Msm.Portfolio.Web.Integrations.Stripe;
 using Msm.Portfolio.Web.Services;
 
@@ -139,6 +140,12 @@ public class SubscriptionController(
         ViewData["ClientId"] = clientId;
         ViewData["Price"] = product?.Price ?? 0m;
         ViewData["Currency"] = product?.Currency ?? "GBP";
+        ViewData["BillingIntervalLabel"] = (product?.BillingInterval ?? BillingInterval.Yearly) switch
+        {
+            BillingInterval.Weekly => "week",
+            BillingInterval.Monthly => "month",
+            _ => "year"
+        };
 
         return View();
     }

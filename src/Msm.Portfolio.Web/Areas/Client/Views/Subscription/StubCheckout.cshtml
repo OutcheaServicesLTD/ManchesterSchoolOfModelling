@@ -3,6 +3,7 @@
     var clientId = (Guid)ViewData["ClientId"]!;
     var price = (decimal)ViewData["Price"]!;
     var currency = (string)ViewData["Currency"]!;
+    var intervalLabel = (string)ViewData["BillingIntervalLabel"]!;
 }
 
 <div class="row justify-content-center">
@@ -14,7 +15,7 @@
         </div>
 
         <h1>Portfolio Maintenance</h1>
-        <p class="lead">£@price.ToString("0.00") @currency / month</p>
+        <p class="lead">£@price.ToString("0.00") @currency / @intervalLabel</p>
 
         <form method="post" asp-action="StubComplete" asp-route-clientId="@clientId">
             <button type="submit" class="btn btn-success btn-lg">Simulate a successful subscription</button>
