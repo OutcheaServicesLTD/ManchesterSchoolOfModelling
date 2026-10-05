@@ -52,7 +52,8 @@ public record PublicPortfolio(
     IReadOnlyList<PublicMeasurement> Measurements,
     Guid? SelfTapeAssetId,
     string? InstagramUrl,
-    string? TikTokUrl)
+    string? TikTokUrl,
+    IReadOnlyList<PublicImage> GalleryImages)
 {
     public bool HasSelfTape => SelfTapeAssetId is not null;
 
@@ -146,6 +147,16 @@ public class PublicPortfolioService(
         var selfTape = assets.FirstOrDefault(m => m.MediaType == MediaType.SelfTape);
         var cover = assets.FirstOrDefault(m => m.Id == portfolio.FeaturedMediaId);
 
+        // The client's own, unlimited gallery — approved photographs only. Everything
+        // else they have added is pending or was rejected, and is private until or
+        // unless it is approved, the same as a photograph not yet chosen for the
+        // curated portfolio above.
+        var galleryImages = assets
+            .Where(m => m.MediaType == MediaType.GalleryPhoto && m.GalleryStatus == GalleryPhotoStatus.Approved)
+            .OrderByDescending(m => m.UploadedAt)
+            .Select(m => new PublicImage(m.Id, m.Orientation, m.Width, m.Height, m.IsFeatured))
+            .ToList();
+
         var template = templates.GetTemplate(client.ModelProfileType);
         var measurements = client.Measurements
             .OrderBy(m => m.DisplayOrder)
@@ -196,7 +207,8 @@ public class PublicPortfolioService(
             measurements,
             selfTape?.Id,
             client.InstagramUrl,
-            client.TikTokUrl);
+            client.TikTokUrl,
+            galleryImages);
     }
 
     /// <summary>

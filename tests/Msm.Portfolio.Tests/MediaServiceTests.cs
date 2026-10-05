@@ -438,6 +438,96 @@ public class MediaServiceTests : IDisposable
         asset.Clipping = 0;
     }
 
+    private async Task<List<Guid>> UploadGalleryAsync(int count)
+    {
+        var files = Enumerable.Range(0, count).Select(i => Jpeg($"gallery{i}.jpg")).ToList();
+        var outcomes = await _service.UploadGalleryPhotosAsync(_clientId, files, null);
+        return [.. outcomes.Where(o => o.Succeeded).Select(o => o.AssetId!.Value)];
+    }
+
+    [Fact]
+    public async Task A_client_gallery_is_not_capped_by_the_pool_limit()
+    {
+        // The pool holds at most Options.MediaPoolImageLimit (6) — a gallery upload well
+        // past that proves the two are governed by entirely separate rules.
+        var ids = await UploadGalleryAsync(Options.MediaPoolImageLimit + 4);
+
+        Assert.Equal(Options.MediaPoolImageLimit + 4, ids.Count);
+        Assert.Equal(
+            Options.MediaPoolImageLimit + 4,
+            await _db.MediaAssets.CountAsync(m => m.MediaType == MediaType.GalleryPhoto));
+    }
+
+    [Fact]
+    public async Task A_gallery_upload_starts_pending_and_is_private_until_approved()
+    {
+        var ids = await UploadGalleryAsync(1);
+
+        var asset = await _db.MediaAssets.SingleAsync(m => m.Id == ids[0]);
+        Assert.Equal(GalleryPhotoStatus.PendingReview, asset.GalleryStatus);
+
+        Assert.Empty(await _service.GetApprovedGalleryAsync(_clientId));
+        Assert.Single(await _service.GetPendingGalleryAsync());
+    }
+
+    [Fact]
+    public async Task Approving_a_gallery_photo_makes_it_public_and_clears_the_queue()
+    {
+        var ids = await UploadGalleryAsync(1);
+
+        var (succeeded, error) = await _service.ApproveGalleryPhotoAsync(ids[0], null);
+
+        Assert.True(succeeded);
+        Assert.Null(error);
+
+        var asset = await _db.MediaAssets.SingleAsync(m => m.Id == ids[0]);
+        Assert.Equal(GalleryPhotoStatus.Approved, asset.GalleryStatus);
+        Assert.NotNull(asset.GalleryReviewedAt);
+
+        Assert.Single(await _service.GetApprovedGalleryAsync(_clientId));
+        Assert.Empty(await _service.GetPendingGalleryAsync());
+    }
+
+    [Fact]
+    public async Task Rejecting_a_gallery_photo_records_the_reason_and_keeps_it_private()
+    {
+        var ids = await UploadGalleryAsync(1);
+
+        var (succeeded, _) = await _service.RejectGalleryPhotoAsync(ids[0], null, "Out of focus.");
+
+        Assert.True(succeeded);
+
+        var asset = await _db.MediaAssets.SingleAsync(m => m.Id == ids[0]);
+        Assert.Equal(GalleryPhotoStatus.Rejected, asset.GalleryStatus);
+        Assert.Equal("Out of focus.", asset.GalleryReviewNote);
+
+        Assert.Empty(await _service.GetApprovedGalleryAsync(_clientId));
+        Assert.Empty(await _service.GetPendingGalleryAsync());
+    }
+
+    [Fact]
+    public async Task A_client_cannot_remove_another_clients_gallery_photo()
+    {
+        var ids = await UploadGalleryAsync(1);
+        var someoneElse = Guid.CreateVersion7();
+
+        var removed = await _service.RemoveGalleryPhotoAsync(someoneElse, ids[0], null);
+
+        Assert.False(removed);
+        Assert.False((await _db.MediaAssets.SingleAsync(m => m.Id == ids[0])).IsDeleted);
+    }
+
+    [Fact]
+    public async Task Staff_can_remove_a_gallery_photo_from_any_client()
+    {
+        var ids = await UploadGalleryAsync(1);
+
+        var removed = await _service.AdminRemoveGalleryPhotoAsync(ids[0], null);
+
+        Assert.True(removed);
+        Assert.True((await _db.MediaAssets.SingleAsync(m => m.Id == ids[0])).IsDeleted);
+    }
+
     [Fact]
     public async Task A_focal_point_is_recorded_on_the_image()
     {

@@ -103,6 +103,45 @@ public interface IMediaService
     Task<IReadOnlyList<MediaAsset>> GetPoolAsync(Guid clientId, CancellationToken cancellationToken = default);
 
     Task<MediaAsset?> GetSelfTapeAsync(Guid clientId, CancellationToken cancellationToken = default);
+
+    // ── The client's own gallery ─────────────────────────────────────────────────
+    // Separate from the 60-image pool and the 30-image portfolio: a client adds as
+    // many of these as they like, and none of them is public until staff approve it.
+
+    /// <summary>
+    /// Uploads to a client's own gallery. Unlike <see cref="UploadImagesAsync"/>, there
+    /// is no pool limit to run out of — every photograph that decodes is accepted,
+    /// pending review.
+    /// </summary>
+    Task<IReadOnlyList<UploadOutcome>> UploadGalleryPhotosAsync(
+        Guid clientId,
+        IReadOnlyList<IFormFile> files,
+        Guid? uploadedByUserId,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>Every gallery photograph a client has, whatever its review state, newest first.</summary>
+    Task<IReadOnlyList<MediaAsset>> GetGalleryAsync(Guid clientId, CancellationToken cancellationToken = default);
+
+    /// <summary>A client's approved gallery photographs only — what the public portfolio page shows.</summary>
+    Task<IReadOnlyList<MediaAsset>> GetApprovedGalleryAsync(
+        Guid clientId, CancellationToken cancellationToken = default);
+
+    /// <summary>Every gallery photograph awaiting review, across every client, oldest first.</summary>
+    Task<IReadOnlyList<MediaAsset>> GetPendingGalleryAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>A client removing one of their own gallery photographs.</summary>
+    Task<bool> RemoveGalleryPhotoAsync(
+        Guid clientId, Guid assetId, Guid? actingUserId, CancellationToken cancellationToken = default);
+
+    /// <summary>Staff removing a gallery photograph, published or not, from any client.</summary>
+    Task<bool> AdminRemoveGalleryPhotoAsync(
+        Guid assetId, Guid? actingUserId, CancellationToken cancellationToken = default);
+
+    Task<(bool Succeeded, string? Error)> ApproveGalleryPhotoAsync(
+        Guid assetId, Guid? reviewerUserId, CancellationToken cancellationToken = default);
+
+    Task<(bool Succeeded, string? Error)> RejectGalleryPhotoAsync(
+        Guid assetId, Guid? reviewerUserId, string? reason, CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -183,7 +222,9 @@ public class MediaService(
         IFormFile file,
         Guid? uploadedByUserId,
         int displayOrder,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        MediaType mediaType = MediaType.Image,
+        GalleryPhotoStatus? galleryStatus = null)
     {
         // Buffered so the image can be inspected, re-read for variants, and stored,
         // without depending on the upload stream being seekable.
@@ -260,7 +301,8 @@ public class MediaService(
             Width = details.Width,
             Height = details.Height,
             Orientation = details.Orientation,
-            MediaType = MediaType.Image,
+            MediaType = mediaType,
+            GalleryStatus = galleryStatus,
             UploadedByUserId = uploadedByUserId,
             DisplayOrder = displayOrder,
             Sharpness = quality?.Sharpness,
@@ -272,7 +314,8 @@ public class MediaService(
 
         db.MediaAssets.Add(asset);
 
-        audit.Record(nameof(MediaAsset), assetId.ToString(), "MediaUploaded",
+        audit.Record(nameof(MediaAsset), assetId.ToString(),
+            mediaType == MediaType.GalleryPhoto ? "GalleryPhotoUploaded" : "MediaUploaded",
             userId: uploadedByUserId,
             newValue: $"{asset.OriginalFilename} ({details.Width}x{details.Height}, {details.Orientation})");
 
@@ -771,6 +814,182 @@ public class MediaService(
             .Where(m => m.ClientId == clientId && !m.IsDeleted && m.MediaType == MediaType.SelfTape)
             .OrderByDescending(m => m.UploadedAt)
             .FirstOrDefaultAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<UploadOutcome>> UploadGalleryPhotosAsync(
+        Guid clientId,
+        IReadOnlyList<IFormFile> files,
+        Guid? uploadedByUserId,
+        CancellationToken cancellationToken = default)
+    {
+        var options = mediaOptions.Value;
+        var outcomes = new List<UploadOutcome>(files.Count);
+
+        foreach (var file in files)
+        {
+            // No pool-limit check here — a client's own gallery is genuinely unlimited.
+            // Size and content-type still apply: the limits exist to keep a browser from
+            // decoding something absurd, not to ration how much a client can share.
+            var rejection = ValidateImage(file, options);
+            if (rejection is not null)
+            {
+                outcomes.Add(new UploadOutcome(file.FileName, false, Error: rejection));
+                continue;
+            }
+
+            try
+            {
+                // Display order has no meaning for a gallery shown newest-first, so every
+                // upload is simply ordered zero.
+                var asset = await StoreImageAsync(
+                    clientId, file, uploadedByUserId, displayOrder: 0, cancellationToken,
+                    mediaType: MediaType.GalleryPhoto, galleryStatus: GalleryPhotoStatus.PendingReview);
+
+                if (asset is null)
+                {
+                    outcomes.Add(new UploadOutcome(file.FileName, false,
+                        Error: "This file could not be read as an image."));
+                    continue;
+                }
+
+                outcomes.Add(new UploadOutcome(file.FileName, true, asset.Id));
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Gallery upload failed for {Filename}.", file.FileName);
+                outcomes.Add(new UploadOutcome(file.FileName, false, Error: "This file could not be uploaded."));
+            }
+        }
+
+        if (outcomes.Any(o => o.Succeeded))
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+
+        return outcomes;
+    }
+
+    public async Task<IReadOnlyList<MediaAsset>> GetGalleryAsync(
+        Guid clientId, CancellationToken cancellationToken = default) =>
+        await db.MediaAssets
+            .Where(m => m.ClientId == clientId && !m.IsDeleted && m.MediaType == MediaType.GalleryPhoto)
+            .OrderByDescending(m => m.UploadedAt)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<MediaAsset>> GetApprovedGalleryAsync(
+        Guid clientId, CancellationToken cancellationToken = default) =>
+        await db.MediaAssets
+            .Where(m => m.ClientId == clientId && !m.IsDeleted
+                        && m.MediaType == MediaType.GalleryPhoto
+                        && m.GalleryStatus == GalleryPhotoStatus.Approved)
+            .OrderByDescending(m => m.UploadedAt)
+            .ToListAsync(cancellationToken);
+
+    public async Task<IReadOnlyList<MediaAsset>> GetPendingGalleryAsync(
+        CancellationToken cancellationToken = default) =>
+        await db.MediaAssets
+            .Include(m => m.Client)
+            .Where(m => !m.IsDeleted
+                        && m.MediaType == MediaType.GalleryPhoto
+                        && m.GalleryStatus == GalleryPhotoStatus.PendingReview)
+            // Oldest first: the one a client has been waiting longest for is reviewed first.
+            .OrderBy(m => m.UploadedAt)
+            .ToListAsync(cancellationToken);
+
+    public async Task<bool> RemoveGalleryPhotoAsync(
+        Guid clientId, Guid assetId, Guid? actingUserId, CancellationToken cancellationToken = default)
+    {
+        var asset = await db.MediaAssets.FirstOrDefaultAsync(
+            m => m.Id == assetId && m.ClientId == clientId
+                 && !m.IsDeleted && m.MediaType == MediaType.GalleryPhoto,
+            cancellationToken);
+
+        if (asset is null)
+        {
+            return false;
+        }
+
+        asset.IsDeleted = true;
+        asset.DeletedAt = DateTimeOffset.UtcNow;
+
+        audit.Record(nameof(MediaAsset), assetId.ToString(), "GalleryPhotoRemoved",
+            userId: actingUserId, oldValue: asset.OriginalFilename);
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        return true;
+    }
+
+    public async Task<bool> AdminRemoveGalleryPhotoAsync(
+        Guid assetId, Guid? actingUserId, CancellationToken cancellationToken = default)
+    {
+        var asset = await db.MediaAssets.FirstOrDefaultAsync(
+            m => m.Id == assetId && !m.IsDeleted && m.MediaType == MediaType.GalleryPhoto,
+            cancellationToken);
+
+        if (asset is null)
+        {
+            return false;
+        }
+
+        asset.IsDeleted = true;
+        asset.DeletedAt = DateTimeOffset.UtcNow;
+
+        audit.Record(nameof(MediaAsset), assetId.ToString(), "GalleryPhotoRemovedByStaff",
+            userId: actingUserId, oldValue: asset.OriginalFilename);
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        return true;
+    }
+
+    public async Task<(bool Succeeded, string? Error)> ApproveGalleryPhotoAsync(
+        Guid assetId, Guid? reviewerUserId, CancellationToken cancellationToken = default)
+    {
+        var asset = await db.MediaAssets.FirstOrDefaultAsync(
+            m => m.Id == assetId && !m.IsDeleted && m.MediaType == MediaType.GalleryPhoto,
+            cancellationToken);
+
+        if (asset is null)
+        {
+            return (false, "That photograph could not be found.");
+        }
+
+        asset.GalleryStatus = GalleryPhotoStatus.Approved;
+        asset.GalleryReviewedAt = DateTimeOffset.UtcNow;
+        asset.GalleryReviewedByUserId = reviewerUserId;
+        asset.GalleryReviewNote = null;
+
+        audit.Record(nameof(MediaAsset), assetId.ToString(), "GalleryPhotoApproved", userId: reviewerUserId);
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        return (true, null);
+    }
+
+    public async Task<(bool Succeeded, string? Error)> RejectGalleryPhotoAsync(
+        Guid assetId, Guid? reviewerUserId, string? reason, CancellationToken cancellationToken = default)
+    {
+        var asset = await db.MediaAssets.FirstOrDefaultAsync(
+            m => m.Id == assetId && !m.IsDeleted && m.MediaType == MediaType.GalleryPhoto,
+            cancellationToken);
+
+        if (asset is null)
+        {
+            return (false, "That photograph could not be found.");
+        }
+
+        asset.GalleryStatus = GalleryPhotoStatus.Rejected;
+        asset.GalleryReviewedAt = DateTimeOffset.UtcNow;
+        asset.GalleryReviewedByUserId = reviewerUserId;
+        asset.GalleryReviewNote = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim();
+
+        audit.Record(nameof(MediaAsset), assetId.ToString(), "GalleryPhotoRejected",
+            userId: reviewerUserId, newValue: asset.GalleryReviewNote);
+
+        await db.SaveChangesAsync(cancellationToken);
+
+        return (true, null);
+    }
 
     /// <summary>
     /// Keeps the "exactly one featured image once the portfolio contains media" rule

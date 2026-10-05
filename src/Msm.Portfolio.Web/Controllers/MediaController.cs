@@ -133,7 +133,11 @@ public class MediaController(
         // An original is never cached publicly, even on a published portfolio. It is only
         // ever served to staff, and a shared cache holding the full-resolution file could
         // hand it to someone the check above would have refused.
-        Response.Headers.CacheControl = asset.IsSelectedForPortfolio && served != MediaVariant.Original
+        var isPublic = asset.IsSelectedForPortfolio
+                       || (asset.MediaType == MediaType.GalleryPhoto
+                           && asset.GalleryStatus == GalleryPhotoStatus.Approved);
+
+        Response.Headers.CacheControl = isPublic && served != MediaVariant.Original
             ? "public, max-age=31536000, immutable"
             : "private, max-age=3600";
 
@@ -201,7 +205,16 @@ public class MediaController(
         // Both conditions matter: an image selected for a portfolio that has not been
         // published is still private, and an unselected image on a published portfolio
         // is part of the private pool.
-        return asset.IsSelectedForPortfolio
+        if (asset.IsSelectedForPortfolio && asset.Client.Portfolio is { IsPublished: true })
+        {
+            return true;
+        }
+
+        // A gallery photograph follows the same published-portfolio gate, with approval
+        // standing in for being selected — pending and rejected photographs stay private
+        // exactly the way an unselected pool image does.
+        return asset.MediaType == MediaType.GalleryPhoto
+               && asset.GalleryStatus == GalleryPhotoStatus.Approved
                && asset.Client.Portfolio is { IsPublished: true };
     }
 

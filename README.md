@@ -296,6 +296,26 @@ SkiaSharp (MIT). ImageSharp is the more common choice but requires a paid commer
 licence above a revenue threshold, which would be a licensing liability for a commercial
 product.
 
+### Client gallery
+
+Separate from the 60-image pool and the 30-image portfolio: once a client's curated
+portfolio has been approved and published for the first time (`Portfolio.PublishedAt`
+is set), `/client/gallery` opens, and the client can add as many photographs as they
+like — there is no cap, as long as each one is a readable image under the usual size
+limit.
+
+Nothing a client adds this way is public on its own. Every upload lands as
+`MediaType.GalleryPhoto` with `GalleryStatus.PendingReview`, and only an approval at
+`/admin/gallery` — a single queue across every client, oldest first — makes it appear
+in the "Gallery" section of their public portfolio page, alongside the curated one. A
+rejection records a reason the client sees against that photograph; removing it either
+way is a soft delete, same as the main pool.
+
+`MediaController`'s `/media/{assetId}/{variant}` route treats an approved gallery photo
+the same way it treats a selected portfolio image for public access — the two checks sit
+side by side, since gallery photos share the pool's storage, processing and serving
+pipeline rather than a parallel one.
+
 ## Retoucher workflow
 
 The queue at `/retoucher` has the four tabs from specification section 6 — Waiting,

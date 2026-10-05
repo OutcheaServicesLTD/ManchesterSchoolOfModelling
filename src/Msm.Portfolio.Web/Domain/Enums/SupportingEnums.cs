@@ -37,7 +37,25 @@ public enum GuardianConsentStatus
 public enum MediaType
 {
     Image = 0,
-    SelfTape = 1
+    SelfTape = 1,
+
+    /// <summary>
+    /// A photograph the client added themselves to their own, unlimited gallery —
+    /// separate from the agency-curated portfolio, and never counted against the
+    /// 60-image pool or 30-image portfolio limits.
+    /// </summary>
+    GalleryPhoto = 2
+}
+
+/// <summary>
+/// Review state for a client's self-added gallery photograph. Unlike the curated
+/// portfolio, nothing a client uploads here is public until staff have looked at it.
+/// </summary>
+public enum GalleryPhotoStatus
+{
+    PendingReview = 0,
+    Approved = 1,
+    Rejected = 2
 }
 
 /// <summary>

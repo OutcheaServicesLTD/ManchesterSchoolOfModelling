@@ -126,4 +126,20 @@ public class MediaAsset
     public bool IsDeleted { get; set; }
 
     public DateTimeOffset? DeletedAt { get; set; }
+
+    /// <summary>
+    /// Review state for a gallery photograph. Null for everything that is not
+    /// <see cref="MediaType.GalleryPhoto"/> — the curated pool and the portfolio have
+    /// never needed a review step of their own, since staff build those directly.
+    /// </summary>
+    public GalleryPhotoStatus? GalleryStatus { get; set; }
+
+    public DateTimeOffset? GalleryReviewedAt { get; set; }
+
+    public Guid? GalleryReviewedByUserId { get; set; }
+
+    public ApplicationUser? GalleryReviewedByUser { get; set; }
+
+    /// <summary>Why a gallery photograph was rejected, shown back to the client.</summary>
+    public string? GalleryReviewNote { get; set; }
 }

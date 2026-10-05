@@ -97,6 +97,54 @@ public class MediaLibraryViewModel
     public long MaxImageMegabytes => MaxImageBytes / (1024 * 1024);
 }
 
+/// <summary>One photograph in a client's own gallery, with its review state.</summary>
+public class GalleryPhotoViewModel
+{
+    public Guid Id { get; set; }
+
+    public string Filename { get; set; } = string.Empty;
+
+    public int? Width { get; set; }
+
+    public int? Height { get; set; }
+
+    public GalleryPhotoStatus Status { get; set; }
+
+    /// <summary>Why a rejected photograph was rejected, shown back to the client.</summary>
+    public string? ReviewNote { get; set; }
+
+    public DateTimeOffset UploadedAt { get; set; }
+
+    public string AspectRatio =>
+        Width is > 0 && Height is > 0 ? $"{Width} / {Height}" : "1 / 1";
+}
+
+/// <summary>
+/// A client's own, unlimited gallery — separate from the curated portfolio
+/// (specification: client self-management once the agency portfolio has been approved).
+/// </summary>
+public class GalleryViewModel
+{
+    public List<GalleryPhotoViewModel> Photos { get; set; } = [];
+
+    /// <summary>
+    /// Whether the gallery is open yet. It stays locked until the curated portfolio has
+    /// been approved and published at least once — the gallery is something a client
+    /// adds alongside the agency's work, not instead of it.
+    /// </summary>
+    public bool Unlocked { get; set; }
+
+    public long MaxImageBytes { get; set; }
+
+    public string[] AllowedContentTypes { get; set; } = [];
+
+    public int PendingCount => Photos.Count(p => p.Status == GalleryPhotoStatus.PendingReview);
+
+    public string AcceptAttribute => string.Join(",", AllowedContentTypes);
+
+    public long MaxImageMegabytes => MaxImageBytes / (1024 * 1024);
+}
+
 /// <summary>The client's self-tape (specification section 14).</summary>
 public class SelfTapeViewModel
 {

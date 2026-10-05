@@ -48,6 +48,7 @@
                     @if (isStaff)
                     {
                         <a class="@active("/admin/clients")" href="/admin">Clients</a>
+                        <a class="@active("/admin/gallery")" href="/admin/gallery">Gallery review</a>
                         <a class="@active("/admin/audit")" href="/admin/audit">Audit</a>
                         <a class="@active("/admin/integrations")" href="/admin/integrations">Integrations</a>
                         @if (User.IsInRole(Roles.SuperAdmin))
@@ -63,6 +64,7 @@
                     {
                         <a class="@active("/client/home")" href="/client">Dashboard</a>
                         <a class="@active("/client/media")" href="/client/media">Photographs</a>
+                        <a class="@active("/client/gallery")" href="/client/gallery">Gallery</a>
                         <a class="@active("/client/profile")" href="/client/profile">Profile</a>
                         <a class="@active("/client/subscription")" href="/client/subscription">Subscription</a>
                     }

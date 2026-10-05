@@ -166,3 +166,30 @@ public class AdminClientEditViewModel
     [Display(Name = "About me")]
     public string? Biography { get; set; }
 }
+
+/// <summary>One client's self-added photograph, waiting on the moderation queue.</summary>
+public class GalleryModerationItemViewModel
+{
+    public Guid Id { get; set; }
+
+    public Guid ClientId { get; set; }
+
+    public string ClientName { get; set; } = string.Empty;
+
+    public string Filename { get; set; } = string.Empty;
+
+    public int? Width { get; set; }
+
+    public int? Height { get; set; }
+
+    public DateTimeOffset UploadedAt { get; set; }
+
+    public string AspectRatio =>
+        Width is > 0 && Height is > 0 ? $"{Width} / {Height}" : "1 / 1";
+}
+
+/// <summary>The cross-client gallery review queue.</summary>
+public class GalleryModerationViewModel
+{
+    public List<GalleryModerationItemViewModel> Photos { get; set; } = [];
+}

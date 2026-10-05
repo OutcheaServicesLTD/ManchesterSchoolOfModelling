@@ -39,6 +39,15 @@ public static class Permissions
         public const string SelectOwn = "media.select.own";
     }
 
+    public static class Gallery
+    {
+        /// <summary>A client adding photographs to their own, unlimited gallery.</summary>
+        public const string UploadOwn = "gallery.upload.own";
+
+        /// <summary>Approving or rejecting a client's self-added gallery photographs.</summary>
+        public const string Moderate = "gallery.moderate";
+    }
+
     public static class Portfolios
     {
         public const string View = "portfolio.view";
@@ -119,6 +128,7 @@ public static class Permissions
             [
                 Clients.ViewAll, Clients.Create, Clients.Edit,
                 Media.ViewPool, Media.Upload, Media.Delete, Media.Select, Media.SetFeatured,
+                Gallery.Moderate,
                 Portfolios.View, Portfolios.Edit, Portfolios.ChangeStatus,
                 Portfolios.Publish, Portfolios.Unpublish, Portfolios.Archive,
                 Payments.View, Payments.StartCheckout, Payments.MarkNoSale, Payments.Review,
@@ -141,6 +151,7 @@ public static class Permissions
             [
                 Clients.ViewOwn, Clients.EditOwn,
                 Media.UploadOwn, Media.SelectOwn,
+                Gallery.UploadOwn,
                 Portfolios.EditOwn
             ]
         };
@@ -162,6 +173,9 @@ public static class Permissions
         yield return Media.SetFeatured;
         yield return Media.UploadOwn;
         yield return Media.SelectOwn;
+
+        yield return Gallery.UploadOwn;
+        yield return Gallery.Moderate;
 
         yield return Portfolios.View;
         yield return Portfolios.Edit;

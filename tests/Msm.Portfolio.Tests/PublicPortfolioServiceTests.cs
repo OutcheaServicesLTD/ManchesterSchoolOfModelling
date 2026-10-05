@@ -408,6 +408,50 @@ public class PublicPortfolioServiceTests : IDisposable
         Assert.Equal(2, (await _service.GetBySlugAsync("emma-johnson"))!.Images.Count);
     }
 
+    /// <summary>
+    /// The client's own gallery is unlimited, but only what staff have approved may
+    /// reach the public page — a pending or rejected photograph is exactly as private as
+    /// an unselected pool image.
+    /// </summary>
+    [Fact]
+    public async Task Only_approved_gallery_photos_appear_publicly()
+    {
+        var clientId = AddModel();
+        AddGalleryPhoto(clientId, GalleryPhotoStatus.Approved);
+        AddGalleryPhoto(clientId, GalleryPhotoStatus.PendingReview);
+        AddGalleryPhoto(clientId, GalleryPhotoStatus.Rejected);
+
+        var portfolio = await _service.GetBySlugAsync("emma-johnson");
+
+        Assert.Single(portfolio!.GalleryImages);
+    }
+
+    [Fact]
+    public async Task A_model_with_no_approved_gallery_photos_has_an_empty_gallery()
+    {
+        AddModel();
+
+        var portfolio = await _service.GetBySlugAsync("emma-johnson");
+
+        Assert.Empty(portfolio!.GalleryImages);
+    }
+
+    private void AddGalleryPhoto(Guid clientId, GalleryPhotoStatus status)
+    {
+        _db.MediaAssets.Add(new MediaAsset
+        {
+            ClientId = clientId,
+            StorageKey = $"clients/{clientId:N}/{Guid.NewGuid():N}/original.jpg",
+            OriginalFilename = "gallery.jpg",
+            MimeType = "image/jpeg",
+            FileSize = 100,
+            MediaType = MediaType.GalleryPhoto,
+            GalleryStatus = status,
+            Orientation = MediaOrientation.Portrait
+        });
+        _db.SaveChanges();
+    }
+
     // ---------- Model board ----------
 
     [Fact]

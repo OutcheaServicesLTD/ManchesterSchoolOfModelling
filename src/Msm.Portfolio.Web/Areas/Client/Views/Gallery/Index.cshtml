@@ -1,0 +1,105 @@
+@model Msm.Portfolio.Web.ViewModels.GalleryViewModel
+@using Msm.Portfolio.Web.Domain.Enums
+@{
+    ViewData["Title"] = "My gallery";
+    var error = TempData["Error"] as string;
+    var saved = TempData["Saved"] as string;
+}
+
+<h1>My gallery</h1>
+
+<p class="lead">
+    Add as many photographs as you like, any time — there is no limit. Each one is
+    reviewed before it appears on your public profile, alongside your main portfolio.
+</p>
+
+@if (saved is not null)
+{
+    <div class="alert alert-success" role="alert">@saved</div>
+}
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+
+@if (!Model.Unlocked)
+{
+    <div class="alert alert-info" role="alert">
+        Your gallery opens once your portfolio has been approved and published for the
+        first time. Nothing to do here yet — check back after that.
+    </div>
+}
+else
+{
+    @if (Model.PendingCount > 0)
+    {
+        <p class="text-muted">
+            @Model.PendingCount photograph@(Model.PendingCount == 1 ? "" : "s") waiting
+            to be reviewed.
+        </p>
+    }
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">Add photographs</h2>
+
+            <form method="post" asp-action="Upload" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label for="files" class="form-label">Choose images</label>
+                    <input id="files" name="files" type="file" class="form-control"
+                           multiple accept="@Model.AcceptAttribute" />
+                    <div class="form-text">
+                        Up to @Model.MaxImageMegabytes MB each. Portrait and landscape are both fine.
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Upload</button>
+            </form>
+        </div>
+    </div>
+
+    @if (Model.Photos.Count == 0)
+    {
+        <p class="text-muted">You have not added anything to your gallery yet.</p>
+    }
+    else
+    {
+        <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">
+            @foreach (var photo in Model.Photos)
+            {
+                <div class="col">
+                    <div class="card h-100">
+                        <img src="/media/@photo.Id/thumbnail"
+                             class="card-img-top"
+                             loading="lazy"
+                             style="aspect-ratio: @photo.AspectRatio; object-fit: cover; background: var(--raised);"
+                             alt="@photo.Filename" />
+
+                        <div class="card-body p-2">
+                            @switch (photo.Status)
+                            {
+                                case GalleryPhotoStatus.PendingReview:
+                                    <span class="badge text-bg-secondary mb-2">Pending review</span>
+                                    break;
+                                case GalleryPhotoStatus.Approved:
+                                    <span class="badge text-bg-primary mb-2">Live</span>
+                                    break;
+                                case GalleryPhotoStatus.Rejected:
+                                    <span class="badge text-bg-danger mb-2">Not approved</span>
+                                    @if (!string.IsNullOrWhiteSpace(photo.ReviewNote))
+                                    {
+                                        <p class="small text-muted mb-2">@photo.ReviewNote</p>
+                                    }
+                                    break;
+                            }
+
+                            <form method="post" asp-action="Remove" asp-route-assetId="@photo.Id"
+                                  data-confirm="Remove this photograph from your gallery?">
+                                <button type="submit" class="btn btn-sm btn-outline-danger w-100">Remove</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+}

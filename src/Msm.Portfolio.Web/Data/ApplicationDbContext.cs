@@ -177,8 +177,21 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
                 .HasForeignKey(m => m.UploadedByUserId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            // Same reasoning as UploadedByUser: a review stays on the record even if the
+            // reviewing account is later removed.
+            entity.HasOne(m => m.GalleryReviewedByUser)
+                .WithMany()
+                .HasForeignKey(m => m.GalleryReviewedByUserId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            entity.Property(m => m.GalleryReviewNote).HasMaxLength(500);
+
             entity.HasIndex(m => new { m.ClientId, m.IsSelectedForPortfolio });
             entity.HasIndex(m => new { m.ClientId, m.DisplayOrder });
+
+            // The moderation queue's whole query, and a client's own gallery view.
+            entity.HasIndex(m => new { m.MediaType, m.GalleryStatus });
+            entity.HasIndex(m => new { m.ClientId, m.MediaType });
         });
 
         builder.Entity<RetoucherAssignment>(entity =>

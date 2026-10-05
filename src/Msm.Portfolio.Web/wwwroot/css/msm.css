@@ -1806,6 +1806,33 @@ html:has(body.public) {
     background: var(--raised);
 }
 
+/* ── The client's own gallery ────────────────────────────────────────────────────
+   Square, cropped tiles rather than the Portfolio's uncropped ones: this is whatever a
+   client keeps adding, shown the way a social grid reads at a glance, not the carefully
+   framed set above it. */
+
+.gallery-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+@media (min-width: 992px) {
+    .gallery-grid { grid-template-columns: repeat(4, 1fr); gap: 6px; }
+}
+
+.gallery-grid img {
+    aspect-ratio: 1 / 1;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    background: var(--raised);
+}
+
 /* ── The photograph viewer ────────────────────────────────────────────────────────
    Clicking a photograph used to leave the portfolio for a page containing nothing but
    an image file: no way to the next one, and no way back except the browser's own

@@ -70,6 +70,10 @@
             <a href="#stats">Info</a>
         }
         <a href="#portfolio">Portfolio</a>
+        @if (p.GalleryImages.Count > 0)
+        {
+            <a href="#gallery">Gallery</a>
+        }
         <a href="#contact">Booking</a>
     </nav>
 }
@@ -205,6 +209,32 @@
             </ul>
         }
     </section>
+
+    @* Hidden entirely when there is nothing approved yet — the client may have added
+       photographs that are still pending review, or none at all. *@
+    @if (p.GalleryImages.Count > 0)
+    {
+        <section class="section" id="gallery" aria-labelledby="gallery-heading">
+            <h2 class="section-title" id="gallery-heading">Gallery</h2>
+
+            @* Square, cropped tiles rather than the Portfolio's uncropped ones — a grid
+               the client keeps adding to reads at a glance, the way a social feed does,
+               rather than needing the careful framing a curated set gets. *@
+            <ul class="gallery-grid" data-viewer>
+                @foreach (var image in p.GalleryImages)
+                {
+                    <li>
+                        <a href="/media/@image.AssetId/large" data-viewer-item
+                           data-thumb="/media/@image.AssetId/thumbnail">
+                            <img src="/media/@image.AssetId/medium"
+                                 loading="lazy"
+                                 alt="Photograph of @p.Name" />
+                        </a>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
 
     @* Hidden entirely when there is no self-tape (specification section 14). *@
     @if (p.HasSelfTape)
