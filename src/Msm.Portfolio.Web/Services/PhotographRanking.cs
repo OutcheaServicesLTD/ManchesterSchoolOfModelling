@@ -104,4 +104,32 @@ public static class PhotographRanking
                 .Select(a => a.Id)
         ];
     }
+
+    /// <summary>
+    /// The best photographs across the whole pool, portfolio and library together, up to
+    /// the number of places a portfolio has.
+    /// </summary>
+    /// <remarks>
+    /// Used once the portfolio already has its full places, when <see cref="Suggest"/>
+    /// would have nothing left to offer. Ranked the same way, just without excluding what
+    /// is already selected — a photograph already on the portfolio can still turn out to
+    /// be the weakest of the lot once better ones have been uploaded since.
+    /// </remarks>
+    public static IReadOnlyList<Guid> SuggestReplacement(IEnumerable<MediaAsset> pool, int limit)
+    {
+        if (limit <= 0)
+        {
+            return [];
+        }
+
+        return
+        [
+            .. pool
+                .Where(a => a.MediaType == MediaType.Image && !a.IsDeleted)
+                .OrderByDescending(Score)
+                .ThenBy(a => a.DisplayOrder)
+                .Take(limit)
+                .Select(a => a.Id)
+        ];
+    }
 }

@@ -49,6 +49,21 @@ public interface IMediaService
         Guid? actingUserId,
         CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// Adds several images to a portfolio that already has its full places, dropping the
+    /// lowest-scoring images already selected to make room, one for one.
+    /// </summary>
+    /// <remarks>
+    /// A dropped image is only deselected, not deleted — it returns to the library, where
+    /// adding it back is one tick away. Returns how many were added and how many were
+    /// dropped to make room for them.
+    /// </remarks>
+    Task<(int Added, int Dropped, string? Error)> ReplaceSelectedManyAsync(
+        Guid clientId,
+        IReadOnlyList<Guid> assetIds,
+        Guid? actingUserId,
+        CancellationToken cancellationToken = default);
+
     Task<(bool Succeeded, string? Error)> SetFeaturedAsync(
         Guid clientId, Guid assetId, Guid? actingUserId, CancellationToken cancellationToken = default);
 
@@ -438,6 +453,71 @@ public class MediaService(
             : null;
 
         return (toAdd.Count, error);
+    }
+
+    public async Task<(int Added, int Dropped, string? Error)> ReplaceSelectedManyAsync(
+        Guid clientId,
+        IReadOnlyList<Guid> assetIds,
+        Guid? actingUserId,
+        CancellationToken cancellationToken = default)
+    {
+        if (assetIds.Count == 0)
+        {
+            return (0, 0, "Choose at least one photograph first.");
+        }
+
+        var images = await LoadImagesAsync(clientId, cancellationToken);
+        var limit = mediaOptions.Value.PortfolioImageLimit;
+
+        var toAdd = assetIds
+            .Select(id => images.FirstOrDefault(m => m.Id == id))
+            .Where(m => m is not null && !m.IsSelectedForPortfolio)
+            .Cast<MediaAsset>()
+            .ToList();
+
+        if (toAdd.Count == 0)
+        {
+            return (0, 0, null);
+        }
+
+        var room = limit - images.Count(m => m.IsSelectedForPortfolio);
+        var shortfall = toAdd.Count - room;
+
+        // Ranked the same way "Suggest a selection" itself is, so whatever is dropped to
+        // make room is never better by this measure than what replaces it.
+        var toDrop = shortfall > 0
+            ? images
+                .Where(m => m.IsSelectedForPortfolio)
+                .OrderBy(PhotographRanking.Score)
+                .ThenByDescending(m => m.DisplayOrder)
+                .Take(shortfall)
+                .ToList()
+            : [];
+
+        // Still bounded by the limit even after dropping everything eligible, in case the
+        // ticked batch asked for more room than the portfolio could ever give up.
+        toAdd = toAdd.Take(room + toDrop.Count).ToList();
+
+        foreach (var asset in toDrop)
+        {
+            asset.IsSelectedForPortfolio = false;
+
+            audit.Record(nameof(MediaAsset), asset.Id.ToString(),
+                "MediaDeselectedFromPortfolio", userId: actingUserId);
+        }
+
+        foreach (var asset in toAdd)
+        {
+            asset.IsSelectedForPortfolio = true;
+
+            audit.Record(nameof(MediaAsset), asset.Id.ToString(),
+                "MediaSelectedForPortfolio", userId: actingUserId);
+        }
+
+        await EnsureFeaturedIsValidAsync(clientId, images, actingUserId, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
+
+        return (toAdd.Count, toDrop.Count, null);
     }
 
     public async Task<(bool Succeeded, string? Error)> SetFeaturedAsync(

@@ -227,14 +227,12 @@
         {
             @if (Model.PortfolioIsFull)
             {
-                @* The controls below are disabled rather than hidden, so a glance still
-                   shows what picking photographs normally looks like — but a disabled
-                   control with no reason given just looks broken, which is exactly what
-                   was reported. *@
                 <p class="text-muted">
                     The portfolio already has its full @Model.PortfolioLimit photographs.
-                    Remove some on the <a href="@baseUrl/portfolio">Portfolio</a> page
-                    before picking more from here.
+                    Tick ones below worth swapping in, then press
+                    <strong>Add to portfolio</strong> — the lowest-scoring photographs
+                    already selected make way, one for one, and return to the library
+                    rather than being deleted.
                 </p>
             }
             else
@@ -246,12 +244,14 @@
             }
 
             @* Tick the ones wanted and add them together. Choosing a shoot's worth one
-               button at a time was the slowest part of the job. *@
-            <form method="post" asp-action="SelectMany" asp-route-clientId="@Model.ClientId" id="picker">
+               button at a time was the slowest part of the job. Posts to ReplaceMany
+               instead of SelectMany once the portfolio is full — the same form and the
+               same button, so the retoucher only ever chooses photographs, never actions. *@
+            <form method="post" asp-action="@(Model.PortfolioIsFull ? "ReplaceMany" : "SelectMany")"
+                  asp-route-clientId="@Model.ClientId" id="picker">
                 <div class="picker-bar">
                     <div class="form-check mb-0">
-                        <input class="form-check-input" type="checkbox" id="pick-all" data-pick-all
-                               @(Model.PortfolioIsFull ? "disabled" : "") />
+                        <input class="form-check-input" type="checkbox" id="pick-all" data-pick-all />
                         <label class="form-check-label" for="pick-all">Select all</label>
                     </div>
 
@@ -260,20 +260,30 @@
                     @* Hidden until script reveals it: without script it could not do
                        anything, and an inert button is worse than no button. The picker
                        itself works either way. *@
-                    <button type="button" class="btn btn-outline-secondary d-none" data-pick-suggest
-                            @(Model.PortfolioIsFull ? "disabled" : "")>
+                    <button type="button" class="btn btn-outline-secondary d-none" data-pick-suggest>
                         Suggest a selection
                     </button>
 
                     <span class="eyebrow" data-pick-count aria-live="polite">None chosen</span>
 
-                    <button type="submit" class="btn btn-primary" data-pick-submit disabled
-                            @(Model.PortfolioIsFull ? "disabled" : "")>
+                    <button type="submit" class="btn btn-primary" data-pick-submit disabled>
                         Add to portfolio
                     </button>
                 </div>
 
-                @if (!Model.PortfolioIsFull)
+                @if (Model.PortfolioIsFull)
+                {
+                    <p class="form-text mt-2">
+                        <strong>Suggest a selection</strong> ticks the best
+                        @Model.PortfolioLimit photographs across the whole library and
+                        portfolio together — sharpest first, well exposed, with nothing
+                        lost to pure black or pure white — then ticks only the ones from
+                        here that made the cut. It judges the picture, never the person in
+                        it, so look through the choice and untick whatever you do not want.
+                        Press the button again to clear everything and start over.
+                    </p>
+                }
+                else
                 {
                     <p class="form-text mt-2">
                         <strong>Suggest a selection</strong> ticks the best
@@ -295,8 +305,7 @@
                                 <label class="pick-tile">
                                     <input class="form-check-input pick" type="checkbox"
                                            name="assetIds" value="@asset.Id" data-pick
-                                           @(asset.IsSuggested ? "data-pick-suggested" : "")
-                                           @(Model.PortfolioIsFull ? "disabled" : "") />
+                                           @(asset.IsSuggested ? "data-pick-suggested" : "") />
                                     <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
                                          style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
                                          alt="@asset.Filename" />

@@ -180,6 +180,43 @@ public class WorkspaceController(
         return RedirectToAction(nameof(Upload), new { clientId });
     }
 
+    /// <summary>
+    /// Adds every ticked photograph to a portfolio that already has its full places,
+    /// dropping the lowest-scoring ones already selected to make room.
+    /// </summary>
+    /// <remarks>
+    /// Picked up by the same picker and the same button as <see cref="SelectMany"/> — the
+    /// form posts here instead once <c>PortfolioIsFull</c>, so the retoucher never has to
+    /// choose which action to take, only which photographs.
+    /// </remarks>
+    [HttpPost("replace")]
+    public async Task<IActionResult> ReplaceMany(
+        Guid clientId,
+        [FromForm(Name = "assetIds")] Guid[]? assetIds,
+        CancellationToken cancellationToken = default)
+    {
+        if (!await IsAllowedAsync(clientId, cancellationToken))
+        {
+            return Forbid();
+        }
+
+        var (added, dropped, error) = await media.ReplaceSelectedManyAsync(
+            clientId, assetIds ?? [], CurrentUserId(), cancellationToken);
+
+        if (error is not null)
+        {
+            TempData["Error"] = error;
+        }
+        else if (added > 0)
+        {
+            TempData["Saved"] = added == 1
+                ? $"1 photograph added to the portfolio, replacing {dropped} that scored lower."
+                : $"{added} photographs added to the portfolio, replacing {dropped} that scored lower.";
+        }
+
+        return RedirectToAction(nameof(Upload), new { clientId });
+    }
+
     [HttpPost("featured/{assetId:guid}")]
     public async Task<IActionResult> Featured(
         Guid clientId, Guid assetId, CancellationToken cancellationToken = default)
@@ -425,9 +462,14 @@ public class WorkspaceController(
         var pool = await media.GetPoolAsync(clientId, cancellationToken);
 
         // Worked out here rather than in the page: the rule is one thing, in one place,
-        // and the page only ticks what it chose.
+        // and the page only ticks what it chose. Once the portfolio has no room left,
+        // Suggest has nothing to offer from the library alone — so the ranking widens to
+        // the whole pool instead, and a library photograph earns a tick by outscoring
+        // something already on the portfolio rather than by there being room for it.
         var room = options.PortfolioImageLimit - pool.Count(a => a.IsSelectedForPortfolio);
-        var suggested = PhotographRanking.Suggest(pool, room).ToHashSet();
+        var suggested = room > 0
+            ? PhotographRanking.Suggest(pool, room).ToHashSet()
+            : PhotographRanking.SuggestReplacement(pool, options.PortfolioImageLimit).ToHashSet();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var assignment = await retouchers.GetAssignmentAsync(clientId, cancellationToken);
 

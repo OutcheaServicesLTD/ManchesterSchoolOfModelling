@@ -376,6 +376,68 @@ public class MediaServiceTests : IDisposable
         Assert.Equal(2, await _db.MediaAssets.CountAsync(m => m.IsSelectedForPortfolio));
     }
 
+    /// <summary>
+    /// Replacing is what "Suggest a selection" turns into once the portfolio has no room
+    /// left: a library photograph only earns its place by outscoring the weakest one
+    /// already on the portfolio, which this proves by giving the ids an explicit,
+    /// unambiguous ranking rather than relying on whatever the sample images happen to
+    /// score.
+    /// </summary>
+    [Fact]
+    public async Task Replacing_swaps_in_a_library_photograph_for_the_lowest_scoring_selected_one()
+    {
+        var ids = await UploadAsync(Options.PortfolioImageLimit + 1);
+        var (best, middle, worst, incoming) = (ids[0], ids[1], ids[2], ids[3]);
+
+        await _service.SetSelectedManyAsync(_clientId, [best, middle, worst], null);
+
+        var assets = await _db.MediaAssets.ToListAsync();
+        Score(assets, best, 90);
+        Score(assets, middle, 60);
+        Score(assets, worst, 20);
+        Score(assets, incoming, 80);
+        await _db.SaveChangesAsync();
+
+        var (added, dropped, error) = await _service.ReplaceSelectedManyAsync(_clientId, [incoming], null);
+
+        Assert.Equal(1, added);
+        Assert.Equal(1, dropped);
+        Assert.Null(error);
+
+        var selected = await _db.MediaAssets
+            .Where(m => m.IsSelectedForPortfolio)
+            .Select(m => m.Id)
+            .ToListAsync();
+
+        Assert.Equal(Options.PortfolioImageLimit, selected.Count);
+        Assert.Contains(incoming, selected);
+        Assert.Contains(best, selected);
+        Assert.Contains(middle, selected);
+        Assert.DoesNotContain(worst, selected);
+    }
+
+    [Fact]
+    public async Task Replacing_with_photographs_already_selected_changes_nothing()
+    {
+        var ids = await UploadAsync(Options.PortfolioImageLimit);
+        await _service.SetSelectedManyAsync(_clientId, ids, null);
+
+        var (added, dropped, _) = await _service.ReplaceSelectedManyAsync(_clientId, ids, null);
+
+        Assert.Equal(0, added);
+        Assert.Equal(0, dropped);
+        Assert.Equal(Options.PortfolioImageLimit, await _db.MediaAssets.CountAsync(m => m.IsSelectedForPortfolio));
+    }
+
+    private static void Score(List<MediaAsset> assets, Guid id, int score)
+    {
+        var asset = assets.Single(a => a.Id == id);
+        asset.Sharpness = score;
+        asset.Exposure = 48;
+        asset.Contrast = score;
+        asset.Clipping = 0;
+    }
+
     [Fact]
     public async Task A_focal_point_is_recorded_on_the_image()
     {
