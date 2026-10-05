@@ -1,0 +1,38 @@
+## .NET build output
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+artifacts/
+*.user
+*.suo
+
+## Rider / VS / VS Code
+.vs/
+.idea/
+## The contents rather than the directory itself: git never looks inside an ignored
+## directory, so a negation below it would have no effect.
+.vscode/*
+
+## ...except the two files that tell every contributor how to run this, rather than
+## leaving each editor to generate its own — a generated one commonly points at a port
+## nothing here listens on.
+!.vscode/launch.json
+!.vscode/tasks.json
+
+## Local databases (development only)
+*.db
+*.db-shm
+*.db-wal
+
+## Local media storage (development only)
+media-storage/
+
+## Secrets — never commit; use user-secrets or environment variables
+appsettings.*.Local.json
+secrets.json
+.env
+
+## OS noise
+.DS_Store
+Thumbs.db

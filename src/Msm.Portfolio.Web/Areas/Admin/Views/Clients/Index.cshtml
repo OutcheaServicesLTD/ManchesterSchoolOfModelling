@@ -1,0 +1,596 @@
+@model Msm.Portfolio.Web.ViewModels.AdminClientDetailViewModel
+@using Microsoft.AspNetCore.Authorization
+@using Msm.Portfolio.Web.Authorization
+@using Msm.Portfolio.Web.Domain.Enums
+@inject IAuthorizationService Auth
+@inject Microsoft.AspNetCore.Antiforgery.IAntiforgery Antiforgery
+@{
+    ViewData["Title"] = Model.Client.PublicName;
+    var token = Antiforgery.GetAndStoreTokens(Context).RequestToken;
+    var saved = TempData["Saved"] as string;
+    var error = TempData["Error"] as string;
+    var issuedPassword = TempData["GeneratedPassword"] as string;
+    var issuedFor = TempData["GeneratedFor"] as string;
+    var issuedDelivered = TempData["GeneratedDelivered"] as bool? ?? false;
+    var edit = Model.ToEditModel();
+
+    async Task<bool> Allowed(string permission) =>
+        (await Auth.AuthorizeAsync(User, permission)).Succeeded;
+}
+
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+    <div>
+        <h1 class="mb-1">@Model.Client.PublicName</h1>
+        <p class="text-muted mb-0">
+            @Model.Status.Label()
+            @if (Model.IsPublished)
+            {
+                <span class="badge text-bg-success">Live</span>
+            }
+            @if (Model.RetoucherName is not null)
+            {
+                <span>· Retoucher: @Model.RetoucherName</span>
+            }
+        </p>
+    </div>
+    <a class="btn btn-outline-secondary" href="/admin">Back to clients</a>
+</div>
+
+@if (saved is not null) { <div class="alert alert-success" role="alert">@saved</div> }
+@if (error is not null) { <div class="alert alert-danger" role="alert">@error</div> }
+
+@if (issuedPassword is not null)
+{
+    @* Shown once. Only the hash is kept, so there is no screen anywhere that can show
+       this again — which is the point, and is why it says so. *@
+    <div class="alert alert-warning" role="alert">
+        <h2 class="h6">Sign-in details for @issuedFor</h2>
+        <dl class="row mb-2">
+            <dt class="col-sm-2">Address</dt>
+            <dd class="col-sm-10"><code>@Model.Client.ApplicationUser.Email</code></dd>
+            <dt class="col-sm-2">Password</dt>
+            <dd class="col-sm-10"><code class="fs-5">@issuedPassword</code></dd>
+        </dl>
+        <p class="mb-0 small">
+            @if (issuedDelivered)
+            {
+                <text>
+                    <strong>Emailed to them.</strong> It is shown here too in case they cannot
+                    find it. It cannot be shown again, and they can change it themselves once
+                    they have signed in.
+                </text>
+            }
+            else
+            {
+                <text>
+                    <strong>Not emailed</strong> — no email provider is set up yet, so copy
+                    this now and give it to them directly. It cannot be shown again, and they
+                    can change it themselves once they have signed in.
+                </text>
+            }
+        </p>
+    </div>
+}
+
+@if (Model.GuardianApprovalPending)
+{
+    <div class="alert alert-warning" role="alert">
+        <strong>Under 18, guardian approval outstanding.</strong>
+        This portfolio cannot be sold or published until the guardian approves.
+    </div>
+}
+
+@if (Model.MaintenanceWarning is { } warning)
+{
+    @* Staff-facing only; agencies never see this on the public portfolio (spec 23). *@
+    <div class="alert @(warning.PortfolioTakenDown ? "alert-danger" : "alert-warning")" role="alert">
+        @if (warning.PortfolioTakenDown)
+        {
+            <strong>Maintenance unpaid — portfolio taken down.</strong>
+            <span>
+                The grace period ended @warning.GracePeriodEndsAt?.ToString("d MMMM yyyy")
+                and the portfolio was unpublished. Republish once payment is resolved.
+            </span>
+        }
+        else
+        {
+            <strong>Maintenance payment failed.</strong>
+            <span>
+                The portfolio stays live until
+                @warning.GracePeriodEndsAt?.ToString("d MMMM yyyy")
+                @if (warning.DaysRemaining is { } days)
+                {
+                    <text>(@days day@(days == 1 ? "" : "s") remaining)</text>
+                }
+                , then it is taken down automatically.
+            </span>
+        }
+    </div>
+}
+
+<div class="card mb-4">
+    <div class="card-body">
+        <h2 class="h5 card-title">Portfolio</h2>
+
+        <dl class="row mb-3">
+            <dt class="col-sm-3">Status</dt>
+            <dd class="col-sm-9">@Model.Status.Label()</dd>
+
+            <dt class="col-sm-3">Photographs</dt>
+            <dd class="col-sm-9">@Model.Selected.Count on portfolio, @Model.Assets.Count in library</dd>
+
+            @* The purchased year. Absent on a portfolio nobody has bought yet, and on the
+               ones sold under the old programme price, which carried no term. *@
+            @if (Model.Portfolio?.ExpiresAt is { } expires)
+            {
+                var left = Model.Portfolio.DaysRemaining(DateTimeOffset.UtcNow) ?? 0;
+
+                <dt class="col-sm-3">Paid until</dt>
+                <dd class="col-sm-9">
+                    @expires.ToString("d MMMM yyyy")
+                    @if (left <= 0)
+                    {
+                        <span class="badge text-bg-danger">Ended</span>
+                    }
+                    else if (left <= 30)
+                    {
+                        <span class="badge text-bg-warning">@left day@(left == 1 ? "" : "s") left</span>
+                    }
+                </dd>
+            }
+
+            <dt class="col-sm-3">Public address</dt>
+            <dd class="col-sm-9">
+                @if (Model.PublicUrl is not null)
+                {
+                    <a href="@Model.PublicUrl">@Model.PublicUrl</a>
+                }
+                else
+                {
+                    <span class="text-muted">Assigned when first published</span>
+                }
+            </dd>
+        </dl>
+
+@if (Model.PublishBlocker is not null && !Model.IsPublished)
+        {
+            @* Explains a disabled Publish button rather than only refusing the attempt. *@
+            <div class="alert alert-secondary py-2" role="status">
+                Cannot publish yet: @Model.PublishBlocker
+            </div>
+        }
+
+        <div class="d-flex flex-wrap gap-2">
+            @if (Model.CanMarkInViewing && await Allowed(Permissions.Portfolios.ChangeStatus))
+            {
+                <form method="post" asp-action="MarkInViewing" asp-route-clientId="@Model.ClientId">
+                    <button type="submit" class="btn btn-primary">Mark ready for viewing</button>
+                </form>
+            }
+
+            @if (await Allowed(Permissions.Portfolios.ChangeStatus) && !Model.IsPublished && !Model.IsArchived)
+            {
+                <form method="post" asp-action="ReturnToRetoucher" asp-route-clientId="@Model.ClientId">
+                    <button type="submit" class="btn btn-outline-secondary">Send back to retoucher</button>
+                </form>
+            }
+
+            @if (!Model.IsPublished && await Allowed(Permissions.Portfolios.Publish))
+            {
+                <form method="post" asp-action="Publish" asp-route-clientId="@Model.ClientId">
+                    <button type="submit" class="btn btn-success" @(Model.CanPublish ? "" : "disabled")>
+                        Publish
+                    </button>
+                </form>
+            }
+
+            @if (Model.IsPublished && await Allowed(Permissions.Portfolios.Unpublish))
+            {
+                <form method="post" asp-action="Unpublish" asp-route-clientId="@Model.ClientId"
+                      data-confirm="Take this portfolio off the web?">
+                    <button type="submit" class="btn btn-outline-danger">Unpublish</button>
+                </form>
+            }
+
+            @if (Model.CanStartCheckout && await Allowed(Permissions.Payments.StartCheckout))
+            {
+                @* Opened with the client present in the studio (specification section 20). *@
+                <a class="btn btn-primary" href="/checkout/@Model.ClientId">
+                    Purchase — @Model.PortfolioPrice for a year
+                </a>
+            }
+
+            @if (Model.CanMarkNoSale && await Allowed(Permissions.Payments.MarkNoSale))
+            {
+                <form method="post" asp-action="MarkNoSale" asp-route-clientId="@Model.ClientId"
+                      data-confirm="Record this as a no sale and archive it?">
+                    <button type="submit" class="btn btn-outline-secondary">No sale</button>
+                </form>
+            }
+
+            @if (Model.IsArchived && await Allowed(Permissions.Portfolios.Restore))
+            {
+                <form method="post" asp-action="Restore" asp-route-clientId="@Model.ClientId">
+                    <button type="submit" class="btn btn-outline-primary">Restore</button>
+                </form>
+            }
+
+            @if (!Model.IsPublished && !Model.IsArchived && await Allowed(Permissions.Portfolios.Archive))
+            {
+                <form method="post" asp-action="Archive" asp-route-clientId="@Model.ClientId">
+                    <button type="submit" class="btn btn-outline-secondary">Archive</button>
+                </form>
+            }
+        </div>
+
+        @if (await Allowed(Permissions.Portfolios.DeletePermanently))
+        {
+            @* Only rendered for Super Admin; the action itself is gated too, so an
+               ordinary Admin cannot reach it by posting directly. *@
+            <div class="border-top mt-3 pt-3">
+                <h3 class="h6 text-danger">Permanent deletion</h3>
+                <p class="small text-muted mb-2">
+                    Destroys the portfolio and every photograph. This cannot be undone.
+                    The audit record of the deletion is kept.
+                </p>
+                <form method="post" asp-action="DeletePermanently" asp-route-clientId="@Model.ClientId"
+                      data-confirm="Permanently delete this portfolio and all its photographs? This cannot be undone.">
+                    <button type="submit" class="btn btn-danger btn-sm">Delete permanently</button>
+                </form>
+            </div>
+        }
+    </div>
+</div>
+
+@if (await Allowed(Permissions.Portfolios.ChangeSlug))
+{
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">Web address</h2>
+            <form method="post" asp-action="Slug" asp-route-clientId="@Model.ClientId" class="row g-2">
+                <div class="col-sm-8">
+                    <label for="slug" class="form-label visually-hidden">Web address</label>
+                    <div class="input-group">
+                        <span class="input-group-text">@Model.PublicUrlBase/</span>
+                        <input id="slug" name="slug" class="form-control" value="@Model.Portfolio?.Slug" />
+                    </div>
+                    <div class="form-text">
+                        Changing this breaks any link already shared with an agency.
+                    </div>
+                </div>
+                <div class="col-sm-4 d-grid align-self-start">
+                    <button type="submit" class="btn btn-outline-primary">Update address</button>
+                </div>
+            </form>
+        </div>
+    </div>
+}
+
+@{
+    var cover = Model.Selected.FirstOrDefault(a => a.IsFeatured);
+}
+
+@if (cover is not null && await Allowed(Permissions.Media.SetFeatured))
+{
+    @* Only the main image: it is the only photograph the site crops. *@
+    <partial name="_CoverFocus" model="@(new Msm.Portfolio.Web.ViewModels.CoverFocusViewModel
+    {
+        AssetId = cover.Id,
+        Filename = cover.Filename,
+        PostUrl = $"/admin/clients/{Model.ClientId}/media/{cover.Id}/focal",
+        X = cover.FocalPointX,
+        Y = cover.FocalPointY
+    })" />
+}
+
+<h2 class="h5">Portfolio photographs (@Model.Selected.Count of @Model.PortfolioLimit)</h2>
+@if (Model.Selected.Count == 0)
+{
+    <p class="text-muted">None chosen.</p>
+}
+else
+{
+    @* data-viewer turns these into the same viewer an agency gets on the public page:
+       click one and it opens large, with the rest of the shoot along the bottom and arrows
+       either side. Reviewing a portfolio one thumbnail at a time is not reviewing it. *@
+    <ol class="row row-cols-2 row-cols-md-4 g-3 list-unstyled mb-4" data-viewer>
+        @for (var i = 0; i < Model.Selected.Count; i++)
+        {
+            var asset = Model.Selected[i];
+            <li class="col">
+                <div class="card h-100 @(asset.IsFeatured ? "border-primary" : "")">
+                    <a href="/media/@asset.Id/large" data-viewer-item
+                       data-thumb="/media/@asset.Id/thumbnail" title="Look at this one full size">
+                        <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
+                             style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
+                             alt="@asset.Filename" />
+                    </a>
+                    <div class="card-body p-2">
+                        <p class="small text-muted mb-1">
+                            @(i + 1). @asset.Orientation
+                            @if (asset.IsFeatured) { <span class="badge text-bg-primary">Main</span> }
+                        </p>
+
+                        @if (await Allowed(Permissions.Media.Select))
+                        {
+                            <div class="btn-group btn-group-sm w-100 mb-1" role="group" aria-label="Reorder">
+                                <form method="post" asp-action="Move" asp-route-clientId="@Model.ClientId"
+                                      asp-route-assetId="@asset.Id" class="d-grid">
+                                    <input type="hidden" name="direction" value="-1" />
+                                    <button type="submit" class="btn btn-outline-secondary"
+                                            aria-label="Move @asset.Filename earlier" @(i == 0 ? "disabled" : "")>&larr;</button>
+                                </form>
+                                <form method="post" asp-action="Move" asp-route-clientId="@Model.ClientId"
+                                      asp-route-assetId="@asset.Id" class="d-grid">
+                                    <input type="hidden" name="direction" value="1" />
+                                    <button type="submit" class="btn btn-outline-secondary"
+                                            aria-label="Move @asset.Filename later"
+                                            @(i == Model.Selected.Count - 1 ? "disabled" : "")>&rarr;</button>
+                                </form>
+                            </div>
+                        }
+
+                        @if (!asset.IsFeatured && await Allowed(Permissions.Media.SetFeatured))
+                        {
+                            <form method="post" asp-action="Featured" asp-route-clientId="@Model.ClientId"
+                                  asp-route-assetId="@asset.Id" class="d-grid mb-1">
+                                <button type="submit" class="btn btn-sm btn-outline-primary">Make main</button>
+                            </form>
+                        }
+
+                        @if (await Allowed(Permissions.Media.Select))
+                        {
+                            <form method="post" asp-action="Select" asp-route-clientId="@Model.ClientId"
+                                  asp-route-assetId="@asset.Id" class="d-grid">
+                                <input type="hidden" name="selected" value="false" />
+                                <button type="submit" class="btn btn-sm btn-outline-secondary">Remove from portfolio</button>
+                            </form>
+                        }
+                    </div>
+                </div>
+            </li>
+        }
+    </ol>
+}
+
+<h2 class="h5">Full library (@Model.Assets.Count of @Model.PoolLimit)</h2>
+<p class="text-muted small">
+    Staff see every photograph, including those the client is not showing publicly.
+</p>
+@if (Model.Unselected.Count == 0)
+{
+    <p class="text-muted">Every photograph is on the portfolio.</p>
+}
+else
+{
+    <div class="row row-cols-2 row-cols-md-4 g-3 mb-4" data-viewer>
+        @foreach (var asset in Model.Unselected)
+        {
+            <div class="col">
+                <div class="card h-100">
+                    <a href="/media/@asset.Id/large" data-viewer-item
+                       data-thumb="/media/@asset.Id/thumbnail" title="Look at this one full size">
+                        <img src="/media/@asset.Id/thumbnail" class="card-img-top" loading="lazy"
+                             style="aspect-ratio: @asset.AspectRatio; object-fit: contain; background: var(--raised);"
+                             alt="@asset.Filename" />
+                    </a>
+                    <div class="card-body p-2">
+                        <p class="small text-muted mb-1">@asset.Orientation</p>
+                        @if (await Allowed(Permissions.Media.Select))
+                        {
+                            <form method="post" asp-action="Select" asp-route-clientId="@Model.ClientId"
+                                  asp-route-assetId="@asset.Id" class="d-grid mb-1">
+                                <input type="hidden" name="selected" value="true" />
+                                <button type="submit" class="btn btn-sm btn-outline-primary">Add to portfolio</button>
+                            </form>
+                        }
+                        @if (await Allowed(Permissions.Media.Delete))
+                        {
+                            <form method="post" asp-action="RemoveMedia" asp-route-clientId="@Model.ClientId"
+                                  asp-route-assetId="@asset.Id" class="d-grid"
+                                  data-confirm="Remove this photograph?">
+                                <button type="submit" class="btn btn-sm btn-outline-danger">Remove</button>
+                            </form>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@if (Model.SelfTapeId is not null)
+{
+    <h2 class="h5">Self-tape</h2>
+    <video controls preload="metadata" class="mb-4" style="max-width:480px;background:#000;">
+        <source src="/media/@Model.SelfTapeId" />
+    </video>
+}
+
+@if (await Allowed(Permissions.Clients.Edit))
+{
+    @* Nested forms are not allowed, so this is its own form outside the details one
+       below rather than a button inside it. *@
+    @* Claimed work belongs to whoever claimed it, so nobody else can open it. Without a
+       way to hand it over, a client claimed by mistake — or by somebody who has left — is
+       stuck with them, and the retoucher who should have it is answered with Access
+       denied and no explanation. *@
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">Retouching</h2>
+
+            <p class="text-muted">
+                @if (Model.RetoucherName is { } holder)
+                {
+                    <text>@holder has this client. Only they can open the workspace.</text>
+                }
+                else
+                {
+                    <text>Nobody has claimed this client. Any retoucher can pick them up.</text>
+                }
+            </p>
+
+            <form method="post" asp-action="Retoucher" asp-route-clientId="@Model.ClientId"
+                  class="row g-2 align-items-end">
+                <div class="col-sm-7">
+                    <label for="retoucherUserId" class="form-label">Give it to</label>
+                    <select id="retoucherUserId" name="retoucherUserId" class="form-select">
+                        <option value="">Nobody — put it back in the queue</option>
+                        @foreach (var person in Model.Retouchers)
+                        {
+                            <option value="@person.UserId"
+                                    selected="@(person.UserId == Model.AssignedRetoucherUserId)">
+                                @person.Name
+                            </option>
+                        }
+                    </select>
+                </div>
+                <div class="col-sm-5">
+                    <button type="submit" class="btn btn-outline-primary">Hand over</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">Their sign-in</h2>
+
+            @if (Model.HasSignInDetails)
+            {
+                <p class="text-muted">
+                    @Model.Client.PublicName can sign in at
+                    <code>@Model.Client.ApplicationUser.Email</code>.
+                    Only they know their password — reset it if they have lost it, which
+                    replaces the one they have.
+                </p>
+            }
+            else
+            {
+                <p class="text-muted">
+                    @Model.Client.PublicName has no way in yet. This creates a password
+                    and shows it once, for you to pass on.
+                </p>
+            }
+
+            @* Two forms rather than one with a conditional attribute. A form tag helper
+               renders data-confirm="" for a null value rather than leaving it out, and an
+               empty confirmation is still a confirmation: the first press put an empty
+               dialog box in front of whoever pressed it. *@
+            <p class="mb-3">
+                <a class="btn btn-outline-primary" asp-action="Portal" asp-route-clientId="@Model.ClientId">
+                    See their portal
+                </a>
+                <span class="form-text d-block mt-1">
+                    What @Model.Client.PublicName sees when they sign in. Nothing is changed
+                    and nobody is signed in as them.
+                </span>
+            </p>
+
+            @if (Model.HasSignInDetails)
+            {
+                <form method="post" asp-action="Access" asp-route-clientId="@Model.ClientId"
+                      data-confirm="Reset this password? The one they are using now will stop working.">
+                    <button type="submit" class="btn btn-outline-secondary">Reset their password</button>
+                </form>
+            }
+            else
+            {
+                <form method="post" asp-action="Access" asp-route-clientId="@Model.ClientId">
+                    <button type="submit" class="btn btn-primary">Create sign-in details</button>
+                </form>
+            }
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h2 class="h5 card-title">Client details</h2>
+            <form method="post" asp-action="Profile" asp-route-clientId="@Model.ClientId">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="@edit.FirstName" class="form-label"></label>
+                        <input asp-for="@edit.FirstName" name="FirstName" class="form-control" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="@edit.LastName" class="form-label"></label>
+                        <input asp-for="@edit.LastName" name="LastName" class="form-control" />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="@edit.DisplayName" class="form-label"></label>
+                        <input asp-for="@edit.DisplayName" name="DisplayName" class="form-control" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="@edit.DateOfBirth" class="form-label"></label>
+                        <input asp-for="@edit.DateOfBirth" name="DateOfBirth" type="date" class="form-control" />
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="@edit.Location" class="form-label"></label>
+                        <input asp-for="@edit.Location" name="Location" class="form-control" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="@edit.ModelProfileType" class="form-label"></label>
+                        <select asp-for="@edit.ModelProfileType" name="ModelProfileType" class="form-select"
+                                asp-items="@Html.GetEnumSelectList<ModelProfileType>()"></select>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="@edit.HairColour" class="form-label"></label>
+                        <input asp-for="@edit.HairColour" name="HairColour" class="form-control" />
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="@edit.EyeColour" class="form-label"></label>
+                        <input asp-for="@edit.EyeColour" name="EyeColour" class="form-control" />
+                    </div>
+                </div>
+                @{
+                    // Nothing is put into the box from here any more. The biography is
+                    // the model's own words, so an administrator reads it rather than
+                    // types in it.
+                }
+
+                <div class="mb-3">
+                    <label asp-for="@edit.Biography" for="biography-box" class="form-label"></label>
+                    <textarea asp-for="@edit.Biography" name="Biography" class="form-control"
+                              rows="4" id="biography-box" readonly aria-readonly="true"></textarea>
+
+                    <p class="form-text mb-0">
+                        @Model.Client.PublicName writes this in their own account. This is
+                        theirs to word.
+                    </p>
+                </div>
+                <button type="submit" class="btn btn-primary">Save client details</button>
+            </form>
+        </div>
+    </div>
+}
+
+<div class="card">
+    <div class="card-body">
+        <h2 class="h5 card-title">Measurements</h2>
+        @if (Model.Client.Measurements.Count == 0)
+        {
+            <p class="text-muted mb-0">None recorded.</p>
+        }
+        else
+        {
+            <dl class="row mb-0">
+                @foreach (var measurement in Model.Client.Measurements.OrderBy(m => m.DisplayOrder))
+                {
+                    var field = Model.MeasurementTemplate.FirstOrDefault(f => f.Key == measurement.MeasurementType);
+                    <dt class="col-sm-4">@(field?.Label ?? measurement.MeasurementType)</dt>
+                    <dd class="col-sm-8">
+                        @measurement.Value
+                        @(measurement.Unit == MeasurementUnit.Centimetres ? "cm"
+                            : measurement.Unit == MeasurementUnit.Inches ? "in" : "")
+                    </dd>
+                }
+            </dl>
+        }
+    </div>
+</div>

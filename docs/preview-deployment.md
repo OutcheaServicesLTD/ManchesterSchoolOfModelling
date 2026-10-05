@@ -1,0 +1,204 @@
+# Putting a preview online
+
+A demonstration site MSM can click through on a real address. **Not the live system** —
+see [What this preview is not](#what-this-preview-is-not) before showing it to anyone.
+
+Written to be followed without using a terminal.
+
+## Why Render
+
+Recommended for this stage because the whole setup is done in a browser: connect the
+GitHub repository, and it builds and deploys from the `Dockerfile` on every push. Azure
+App Service is the more natural long-term home for a .NET application, but its setup is
+considerably heavier, and the container built here runs on Azure, Fly or a plain Linux
+server without changes — so nothing is locked in.
+
+Cost is about **$7 a month** for the service, plus a small amount for the 5 GB disk. The
+free plan cannot be used: it has no persistent disk, so every photograph uploaded would
+be lost on the next deploy.
+
+## Before you start
+
+You need:
+
+- a **GitHub account** with access to the repository
+- a **Render account** — sign up at [render.com](https://render.com) with that GitHub
+  account
+- a **password you have chosen** for the MSM owner login, at least 10 characters with an
+  uppercase letter, a lowercase letter, a digit and a symbol
+
+## 1. Create the service
+
+1. In Render, click **New** → **Blueprint**.
+2. Choose the `ManchesterSchoolOfModelling` repository.
+3. Set the branch to `claude/test-html-page-lqqflh`.
+4. Render reads `render.yaml` and shows one service, `msm-portfolio-preview`. Click
+   **Apply**.
+
+It will ask for the three values that are deliberately not in the repository:
+
+| Setting | What to enter |
+| ------- | ------------- |
+| `Seed__SuperAdmin__Email` | The email MSM will sign in with |
+| `Seed__SuperAdmin__Password` | The password you chose |
+| `Msm__PublicDomain` | Leave blank for now — step 3 |
+
+The first build takes around five minutes.
+
+## 2. Check it works
+
+**The preview lives at https://msm-portfolio-preview.onrender.com**
+
+Render assigns that from the service name in `render.yaml`. Recorded here so nobody has
+to go digging through the Render dashboard for it again.
+
+The pages worth having to hand:
+
+| | |
+|---|---|
+| Model Board | `/models` |
+| Sign in | `/account/login` |
+| Register as a model | `/register` |
+| Admin | `/admin` |
+| Which integrations are on | `/admin/integrations` |
+| Retoucher queue | `/retoucher` |
+| One model's public page | `/` plus their slug, e.g. `/amara-whitfield` |
+
+Open it and you should land on the Model Board with two models on it.
+
+Sign in at `/account/login` with the email and password from step 1.
+
+### What is already in it
+
+One client — **Elizabeth Cousins** — sitting in the retoucher queue waiting to be
+claimed, with her details filled in and no photographs yet. Build her portfolio by
+uploading them, which is both how it gets done and the most convincing thing to show
+MSM. The Model Board stays empty until she is published.
+
+**Bust and waist are deliberately blank.** They were not supplied, and a guessed figure
+would appear on a published portfolio as though MSM had measured her — an agency would
+book against it. Add them on her client record before publishing.
+
+There are three further sign-ins, all using the **same password** you set for the owner:
+
+| Email | Role | What it shows |
+|-------|------|----------------|
+| `retoucher@msm.local` | Retoucher | The upload workspace and queue, narrower than an Admin's. |
+| `viewer@msm.local` | Viewer | The same client list and detail pages as Admin, restricted to view-only. |
+| `elizabeth.cousins@example.com` | Client | Elizabeth's own dashboard — Photographs, Profile and Subscription — once her portfolio has something in it to show. |
+
+To see self-registration itself rather than a pre-seeded account, open `/register`
+(linked from `/account/login`) and create a new model. It pre-fills from URL query
+parameters — try `/register?firstName=Test&lastName=Model&email=test.model@example.com`
+— but never submits on its own; review the form and press Register. On success you are
+signed straight in as that new client, and the account appears in Admin's Clients list
+immediately, ready for a retoucher to claim.
+
+#### Building her portfolio
+
+1. Sign in → **Retoucher** → **Start work** on Elizabeth
+2. Drag the photographs into the upload box
+3. **Add to portfolio** on each, then **Make main** on the hero shot
+4. **Send for review**
+5. **Clients** → open her → **Mark ready for viewing** → **Publish**
+
+#### A fuller demonstration
+
+To show every screen with something in it, set `Seed__SampleClients` to `true`. That
+adds six invented clients at each stage of the workflow — two published, one waiting for
+review, one part-way through retouching, one just onboarded, and one under 18 whose
+guardian has not approved, which demonstrates publication being blocked. Off by default,
+so a preview built around a real model is not cluttered with fictional ones.
+
+#### Starting over
+
+Both seeders are skipped once **any** client exists, so changing these settings does
+nothing on their own to a database that already has clients — the previous clients stay
+and the new ones are never created.
+
+To rebuild from scratch, in **Environment**:
+
+1. Set `Seed__ResetPreviewData` to `true`
+2. **Manual Deploy** → *Deploy latest commit*
+3. Once it looks right, set it back to `false`
+
+That erases the database and every stored photograph on start, then seeds again. **Leave
+it on and the next restart wipes the preview a second time**, including any photographs
+uploaded in between — which is why step 3 matters.
+
+It refuses to run outside Development, and refuses when media storage is anything other
+than local disk, since a shared object store may hold a real studio's work.
+
+Deleting the platform's disk by hand does the same thing, if you would rather.
+
+## 3. Tell the application its own address
+
+Copy the address Render gave you into the `Msm__PublicDomain` environment variable
+(**Environment** in the service's settings), with no trailing slash, then redeploy.
+
+This matters more than it looks: every shared portfolio link, every social preview card
+and **every guardian approval link** is built from this value. Until it is set, those
+links point somewhere wrong.
+
+## 4. The real subdomain, when you want it
+
+In Render, **Settings** → **Custom Domain** → add:
+
+```
+model-portfolio.manchesterschoolofmodelling.co.uk
+```
+
+Render shows a `CNAME` record. Whoever manages
+`manchesterschoolofmodelling.co.uk` adds it at the domain registrar. Once it resolves,
+Render issues the certificate automatically.
+
+Then update `Msm__PublicDomain` to
+`https://model-portfolio.manchesterschoolofmodelling.co.uk` and redeploy.
+
+Consider whether the preview should use the real subdomain at all. Anything shown there
+is associated with MSM's brand, and the site is configured to ask search engines to
+ignore it precisely because the models on it are invented.
+
+## 5. Optional: connect the CRM
+
+Without this, `/admin/integrations` shows GoHighLevel as **not configured** and every
+portfolio change is recorded but never sent — the rest of the preview works normally.
+
+In Render, **Environment**, set:
+
+| Setting | What to enter |
+| ------- | ------------- |
+| `Integrations__HighLevel__ApiKey` | The Private Integration Token from GoHighLevel |
+| `Integrations__HighLevel__LocationId` | The GoHighLevel location id |
+
+Both are already listed in `render.yaml` as values Render will ask for but never store
+in the repository — the same treatment as the owner login in step 1. Save, then
+**Manual Deploy** → *Deploy latest commit* to pick them up.
+
+Check it took by opening `/admin/integrations` — GoHighLevel should show **connected**.
+
+The HTTP calls to GoHighLevel are written but were unverified against a real account at
+build time; see [`docs/gohighlevel-verification.md`](docs/gohighlevel-verification.md)
+before relying on the sync.
+
+## What this preview is not
+
+It runs in **Development** mode. That is what makes a demonstration possible, and it is
+exactly what must not be true of the live system:
+
+- **Payments take no money.** The placeholder provider authorises every checkout, so the
+  purchase journey can be shown end to end. Nothing reaches a bank.
+- **Emails are not delivered.** Guardian approval requests are written to the log. An
+  under-18 client cannot actually be approved by their guardian here.
+- **Detailed error pages are shown.** If something breaks, the page displays internal
+  detail. Do not leave a preview running indefinitely on a public address.
+- **Uploads are not scanned** for malware (specification section 38).
+- **The database and photographs sit on one disk** attached to a single instance.
+
+**Do not put a real client's details or photographs in it.** Use invented names. The
+four go-live blockers in the README are unchanged by this preview existing.
+
+## Turning it off
+
+**Settings** → **Suspend** stops the service and the billing without deleting anything.
+**Delete** removes the service and the disk, photographs included.

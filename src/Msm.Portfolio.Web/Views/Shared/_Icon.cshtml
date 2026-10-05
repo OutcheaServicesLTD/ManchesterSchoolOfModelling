@@ -1,0 +1,31 @@
+@model string
+@*
+    A small set of inline icons for compact action buttons — star, eye and trash so
+    far. Inline SVG rather than an icon font or image request, the same reasoning as
+    _ThemeToggle: the Content Security Policy allows no external origin, and a font
+    for three glyphs is not worth it. Always decorative (aria-hidden): the button
+    carries its own visible label and title, so the icon adds recognition rather than
+    meaning a screen reader needs to announce twice.
+*@
+@switch (Model)
+{
+    case "star":
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3.3l2.5 5.4 5.9.6-4.4 4 1.2 5.8-5.2-3-5.2 3 1.2-5.8-4.4-4 5.9-.6L12 3.3Z" />
+        </svg>
+        break;
+    case "eye":
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" />
+            <circle cx="12" cy="12" r="3" />
+        </svg>
+        break;
+    case "trash":
+        <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M4 7h16M9 7V4.8c0-.4.4-.8.8-.8h4.4c.4 0 .8.4.8.8V7M7 7l1 12.2c0 .4.4.8.8.8h6.4c.4 0 .8-.4.8-.8L17 7" />
+        </svg>
+        break;
+}

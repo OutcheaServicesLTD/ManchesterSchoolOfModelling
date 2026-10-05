@@ -1,0 +1,16 @@
+@model Msm.Portfolio.Web.ViewModels.CheckoutViewModel
+@{
+    ViewData["Title"] = "Payment complete";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7 text-center">
+        <h1>Thank you</h1>
+        <p class="lead">
+            @Model.ClientName's payment of @Model.FormattedAmount has been accepted.
+        </p>
+        <p>Their portfolio is now live and they will receive their link shortly.</p>
+
+        <a class="btn btn-primary" href="/admin/clients/@Model.ClientId">Back to client</a>
+    </div>
+</div>

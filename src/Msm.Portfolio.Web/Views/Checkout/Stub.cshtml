@@ -1,0 +1,26 @@
+@model Msm.Portfolio.Web.ViewModels.CheckoutViewModel
+@{
+    ViewData["Title"] = "Payment provider (stub)";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="alert alert-warning" role="alert">
+            <strong>This is not a real payment page.</strong>
+            It stands in for the provider's hosted flow so the journey can be tested.
+            No money will move.
+        </div>
+
+        <h1>@Model.ProductName</h1>
+        <p class="lead">@Model.ClientName — @Model.FormattedAmount</p>
+
+        <div class="d-flex gap-2 mt-4">
+            <a class="btn btn-success btn-lg" href="/checkout/@Model.OrderId/success">
+                Simulate a successful payment
+            </a>
+            <a class="btn btn-outline-secondary btn-lg" href="/checkout/@Model.OrderId/failure">
+                Simulate a failure
+            </a>
+        </div>
+    </div>
+</div>

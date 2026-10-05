@@ -1,0 +1,17 @@
+# Keeps the build context small and, more importantly, keeps local state out of the
+# image: the development database and the media folder both contain real uploads.
+**/bin/
+**/obj/
+**/*.db
+**/*.db-shm
+**/*.db-wal
+**/media-storage/
+.git/
+.github/
+.vscode/
+docs/
+tests/
+*.md
+test.html
+Start Website.bat
+start-website.sh

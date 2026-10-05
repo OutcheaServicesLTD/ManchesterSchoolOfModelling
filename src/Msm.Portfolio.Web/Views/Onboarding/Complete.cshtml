@@ -1,0 +1,27 @@
+@{
+    ViewData["Title"] = "Thank you";
+    var guardianPending = ViewData["GuardianPending"] as bool? ?? false;
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <h1>Thank you</h1>
+        <p class="lead">We have received your details.</p>
+
+        @if (guardianPending)
+        {
+            <div class="alert alert-info" role="alert">
+                <p>
+                    Because you are under 18, we have emailed your parent or guardian a link
+                    asking them to approve. Your portfolio cannot be completed until they do.
+                </p>
+                <p class="mb-0">
+                    If they do not receive it, please ask them to check their junk folder or
+                    contact us.
+                </p>
+            </div>
+        }
+
+        <p>Our team will now prepare your portfolio. We will be in touch shortly.</p>
+    </div>
+</div>

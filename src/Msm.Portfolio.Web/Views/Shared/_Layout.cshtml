@@ -1,0 +1,117 @@
+@inject Microsoft.Extensions.Options.IOptions<Msm.Portfolio.Web.Configuration.MsmBrandOptions> BrandOptions
+@using Msm.Portfolio.Web.Authorization
+@{
+    var brand = BrandOptions.Value;
+    var signedIn = User.Identity?.IsAuthenticated == true;
+
+    // Which portal the signed-in user is in. Presentation only — every page behind these
+    // links re-checks the permission itself, so the nav can never grant access.
+    var isStaff = User.IsInRole(Roles.SuperAdmin) || User.IsInRole(Roles.Admin);
+    var isRetoucher = User.IsInRole(Roles.Retoucher);
+    var isClient = User.IsInRole(Roles.Client);
+
+    var area = isStaff ? "Studio" : isRetoucher ? "Retouching" : isClient ? "My portfolio" : null;
+    var currentPath = Context.Request.Path.Value ?? string.Empty;
+
+    Func<string, string> active = path =>
+        currentPath.StartsWith(path, StringComparison.OrdinalIgnoreCase) ? "active" : string.Empty;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>@ViewData["Title"] — @brand.BusinessName</title>
+    <partial name="_Favicons" />
+    <link rel="stylesheet" href="~/css/msm.css" asp-append-version="true" />
+    @* Synchronous and in the head, so the chosen appearance is applied before the first
+       paint rather than flashing the wrong one. *@
+    <script src="~/js/theme.js" asp-append-version="true"></script>
+</head>
+<body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="portal-header">
+        <div class="container-fluid">
+            <a class="portal-brand" href="@(isStaff ? "/admin" : isRetoucher ? "/retoucher" : isClient ? "/client" : "/models")">
+                <partial name="_Wordmark" model="@("portal")" />
+                @if (area is not null)
+                {
+                    <span class="area">@area</span>
+                }
+            </a>
+
+            @if (signedIn)
+            {
+                <nav class="portal-nav" aria-label="Sections">
+                    @if (isStaff)
+                    {
+                        <a class="@active("/admin/clients")" href="/admin">Clients</a>
+                        <a class="@active("/admin/gallery")" href="/admin/gallery">Gallery review</a>
+                        <a class="@active("/admin/audit")" href="/admin/audit">Audit</a>
+                        <a class="@active("/admin/integrations")" href="/admin/integrations">Integrations</a>
+                        @if (User.IsInRole(Roles.SuperAdmin))
+                        {
+                            <a class="@active("/admin/users")" href="/admin/users">Staff</a>
+                        }
+                    }
+                    else if (isRetoucher)
+                    {
+                        <a class="@active("/retoucher")" href="/retoucher">Queue</a>
+                    }
+                    else if (isClient)
+                    {
+                        <a class="@active("/client/home")" href="/client">Dashboard</a>
+                        <a class="@active("/client/media")" href="/client/media">Photographs</a>
+                        <a class="@active("/client/gallery")" href="/client/gallery">Gallery</a>
+                        <a class="@active("/client/profile")" href="/client/profile">Profile</a>
+                        <a class="@active("/client/subscription")" href="/client/subscription">Subscription</a>
+                    }
+                </nav>
+            }
+
+            <div class="portal-utility">
+                @if (signedIn)
+                {
+                    @* The name is the link to the account's own settings, which today is
+                       the one setting there is. *@
+                    <a class="portal-user" href="/account/password">@User.Identity!.Name</a>
+                }
+
+                <partial name="_ThemeToggle" />
+
+                @if (signedIn)
+                {
+                    @* A POST, so signing out cannot be triggered by a link someone else
+                       persuades a member of staff to click.
+
+                       asp-antiforgery is required, not decoration. Every POST on the site
+                       is checked for a token, and the form tag helper only adds one when
+                       it generated the action itself — write the address out by hand, as
+                       here, and the token is silently left off. Signing out answered 400
+                       and did nothing at all. *@
+                    <form method="post" action="/account/logout" asp-antiforgery="true">
+                        <button type="submit" class="btn btn-sm">Sign out</button>
+                    </form>
+                }
+            </div>
+        </div>
+    </header>
+
+    <main id="main" class="portal-main" role="main">
+        <div class="container">
+            @RenderBody()
+        </div>
+    </main>
+
+    <footer class="portal-footer">
+        <div class="container">
+            &copy; @DateTime.UtcNow.Year @brand.BusinessName
+        </div>
+    </footer>
+
+    <script src="~/js/msm.js" asp-append-version="true" defer></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

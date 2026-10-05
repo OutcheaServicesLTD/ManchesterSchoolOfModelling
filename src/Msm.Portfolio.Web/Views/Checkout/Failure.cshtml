@@ -1,0 +1,15 @@
+@model Msm.Portfolio.Web.ViewModels.CheckoutViewModel
+@{
+    ViewData["Title"] = "Payment not completed";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <h1>Payment not completed</h1>
+        <p class="lead">@Model.ClientName's payment was not completed.</p>
+        <p>Nothing has been charged. You can start the checkout again when ready.</p>
+
+        <a class="btn btn-primary" href="/checkout/@Model.ClientId">Try again</a>
+        <a class="btn btn-link" href="/admin/clients/@Model.ClientId">Back to client</a>
+    </div>
+</div>

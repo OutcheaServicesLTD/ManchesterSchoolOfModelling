@@ -1,0 +1,19 @@
+@model string
+@inject Microsoft.Extensions.Options.IOptions<Msm.Portfolio.Web.Configuration.MsmBrandOptions> BrandOptions
+@{
+    // "header" or "footer" — the two sizes the mark is used at.
+    var size = string.IsNullOrWhiteSpace(Model) ? "header" : Model;
+    var brand = BrandOptions.Value;
+}
+@*
+    The registered wordmark. Two files rather than one recoloured with a CSS filter,
+    because a filter on a fine Bodoni hairline muddies the thin strokes it is made of.
+    The stylesheet shows whichever suits the current appearance; only one is ever
+    visible, and the alt text sits on the pair so a screen reader hears the name once.
+*@
+<span class="wordmark wordmark-@size" role="img" aria-label="@brand.BusinessName">
+    <img class="wordmark-ink" src="~/img/msom-logo.png" alt="" aria-hidden="true"
+         width="1884" height="376" />
+    <img class="wordmark-paper" src="~/img/msom-logo-white.png" alt="" aria-hidden="true"
+         width="1884" height="376" />
+</span>

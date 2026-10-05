@@ -1,0 +1,70 @@
+@model Msm.Portfolio.Web.ViewModels.GalleryModerationViewModel
+@{
+    ViewData["Title"] = "Gallery review";
+    var error = TempData["Error"] as string;
+    var saved = TempData["Saved"] as string;
+}
+
+<h1 class="mb-1">Gallery review</h1>
+<p class="text-muted">
+    Photographs clients have added to their own galleries. Nothing here is public until
+    approved.
+</p>
+
+@if (saved is not null)
+{
+    <div class="alert alert-success" role="alert">@saved</div>
+}
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+
+@if (Model.Photos.Count == 0)
+{
+    <p class="text-muted">Nothing is waiting for review.</p>
+}
+else
+{
+    <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3">
+        @foreach (var photo in Model.Photos)
+        {
+            <div class="col">
+                <div class="card h-100">
+                    <img src="/media/@photo.Id/thumbnail"
+                         class="card-img-top"
+                         loading="lazy"
+                         style="aspect-ratio: @photo.AspectRatio; object-fit: cover; background: var(--raised);"
+                         alt="@photo.Filename" />
+
+                    <div class="card-body p-2">
+                        <p class="small text-muted mb-2">
+                            <a href="/admin/clients/@photo.ClientId">@photo.ClientName</a>
+                            <br />
+                            @photo.UploadedAt.ToString("d MMM yyyy")
+                        </p>
+
+                        <div class="d-grid gap-1">
+                            <form method="post" asp-action="Approve" asp-route-assetId="@photo.Id">
+                                <button type="submit" class="btn btn-sm btn-primary w-100">Approve</button>
+                            </form>
+
+                            @* A reason is optional, but shown back to the client when given, so
+                               they know what to change rather than just that it was refused. *@
+                            <form method="post" asp-action="Reject" asp-route-assetId="@photo.Id" class="d-flex gap-1">
+                                <input type="text" name="reason" class="form-control form-control-sm"
+                                       placeholder="Reason (optional)" />
+                                <button type="submit" class="btn btn-sm btn-outline-danger text-nowrap">Reject</button>
+                            </form>
+
+                            <form method="post" asp-action="Remove" asp-route-assetId="@photo.Id"
+                                  data-confirm="Remove this photograph entirely?">
+                                <button type="submit" class="btn btn-sm btn-outline-secondary w-100">Remove</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}

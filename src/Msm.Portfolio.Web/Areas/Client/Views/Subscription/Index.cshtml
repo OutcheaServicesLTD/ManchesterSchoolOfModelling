@@ -1,0 +1,121 @@
+@using Msm.Portfolio.Web.Domain.Enums
+@model Msm.Portfolio.Web.ViewModels.ClientDashboardViewModel
+@{
+    ViewData["Title"] = "Subscription";
+    var saved = TempData["Saved"] as string;
+    var error = TempData["Error"] as string;
+    var justStarted = Context.Request.Query["started"] == "true";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <h1>Subscription</h1>
+
+        @if (saved is not null) { <div class="alert alert-success" role="alert">@saved</div> }
+        @if (error is not null) { <div class="alert alert-danger" role="alert">@error</div> }
+        @if (justStarted)
+        {
+            <div class="alert alert-success" role="alert">
+                Thank you. Stripe is confirming your payment — this page updates automatically
+                once it has, usually within a few seconds.
+            </div>
+        }
+
+        @if (!Model.SubscriptionAvailable && !Model.HasSubscription)
+        {
+            <p class="text-muted">Subscriptions are not available yet. Please check back soon.</p>
+        }
+        else
+        {
+            <div class="card mb-4">
+                <div class="card-body">
+                    <p class="card-text mb-1">
+                        Status:
+                        <span class="badge @(Model.SubscriptionStatus is MaintenanceSubscriptionStatus.Active && !Model.SubscriptionCancelAtPeriodEnd
+                            ? "text-bg-success"
+                            : Model.SubscriptionStatus is MaintenanceSubscriptionStatus.PaymentIssue
+                                or MaintenanceSubscriptionStatus.GracePeriodExpired
+                                or MaintenanceSubscriptionStatus.Active
+                                ? "text-bg-warning"
+                                : "text-bg-secondary")">
+                            @Model.SubscriptionStatusLabel
+                        </span>
+                    </p>
+
+                    <p class="card-text mb-3 display-6">
+                        £@Model.SubscriptionPrice.ToString("0.00") @Model.SubscriptionCurrency
+                        <span class="fs-6 text-muted">/ @Model.SubscriptionBillingIntervalLabel</span>
+                    </p>
+
+                    @if (Model.SubscriptionStatus == MaintenanceSubscriptionStatus.Active
+                         && Model.SubscriptionNextPaymentDate is { } next)
+                    {
+                        @if (Model.SubscriptionCancelAtPeriodEnd)
+                        {
+                            <p class="card-text">
+                                Your subscription will not renew. Your portfolio stays public
+                                until <strong>@next.ToString("d MMMM yyyy")</strong>, after which
+                                it comes offline.
+                            </p>
+                        }
+                        else
+                        {
+                            <p class="card-text">
+                                Renews automatically on <strong>@next.ToString("d MMMM yyyy")</strong>.
+                            </p>
+                        }
+                    }
+
+                    @if (Model.SubscriptionStatus is MaintenanceSubscriptionStatus.PaymentIssue
+                         or MaintenanceSubscriptionStatus.GracePeriodExpired)
+                    {
+                        <p class="card-text text-danger">
+                            There is a problem with your last payment. Use Manage subscription
+                            below to update your card.
+                        </p>
+                    }
+
+                    @if (Model.SubscriptionStatus is MaintenanceSubscriptionStatus.Cancelled
+                         or MaintenanceSubscriptionStatus.Ended)
+                    {
+                        <p class="card-text">
+                            Your subscription has ended and your portfolio is offline. Starting
+                            again brings it straight back online.
+                        </p>
+                    }
+
+                    <div class="d-flex gap-2 flex-wrap">
+                        @if (!Model.HasSubscription || Model.SubscriptionStatus is MaintenanceSubscriptionStatus.Cancelled
+                             or MaintenanceSubscriptionStatus.Ended)
+                        {
+                            <form method="post" asp-action="Start">
+                                <button type="submit" class="btn btn-primary">Start subscription</button>
+                            </form>
+                        }
+
+                        @if (Model.SubscriptionCanBeManaged)
+                        {
+                            <form method="post" asp-action="Manage">
+                                <button type="submit" class="btn btn-outline-primary">Manage subscription</button>
+                            </form>
+                        }
+
+                        @if (Model.SubscriptionCanBeCancelled)
+                        {
+                            <form method="post" asp-action="Cancel"
+                                  data-confirm="Cancel your subscription? Your portfolio stays online until the date already paid for, then comes offline.">
+                                <button type="submit" class="btn btn-outline-danger">Cancel subscription</button>
+                            </form>
+                        }
+                    </div>
+                </div>
+            </div>
+
+            <p class="text-muted small">
+                Payment is handled entirely by Stripe — your card details are never seen or
+                stored by us. Cancelling never takes money back and never cuts your portfolio
+                off early: it stays online for the period you have already paid for.
+            </p>
+        }
+    </div>
+</div>

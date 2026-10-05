@@ -1,0 +1,104 @@
+@inject Microsoft.Extensions.Options.IOptions<Msm.Portfolio.Web.Configuration.MsmBrandOptions> BrandOptions
+@{
+    var brand = BrandOptions.Value;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    @* Mobile-first: portfolios are shared through messaging and social media, so the
+       phone is the primary device (specification section 40). *@
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
+    <title>@ViewData["Title"] — @brand.BusinessName</title>
+    @await RenderSectionAsync("Meta", required: false)
+    <partial name="_Favicons" />
+    <link rel="stylesheet" href="~/css/msm.css" asp-append-version="true" />
+    @* Synchronous and in the head, so the chosen appearance is applied before the first
+       paint rather than flashing the wrong one. *@
+    <script src="~/js/theme.js" asp-append-version="true"></script>
+</head>
+<body class="public">
+    @* Keyboard users reach the content without tabbing the whole header first
+       (specification section 41). *@
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="public-header">
+        <div class="container">
+            @await RenderSectionAsync("HeaderNav", required: false)
+
+            @* MSM branding is rendered by the platform and is not client-editable
+               (specification section 16). *@
+            <a class="brand" href="/models">
+                <partial name="_Wordmark" model="@("header")" />
+            </a>
+
+            <div class="header-utility">
+                @* Deliberately unlabelled: a small control among others, not a
+                   "staff/model sign in" banner an agency would notice while browsing
+                   the board. Present on every public page because it lives in the
+                   shared layout, not just here. *@
+                <a class="theme-toggle" href="/account/login" aria-label="Sign in">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+                         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="8" r="3.5" />
+                        <path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7" />
+                    </svg>
+                </a>
+                <partial name="_ThemeToggle" />
+            </div>
+        </div>
+    </header>
+
+    <main id="main">
+        @RenderBody()
+    </main>
+
+    <footer class="public-footer">
+        <div class="container py-5">
+            <p class="footer-brand">
+                <partial name="_Wordmark" model="@("footer")" />
+            </p>
+
+            @if (!string.IsNullOrWhiteSpace(brand.CompanyInformation))
+            {
+                <p class="footer-company">@brand.CompanyInformation</p>
+            }
+
+            <nav class="footer-links" aria-label="Footer">
+                @if (!string.IsNullOrWhiteSpace(brand.WebsiteUrl))
+                {
+                    <a href="@brand.WebsiteUrl">Our website</a>
+                }
+                <a href="/models">Model board</a>
+                @if (!string.IsNullOrWhiteSpace(brand.InstagramUrl))
+                {
+                    <a href="@brand.InstagramUrl">Instagram</a>
+                }
+                @if (!string.IsNullOrWhiteSpace(brand.TikTokUrl))
+                {
+                    <a href="@brand.TikTokUrl">TikTok</a>
+                }
+            </nav>
+
+            <div class="footer-contact">
+                @if (!string.IsNullOrWhiteSpace(brand.ContactEmail))
+                {
+                    <p><a href="mailto:@brand.ContactEmail">@brand.ContactEmail</a></p>
+                }
+                @if (!string.IsNullOrWhiteSpace(brand.ContactPhone))
+                {
+                    <p><a href="tel:@brand.ContactPhone?.Replace(" ", "")">@brand.ContactPhone</a></p>
+                }
+            </div>
+
+            <p class="footer-legal">
+                &copy; @DateTime.UtcNow.Year @brand.BusinessName. All rights reserved.
+            </p>
+        </div>
+    </footer>
+
+    <script src="~/js/msm.js" asp-append-version="true" defer></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -1,0 +1,64 @@
+@model Msm.Portfolio.Web.ViewModels.GuardianApprovalViewModel
+@{
+    ViewData["Title"] = "Guardian approval";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <h1>Guardian approval</h1>
+
+        <p class="lead">
+            @Model.ClientName has applied to @Model.BusinessName and is under 18.
+            As their @Model.Relationship.ToLowerInvariant(), your approval is needed
+            before their portfolio can be completed.
+        </p>
+
+        <div class="border rounded p-3 mb-4">
+            <h2 class="h5">Consent</h2>
+
+            @if (!string.IsNullOrWhiteSpace(Model.ConsentText))
+            {
+                <div>@Model.ConsentText</div>
+            }
+            else
+            {
+                @* Placeholder until MSM supplies the approved wording (specification section 11). *@
+                <p>
+                    By approving, you confirm that you are the legal guardian of
+                    @Model.ClientName and that you consent to them taking part in
+                    @Model.BusinessName's model development programme, including the
+                    creation and publication of a digital portfolio containing their
+                    photographs, measurements and biography.
+                </p>
+                <p class="text-muted mb-0">
+                    <small>
+                        This wording is a placeholder pending confirmation by
+                        @Model.BusinessName.
+                    </small>
+                </p>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(Model.ConsentVersion))
+            {
+                <p class="text-muted mt-2 mb-0">
+                    <small>Consent version @Model.ConsentVersion</small>
+                </p>
+            }
+        </div>
+
+        <form method="post">
+            <div asp-validation-summary="All" class="text-danger" role="alert"></div>
+
+            <div class="form-check mb-3">
+                <input asp-for="Agreed" class="form-check-input" />
+                <label asp-for="Agreed" class="form-check-label"></label>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg">Give my approval</button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

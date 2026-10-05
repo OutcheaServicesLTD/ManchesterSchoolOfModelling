@@ -1,0 +1,361 @@
+@model Msm.Portfolio.Web.ViewModels.PublicPortfolioViewModel
+@using Msm.Portfolio.Web.Storage
+@using Msm.Portfolio.Web.Domain.Enums
+@{
+    Layout = "_PublicLayout";
+    ViewData["Title"] = Model.Portfolio.Name;
+    var p = Model.Portfolio;
+    var hasStats = p.Measurements.Count > 0;
+    var hasAbout = !string.IsNullOrWhiteSpace(p.Biography);
+
+    // The name is set as the design specifies: forename in roman, everything after it in
+    // italic on its own line. A single-word name simply has no second line.
+    var nameParts = p.Name.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+    var forename = nameParts.Length > 0 ? nameParts[0] : p.Name;
+    var surname = nameParts.Length > 1 ? nameParts[1] : null;
+
+    // The widths the hero's renditions actually come out at, so the browser can pick one.
+    // Stated rather than assumed: the targets apply to the longest edge, so a portrait
+    // photograph is far narrower than the target number — the very thing that made the
+    // hero soft — and a srcset written with the target itself is a lie the browser acts on.
+    var largeW = ImageProcessor.RenditionWidth(p.CoverWidth ?? 0, p.CoverHeight ?? 0, ImageProcessor.LargeEdge);
+    var mediumW = ImageProcessor.RenditionWidth(p.CoverWidth ?? 0, p.CoverHeight ?? 0, ImageProcessor.MediumEdge);
+
+    // Null when there is nothing to choose between, and Razor drops a null attribute
+    // rather than writing an empty one. Built as a value rather than as a string holding
+    // its own attribute name: interpolating "srcset=..." into the tag is encoded as text,
+    // which the browser reads as an attribute whose value is one bare URL with no width —
+    // so it picks that one every time, and the largest rendition is never fetched.
+    // The photograph shown beside the biography. Anything but the cover where there is a
+    // choice: the cover already fills the screen above, and meeting it again a moment
+    // later reads as a page with one photograph rather than a portfolio.
+    var aboutImage = p.Images.FirstOrDefault(i => i.AssetId != p.FeaturedAssetId)
+                     ?? p.Images.FirstOrDefault();
+
+    var heroSrcset = largeW > mediumW
+        ? $"/media/{p.FeaturedAssetId}/medium {mediumW}w, /media/{p.FeaturedAssetId}/large {largeW}w"
+        : null;
+}
+
+@section Meta {
+    <meta name="description" content="@p.Name — portfolio at @Model.Brand.BusinessName." />
+    @* Shared through messaging and social media, so the preview card matters. *@
+    <meta property="og:title" content="@p.Name — @Model.Brand.BusinessName" />
+    <meta property="og:type" content="profile" />
+    <meta property="og:url" content="@Model.ShareUrl" />
+    @if (p.FeaturedAssetId is not null)
+    {
+        <meta property="og:image" content="@Model.Brand.PublicDomain.TrimEnd('/')/media/@p.FeaturedAssetId/large" />
+    }
+}
+
+@section HeaderNav {
+    @* Below a desktop width the four links become this button and a panel beneath the
+       bar. They were simply hidden on a phone, which left no way to reach a section at
+       all, and on a tablet they were pressed up against the wordmark. *@
+    <button class="nav-toggle" type="button" data-nav-toggle
+            aria-controls="portfolio-nav" aria-expanded="false">
+        <span class="nav-toggle-bars" aria-hidden="true"></span>
+        <span class="visually-hidden">Menu</span>
+    </button>
+
+    @* Minimal, per specification section 15: no join, no sign-up, no account prompt. *@
+    <nav class="portfolio-nav" id="portfolio-nav" aria-label="Sections">
+        @if (hasAbout)
+        {
+            <a href="#about">About</a>
+        }
+        @if (hasStats)
+        {
+            <a href="#stats">Info</a>
+        }
+        <a href="#portfolio">Portfolio</a>
+        @if (p.GalleryImages.Count > 0)
+        {
+            <a href="#gallery">Gallery</a>
+        }
+        <a href="#contact">Booking</a>
+    </nav>
+}
+
+@* Full bleed, outside the container: the photograph runs edge to edge. *@
+<section class="hero" aria-labelledby="model-name">
+    @if (p.FeaturedAssetId is not null)
+    {
+        @* The hero is a crop by nature, so it obeys the focal point staff set on the
+           cover photograph. Left unset it keeps the stylesheet's default framing, which
+           sits above centre because faces usually do.
+
+           Two sizes offered: a phone takes the smaller one rather than a multi-megabyte
+           file it has no pixels for, and a desktop takes the large one because this is
+           the photograph the whole page is built around. Loaded eagerly and at high
+           priority — it is the first thing anybody sees, so nothing is gained by being
+           polite about it. *@
+        <img class="hero-image" src="/media/@p.FeaturedAssetId/large"
+             srcset="@heroSrcset" sizes="100vw"
+             fetchpriority="high" decoding="async"
+             style="@(p.CoverFocus is null ? null : $"object-position: {p.CoverFocus.AsCss}")"
+             alt="Portrait of @p.Name" />
+    }
+    <div class="hero-content">
+        @* True whenever this page renders at all: an unpublished portfolio is not
+           served, and the booking form below reaches the model directly. *@
+        <p class="hero-status">Available for bookings</p>
+
+        <h1 class="hero-name" id="model-name">
+            @forename@if (surname is not null)
+            {<span class="surname">@surname</span>}
+        </h1>
+
+        @if (!string.IsNullOrWhiteSpace(p.Location) || p.Age is not null)
+        {
+            <ul class="hero-strapline">
+                @if (!string.IsNullOrWhiteSpace(p.Location))
+                {
+                    <li>@p.Location</li>
+                }
+                @if (p.Age is { } age)
+                {
+                    <li>Age @age</li>
+                }
+            </ul>
+        }
+
+        <a class="hero-cta" href="#portfolio">
+            View portfolio
+            <span aria-hidden="true">&rarr;</span>
+        </a>
+    </div>
+</section>
+
+<div class="container">
+    @if (hasAbout)
+    {
+        <section class="section" id="about" aria-labelledby="about-heading">
+            <h2 class="section-title" id="about-heading">About</h2>
+
+            <div class="about-body">
+                @* Name above the biography, both of them beside the photograph, which runs
+                   the height of the two. The name used to run the full width with the
+                   photograph starting level with the text underneath it — so the picture
+                   began halfway down the section with nothing to line up against. *@
+                <p class="about-name">
+                    @forename@if (surname is not null)
+                    {<em>@surname</em>}
+                </p>
+
+                @* Plain text: rendering client-supplied HTML here would be a stored XSS
+                   route into every agency's browser. Razor encodes it. *@
+                <p class="lead" style="white-space: pre-line;">@p.Biography</p>
+
+                @if (aboutImage is not null)
+                {
+                    <figure class="about-figure">
+                        @* Medium, not large: it is shown at a third of the column at most,
+                           and the gallery below is where a full-size photograph is reached.
+                           Lazy, because the hero above it is the page's priority. *@
+                        <img src="/media/@aboutImage.AssetId/medium"
+                             loading="lazy"
+                             alt="Photograph of @p.Name" />
+                    </figure>
+                }
+            </div>
+        </section>
+    }
+
+    @if (hasStats)
+    {
+        <section class="section" id="stats" aria-labelledby="stats-heading">
+            <h2 class="section-title" id="stats-heading">Information</h2>
+            <dl class="stats">
+                @foreach (var measurement in p.Measurements)
+                {
+                    <div>
+                        <dt>@measurement.Label</dt>
+                        <dd>@measurement.Value@(measurement.Unit is null ? "" : $" {measurement.Unit}")</dd>
+                    </div>
+                }
+            </dl>
+        </section>
+    }
+
+    <section class="section" id="portfolio" aria-labelledby="portfolio-heading">
+        <h2 class="section-title" id="portfolio-heading">Portfolio</h2>
+
+        @if (p.Images.Count == 0)
+        {
+            <p class="empty">No photographs are available.</p>
+        }
+        else
+        {
+            @* data-viewer turns these links into the overlay viewer. The links themselves
+               are ordinary ones and stay that way: with scripting unavailable, or before
+               the script has run, clicking a photograph still opens it. *@
+            <ul class="gallery" data-viewer>
+                @foreach (var image in p.Images)
+                {
+                    <li class="@(image.Orientation == MediaOrientation.Landscape ? "landscape" : "")">
+                        @* Medium in the grid, large behind the link: the archived original
+                           is never served to a browser (specification sections 13 and 42). *@
+                        <a href="/media/@image.AssetId/large" data-viewer-item
+                           data-thumb="/media/@image.AssetId/thumbnail">
+                            <img src="/media/@image.AssetId/medium"
+                                 loading="lazy"
+                                 width="@image.Width" height="@image.Height"
+                                 alt="Photograph of @p.Name" />
+                        </a>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+
+    @* Hidden entirely when there is nothing approved yet — the client may have added
+       photographs that are still pending review, or none at all. *@
+    @if (p.GalleryImages.Count > 0)
+    {
+        <section class="section" id="gallery" aria-labelledby="gallery-heading">
+            <h2 class="section-title" id="gallery-heading">Gallery</h2>
+
+            @* Square, cropped tiles rather than the Portfolio's uncropped ones — a grid
+               the client keeps adding to reads at a glance, the way a social feed does,
+               rather than needing the careful framing a curated set gets. *@
+            <ul class="gallery-grid" data-viewer>
+                @foreach (var image in p.GalleryImages)
+                {
+                    <li>
+                        <a href="/media/@image.AssetId/large" data-viewer-item
+                           data-thumb="/media/@image.AssetId/thumbnail">
+                            <img src="/media/@image.AssetId/medium"
+                                 loading="lazy"
+                                 alt="Photograph of @p.Name" />
+                        </a>
+                    </li>
+                }
+            </ul>
+        </section>
+    }
+
+    @* Hidden entirely when there is no self-tape (specification section 14). *@
+    @if (p.HasSelfTape)
+    {
+        <section class="section self-tape" id="self-tape" aria-labelledby="self-tape-heading">
+            <h2 class="section-title" id="self-tape-heading">Self-tape</h2>
+            <video controls preload="metadata"
+                   @(p.FeaturedAssetId is null ? "" : $"poster=/media/{p.FeaturedAssetId}/medium")>
+                <source src="/media/@p.SelfTapeAssetId" />
+                Your browser cannot play this video.
+            </video>
+        </section>
+    }
+
+    @if (p.HasSocialLinks)
+    {
+        <section class="section" aria-labelledby="social-heading">
+            <h2 class="section-title" id="social-heading">Social media</h2>
+            <nav class="footer-links" style="border-top: 0; padding-top: 0; margin-top: 0;"
+                 aria-label="Social media">
+                @if (!string.IsNullOrWhiteSpace(p.InstagramUrl))
+                {
+                    <a href="@p.InstagramUrl" rel="nofollow noopener">Instagram</a>
+                }
+                @if (!string.IsNullOrWhiteSpace(p.TikTokUrl))
+                {
+                    <a href="@p.TikTokUrl" rel="nofollow noopener">TikTok</a>
+                }
+            </nav>
+        </section>
+    }
+
+    <section class="section" id="contact" aria-labelledby="contact-heading">
+        <h2 class="section-title" id="contact-heading">Booking</h2>
+
+        <div class="contact-panel">
+            @if (Model.EnquirySent)
+            {
+                <div class="alert alert-success" role="alert">
+                    Thank you. Your enquiry has gone straight to @p.Name and they will be
+                    in touch.
+                </div>
+            }
+
+            @* The enquiry belongs to the model. MSM neither stores it nor is told about
+               it, so the page must not imply otherwise.
+
+               What has not changed is that the model's own email and telephone are never
+               printed here: the form is the route to them, so the address an agency
+               writes to is never one that can be harvested off the page (specification
+               sections 16 and 46). The details below are the studio's own and are meant
+               to be public. *@
+            <p class="contact-note mb-3">
+                All enquiries about @p.Name go straight to them, and they will answer
+                you directly.
+            </p>
+
+            @if (!string.IsNullOrWhiteSpace(Model.Brand.ContactEmail)
+                 || !string.IsNullOrWhiteSpace(Model.Brand.ContactPhone)
+                 || !string.IsNullOrWhiteSpace(Model.Brand.WhatsApp))
+            {
+                <p>
+                    @if (!string.IsNullOrWhiteSpace(Model.Brand.ContactEmail))
+                    {
+                        <a href="mailto:@Model.Brand.ContactEmail">@Model.Brand.ContactEmail</a>
+                        <span aria-hidden="true"> · </span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Model.Brand.ContactPhone))
+                    {
+                        <a href="tel:@Model.Brand.ContactPhone.Replace(" ", "")">@Model.Brand.ContactPhone</a>
+                        <span aria-hidden="true"> · </span>
+                    }
+                    @if (!string.IsNullOrWhiteSpace(Model.Brand.WhatsApp))
+                    {
+                        <a href="https://wa.me/@Model.Brand.WhatsApp.Replace("+", "").Replace(" ", "")"
+                           rel="nofollow noopener">WhatsApp</a>
+                    }
+                </p>
+            }
+
+            <form method="post" asp-action="Enquire" asp-route-slug="@p.Slug" novalidate>
+                <div asp-validation-summary="All" class="alert alert-danger" role="alert"
+                     style="@(ViewData.ModelState.IsValid ? "display:none" : "")"></div>
+
+                <div class="row g-3">
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="Enquiry.Name" class="form-label"></label>
+                        <input asp-for="Enquiry.Name" class="form-control" autocomplete="name" />
+                        <span asp-validation-for="Enquiry.Name" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="Enquiry.Company" class="form-label"></label>
+                        <input asp-for="Enquiry.Company" class="form-control" autocomplete="organization" />
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="Enquiry.Email" class="form-label"></label>
+                        <input asp-for="Enquiry.Email" class="form-control" autocomplete="email" />
+                        <span asp-validation-for="Enquiry.Email" class="text-danger"></span>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label asp-for="Enquiry.Phone" class="form-label"></label>
+                        <input asp-for="Enquiry.Phone" class="form-control" autocomplete="tel" />
+                        <span asp-validation-for="Enquiry.Phone" class="text-danger"></span>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="Enquiry.Message" class="form-label"></label>
+                    <textarea asp-for="Enquiry.Message" class="form-control" rows="5"></textarea>
+                    <span asp-validation-for="Enquiry.Message" class="text-danger"></span>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-lg">Send enquiry</button>
+            </form>
+        </div>
+    </section>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

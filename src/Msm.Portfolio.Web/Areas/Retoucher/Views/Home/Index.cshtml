@@ -1,0 +1,134 @@
+@model Msm.Portfolio.Web.ViewModels.RetoucherQueueViewModel
+@using Msm.Portfolio.Web.Domain.Enums
+@using Msm.Portfolio.Web.Services
+@using Msm.Portfolio.Web.ViewModels
+@{
+    ViewData["Title"] = "Retoucher queue";
+    var error = TempData["Error"] as string;
+    // Two ways to arrive here having just sent something for review: the ordinary
+    // form post, which sets this in TempData, and the script-driven send, which
+    // navigates here with the same fact on the URL instead — there is no server round
+    // trip at the point it knows to set TempData. Either is enough to show the banner.
+    var submitted = (TempData["Submitted"] as bool? ?? false)
+                     || string.Equals(Context.Request.Query["submitted"], "true", StringComparison.OrdinalIgnoreCase);
+}
+
+<h1>Queue</h1>
+
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+@if (submitted)
+{
+    @* Deliberately larger than an ordinary alert: this confirms the one thing a
+       retoucher came here to check just happened, and a line of small print was the
+       complaint before this existed. *@
+    <div class="confirmation-banner" role="alert">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M8 12.5l2.5 2.5L16 9" />
+        </svg>
+        <div>
+            <strong>Sent for review</strong>
+            <span>An administrator has been told and will review it shortly.</span>
+        </div>
+    </div>
+}
+
+<ul class="nav nav-tabs mb-3">
+    @foreach (var tab in Enum.GetValues<RetoucherQueueTab>())
+    {
+        <li class="nav-item">
+            <a class="nav-link @(Model.Tab == tab ? "active" : "")"
+               asp-action="Index" asp-route-tab="@tab"
+               aria-current="@(Model.Tab == tab ? "page" : null)">
+                @RetoucherQueueViewModel.Label(tab)
+                <span class="badge text-bg-secondary">@Model.CountFor(tab)</span>
+            </a>
+        </li>
+    }
+</ul>
+
+@if (Model.Items.Count == 0)
+{
+    <p class="text-muted">Nothing in this queue.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <caption class="visually-hidden">Clients in the @RetoucherQueueViewModel.Label(Model.Tab) queue</caption>
+            <thead>
+                <tr>
+                    <th scope="col">Client</th>
+                    <th scope="col">Received</th>
+                    <th scope="col">Images</th>
+                    <th scope="col">Status</th>
+                    <th scope="col">Retoucher</th>
+                    <th scope="col"><span class="visually-hidden">Actions</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var item in Model.Items)
+                {
+                    <tr class="@(item.IsNew ? "is-new" : null)">
+                        <th scope="row" class="fw-normal">
+                            @item.ClientName
+                            @if (item.IsNew)
+                            {
+                                <span class="badge text-bg-success ms-1">New</span>
+                            }
+                            @if (item.GuardianApprovalPending)
+                            {
+                                <span class="badge text-bg-warning ms-1"
+                                      title="Under 18. Guardian approval is still outstanding.">
+                                    Guardian pending
+                                </span>
+                            }
+                        </th>
+                        <td>@item.SubmittedAt.ToString("d MMM yyyy")</td>
+                        <td>
+                            @item.ImageCount
+                            @if (item.SelectedCount > 0)
+                            {
+                                <span class="text-muted">(@item.SelectedCount on portfolio)</span>
+                            }
+                        </td>
+                        <td>@item.Status.Label()</td>
+                        <td>
+                            @(item.AssignedRetoucher ?? "—")
+                            @if (item.AssignedToMe)
+                            {
+                                <span class="badge text-bg-primary">You</span>
+                            }
+                        </td>
+                        <td class="text-end">
+                            @if (item.Status == Msm.Portfolio.Web.Domain.Enums.PortfolioStatus.ReadyForRetoucher)
+                            {
+                                <form method="post" asp-action="Start" asp-route-clientId="@item.ClientId">
+                                    <button type="submit" class="btn btn-sm btn-primary">Start work</button>
+                                </form>
+                            }
+                            else if (item.CanOpen)
+                            {
+                                <a class="btn btn-sm btn-outline-primary"
+                                   href="/retoucher/client/@item.ClientId">Open</a>
+                            }
+                            else
+                            {
+                                @* Somebody else claimed it. Saying so beats an Open button
+                                   that answers Access denied and leaves them wondering what
+                                   they broke. An administrator can pass it over from the
+                                   client record. *@
+                                <span class="text-muted small">
+                                    @(item.AssignedRetoucher ?? "Someone else") has this one
+                                </span>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

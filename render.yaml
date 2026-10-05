@@ -1,0 +1,98 @@
+# Preview deployment for Manchester School of Modelling.
+#
+# This describes a DEMONSTRATION site — something MSM can click through on a real URL.
+# It is not the live system, and it must not carry a real client's details or
+# photographs. See docs/preview-deployment.md.
+#
+# Render reads this file when you create a Blueprint from the repository, so the service
+# is configured from source control rather than from a screen of settings nobody
+# remembers changing.
+
+services:
+  - type: web
+    name: msm-portfolio-preview
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: starter          # A persistent disk is required, and the free plan has none.
+    region: frankfurt      # Closest to Manchester of the European regions.
+    healthCheckPath: /health
+    autoDeploy: true
+
+    disk:
+      name: msm-data
+      # Matches the volume in the Dockerfile. Both the SQLite database and the uploaded
+      # photographs live here; without it, every upload is lost on the next deploy.
+      mountPath: /data
+      sizeGB: 5
+
+    envVars:
+      # Development is deliberate for a preview, and is the one setting that would be
+      # wrong for the live system:
+      #   - the placeholder payment provider only authorises in Development, so the
+      #     checkout journey can be demonstrated end to end without taking money
+      #   - the readiness guard is skipped, which is what otherwise blocks a start
+      #     while email, object storage and Stripe are outstanding
+      # It also enables the detailed error page, which is a reason not to leave a
+      # preview running longer than it is needed.
+      - key: ASPNETCORE_ENVIRONMENT
+        value: Development
+
+      # Invented models on a subdomain of MSM's real brand must not appear in a search
+      # for MSM. Sends noindex on every response and serves a disallow-all robots file.
+      - key: Msm__DiscourageSearchEngines
+        value: "true"
+
+      # Creates the Elizabeth Cousins client record on first start, waiting in the
+      # retoucher queue for her photographs to be uploaded. Ignored once any client
+      # exists, and refused outside Development.
+      - key: Seed__DemoData
+        value: "true"
+
+      # Set to "true" as well to add six invented clients at every stage of the
+      # workflow, for demonstrating the whole system rather than one portfolio.
+      - key: Seed__SampleClients
+        value: "false"
+
+      # Both seeders skip a database that already has clients, so changing what they
+      # create does nothing until the old data is gone. Setting this to "true" erases
+      # the database and every stored photograph on the next start, then seeds again.
+      # Destructive on purpose — turn it back to "false" once the preview looks right,
+      # or the following restart wipes it a second time.
+      - key: Seed__ResetPreviewData
+        value: "false"
+
+      # Set this to the address the preview is actually served on, once known — every
+      # shared link, preview card and guardian approval link is built from it.
+      - key: Msm__PublicDomain
+        sync: false
+
+      # The owner account. Set both in the Render dashboard; they are marked sync:false
+      # so they are never committed to the repository. Without them the application
+      # creates no owner account at all — and with them, the well-known development
+      # password is never used, which matters on a public address.
+      - key: Seed__SuperAdmin__Email
+        sync: false
+      - key: Seed__SuperAdmin__Password
+        sync: false
+
+      # Optional: connects the preview to the real GoHighLevel account instead of the
+      # stub that only logs. Both marked sync:false for the same reason as the owner
+      # login above — set them directly in the Render dashboard, never here. See
+      # "Optional: connect the CRM" in docs/preview-deployment.md.
+      - key: Integrations__HighLevel__ApiKey
+        sync: false
+      - key: Integrations__HighLevel__LocationId
+        sync: false
+
+      # SQLite on the mounted disk. Adequate for a preview and for a single instance;
+      # the live system should use PostgreSQL, which needs the migrations regenerating
+      # for that provider first.
+      - key: Database__Provider
+        value: Sqlite
+      - key: Database__ConnectionString
+        value: Data Source=/data/msm-portfolio.db
+      - key: Database__MigrateOnStartup
+        value: "true"
+
+      - key: Media__LocalStorageRoot
+        value: /data/media

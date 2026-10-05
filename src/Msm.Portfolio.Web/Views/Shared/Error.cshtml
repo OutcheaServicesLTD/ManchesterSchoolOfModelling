@@ -1,0 +1,49 @@
+@model ErrorViewModel
+@inject Microsoft.Extensions.Options.IOptions<Msm.Portfolio.Web.Configuration.MsmBrandOptions> BrandOptions
+@{
+    ViewData["Title"] = Model.Heading;
+}
+
+<div class="auth-panel">
+    <div class="auth-mark">
+        <partial name="_Wordmark" model="@("header")" />
+    </div>
+
+    <h1 class="mb-3">@Model.Heading</h1>
+
+    <p class="lead">@Model.Explanation</p>
+
+    @* A way onwards, not a dead end. The board is the right place to arrive at from a
+       portfolio link that no longer works: the model may simply have a new address, and
+       the board is where an agency finds them. *@
+    <div class="d-flex flex-wrap gap-2 mt-4">
+        <a class="btn btn-primary" href="/models">See the model board</a>
+
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <a class="btn btn-outline-secondary" href="/">Back to the start</a>
+        }
+        else
+        {
+            <a class="btn btn-outline-secondary" href="/account/login">Sign in</a>
+        }
+    </div>
+
+    @if (!string.IsNullOrWhiteSpace(BrandOptions.Value.ContactEmail))
+    {
+        <p class="mt-4 mb-0 small text-muted">
+            If you were sent this address by someone at @BrandOptions.Value.BusinessName,
+            tell us at <a href="mailto:@BrandOptions.Value.ContactEmail">@BrandOptions.Value.ContactEmail</a>
+            and we will put it right.
+        </p>
+    }
+
+    @if (Model.ShowRequestId)
+    {
+        @* Only on a fault, and only so support can find this exact request in the log.
+           A visitor who mistyped an address has no use for it. *@
+        <p class="mt-3 mb-0 small text-muted">
+            Reference: <code>@Model.RequestId</code>
+        </p>
+    }
+</div>

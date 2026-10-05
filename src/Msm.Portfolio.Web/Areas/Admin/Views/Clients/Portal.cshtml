@@ -1,0 +1,23 @@
+@model Msm.Portfolio.Web.ViewModels.ClientDashboardViewModel
+@{
+    var clientId = ViewData["ClientId"];
+    var clientName = ViewData["ClientName"] as string;
+    ViewData["Title"] = $"{clientName} — their portal";
+}
+
+@* Unmistakable, and above the preview rather than beside it: somebody who has scrolled
+   into the middle of this page should still be able to tell it is not their own account
+   they are looking at. *@
+<div class="alert alert-info d-flex flex-wrap justify-content-between align-items-center gap-3" role="alert">
+    <div>
+        <strong>You are seeing what @clientName sees.</strong>
+        <span class="d-block small">
+            Nobody is signed in as them and nothing here changes their account. Their own
+            buttons are stood down.
+        </span>
+    </div>
+    <a class="btn btn-outline-secondary btn-sm flex-shrink-0"
+       href="/admin/clients/@clientId">Back to their record</a>
+</div>
+
+<partial name="~/Areas/Client/Views/Home/_Dashboard.cshtml" model="Model" />
