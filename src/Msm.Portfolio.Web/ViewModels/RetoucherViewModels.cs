@@ -34,16 +34,16 @@ public class RetoucherQueueViewModel
 /// <summary>
 /// The workspace's stops, each its own page and URL rather than sections of one long
 /// scroll — up to 30 portfolio photographs and 60 in the library made that scroll too
-/// long to work through blind. Neither the library nor sending for review has a stop
-/// of its own: the library renders as part of Upload, since it is exactly the
-/// photographs that stop uploads to, and sending for review renders as part of
-/// Portfolio, since it is the natural next action once the portfolio is arranged.
+/// long to work through blind. Sending for review has no stop of its own: it renders as
+/// part of Portfolio, since it is the natural next action once the portfolio is
+/// arranged.
 /// </summary>
 public enum WorkspaceSection
 {
     Upload,
     Cover,
-    Portfolio
+    Portfolio,
+    Library
 }
 
 /// <summary>The workspace for one client (specification section 6).</summary>
